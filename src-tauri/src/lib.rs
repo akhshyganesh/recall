@@ -33,10 +33,8 @@ struct AppInfoPayload {
     updater_enabled: bool,
 }
 
-fn updater_pubkey() -> Option<&'static str> {
-    option_env!("RECALL_UPDATER_PUBLIC_KEY")
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
+fn updater_enabled() -> bool {
+    !cfg!(debug_assertions)
 }
 
 fn get_db_path() -> AppResult<PathBuf> {
@@ -175,7 +173,7 @@ fn detect_sources() -> AppResult<Vec<DetectedSourcePayload>> {
 fn get_app_info(app: AppHandle) -> AppInfoPayload {
     AppInfoPayload {
         current_version: app.package_info().version.to_string(),
-        updater_enabled: updater_pubkey().is_some(),
+        updater_enabled: updater_enabled(),
     }
 }
 
@@ -324,13 +322,9 @@ pub fn run() {
             db: Arc::new(Mutex::new(Some(db))),
         })
         .setup(|app| {
-            if let Some(pubkey) = updater_pubkey() {
+            if updater_enabled() {
                 app.handle()
-                    .plugin(tauri_plugin_updater::Builder::new().pubkey(pubkey).build())?;
-            } else {
-                eprintln!(
-                    "[recall] Updater disabled: RECALL_UPDATER_PUBLIC_KEY was not set at build time"
-                );
+                    .plugin(tauri_plugin_updater::Builder::new().build())?;
             }
 
             spawn_initial_scan(app.state::<AppState>().db.clone());
