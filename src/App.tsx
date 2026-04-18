@@ -904,7 +904,6 @@ export default function App() {
                 void handleInstallUpdate();
               }}
               sources={sources}
-              stats={stats}
               updateStatus={updateStatus}
             />
           )}

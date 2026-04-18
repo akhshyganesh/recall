@@ -1,11 +1,10 @@
-import type { AppInfo, DetectedSource, Stats, UpdateStatus } from '../types';
+import type { AppInfo, DetectedSource, UpdateStatus } from '../types';
 import { formatBytes, formatUpdateDate, trimReleaseNotes } from '../lib/update-format';
-import { DatabaseIcon, DownloadIcon, RefreshIcon, TrashIcon } from './AppIcons';
+import { DownloadIcon, RefreshIcon, TrashIcon } from './AppIcons';
 
 interface SettingsPanelProps {
   appInfo: AppInfo | null;
   sources: DetectedSource[];
-  stats: Stats | null;
   updateStatus: UpdateStatus;
   onCheckForUpdates: () => void;
   onInstallUpdate: () => void;
@@ -125,7 +124,6 @@ function getSourceLocationPreview(source: DetectedSource): { preview: string; fu
 export default function SettingsPanel({
   appInfo,
   sources,
-  stats,
   updateStatus,
   onCheckForUpdates,
   onInstallUpdate,
