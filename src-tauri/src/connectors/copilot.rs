@@ -1,9 +1,31 @@
 use crate::connectors::Connector;
 use crate::models::{DetectionResult, NormalizedConversation, NormalizedMessage};
+use similar::TextDiff;
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 pub struct CopilotConnector;
+
+#[derive(Debug, Clone)]
+struct EditOperation {
+    epoch: i64,
+    index: usize,
+    kind: EditOperationKind,
+}
+
+#[derive(Debug, Clone)]
+enum EditOperationKind {
+    Create { initial_content: String },
+    Delete { final_content: String },
+    TextEdit { edits: Vec<serde_json::Value> },
+}
+
+#[derive(Debug, Default)]
+struct EditSessionData {
+    request_parts: HashMap<String, Vec<serde_json::Value>>,
+    source_mtime: Option<String>,
+}
 
 impl CopilotConnector {
     pub fn new() -> Self { Self }
@@ -92,6 +114,411 @@ impl CopilotConnector {
             return urlencoding::decode(stripped).unwrap_or_default().to_string();
         }
         uri_str.to_string()
+    }
+
+    fn extract_path_from_value(value: &serde_json::Value) -> String {
+        if let Some(path) = value.get("path").and_then(|p| p.as_str()) {
+            return path.to_string();
+        }
+        if let Some(fs_path) = value.get("fsPath").and_then(|p| p.as_str()) {
+            return fs_path.to_string();
+        }
+        if let Some(external) = value.get("external").and_then(|p| p.as_str()) {
+            return Self::extract_path_from_uri(external);
+        }
+        value.as_str().map(Self::extract_path_from_uri).unwrap_or_default()
+    }
+
+    fn extract_display_text(value: &serde_json::Value) -> Option<String> {
+        match value {
+            serde_json::Value::String(text) => {
+                let trimmed = text.trim();
+                if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
+            }
+            serde_json::Value::Number(number) => Some(number.to_string()),
+            serde_json::Value::Bool(boolean) => Some(boolean.to_string()),
+            serde_json::Value::Array(items) => {
+                let joined = items.iter()
+                    .filter_map(Self::extract_display_text)
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                if joined.is_empty() { None } else { Some(joined) }
+            }
+            serde_json::Value::Object(_) => {
+                for key in ["value", "title", "label", "name", "message", "description", "content", "original"] {
+                    if let Some(text) = value.get(key).and_then(Self::extract_display_text) {
+                        return Some(text);
+                    }
+                }
+
+                if let Some(parts) = value.get("parts").and_then(|parts| parts.as_array()) {
+                    let joined = parts.iter()
+                        .filter_map(Self::extract_display_text)
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    if !joined.is_empty() {
+                        return Some(joined);
+                    }
+                }
+
+                None
+            }
+            _ => None,
+        }
+    }
+
+    fn extract_content_text(value: &serde_json::Value) -> Option<String> {
+        match value {
+            serde_json::Value::String(text) => Some(text.clone()),
+            _ => Self::extract_display_text(value),
+        }
+    }
+
+    fn extract_tool_description(part: &serde_json::Value) -> Option<String> {
+        let tool_data = part.get("toolSpecificData")?;
+        let parsed = match tool_data {
+            serde_json::Value::String(raw) => serde_json::from_str::<serde_json::Value>(raw)
+                .unwrap_or_else(|_| serde_json::Value::String(raw.clone())),
+            serde_json::Value::Object(_) | serde_json::Value::Array(_) => tool_data.clone(),
+            _ => return None,
+        };
+
+        for key in ["description", "progressMessage", "message", "content", "commandLine"] {
+            if let Some(text) = parsed.get(key).and_then(Self::extract_display_text) {
+                return Some(text);
+            }
+        }
+
+        Self::extract_display_text(&parsed)
+    }
+
+    fn edit_session_state_path(chat_session_path: &Path, session_id: &str) -> PathBuf {
+        chat_session_path
+            .parent()
+            .and_then(Path::parent)
+            .unwrap_or(chat_session_path)
+            .join("chatEditingSessions")
+            .join(session_id)
+            .join("state.json")
+    }
+
+    fn path_mtime_rfc3339(path: &Path) -> Option<String> {
+        fs::metadata(path).ok()
+            .and_then(|meta| meta.modified().ok())
+            .map(|time| chrono::DateTime::<chrono::Utc>::from(time).to_rfc3339())
+    }
+
+    fn latest_session_source_mtime(chat_session_path: &Path) -> Option<String> {
+        let mut mtimes = Vec::new();
+
+        if let Some(chat_mtime) = Self::path_mtime_rfc3339(chat_session_path) {
+            mtimes.push(chat_mtime);
+        }
+
+        if let Some(session_id) = chat_session_path.file_stem().and_then(|stem| stem.to_str()) {
+            let edit_state_path = Self::edit_session_state_path(chat_session_path, session_id);
+            if let Some(edit_mtime) = Self::path_mtime_rfc3339(&edit_state_path) {
+                mtimes.push(edit_mtime);
+            }
+        }
+
+        mtimes.into_iter().max()
+    }
+
+    fn collect_file_baselines(state: &serde_json::Value) -> HashMap<(String, String), String> {
+        let mut baselines = HashMap::new();
+
+        let Some(file_baselines) = state.get("timeline")
+            .and_then(|timeline| timeline.get("fileBaselines"))
+        else {
+            return baselines;
+        };
+
+        let baseline_values: Vec<&serde_json::Value> = match file_baselines {
+            serde_json::Value::Object(entries) => entries.values().collect(),
+            serde_json::Value::Array(entries) => entries.iter().collect(),
+            _ => Vec::new(),
+        };
+
+        for entry in baseline_values {
+            let baseline = match entry {
+                serde_json::Value::Array(items) if items.len() >= 2 => &items[1],
+                _ => entry,
+            };
+
+            let Some(request_id) = baseline.get("requestId").and_then(|value| value.as_str()) else {
+                continue;
+            };
+
+            let path = baseline.get("uri")
+                .map(Self::extract_path_from_value)
+                .unwrap_or_default();
+            let content = baseline.get("content")
+                .and_then(|value| value.as_str())
+                .unwrap_or("");
+
+            if !path.is_empty() {
+                baselines.insert((request_id.to_string(), path), content.to_string());
+            }
+        }
+
+        baselines
+    }
+
+    fn byte_index_for_char_offset(line: &str, char_offset: usize) -> usize {
+        if char_offset == 0 {
+            return 0;
+        }
+
+        for (index, (byte_offset, _)) in line.char_indices().enumerate() {
+            if index == char_offset {
+                return byte_offset;
+            }
+        }
+
+        line.len()
+    }
+
+    fn byte_index_for_position(content: &str, line_number: usize, column: usize) -> usize {
+        let target_line = line_number.max(1);
+        let target_column = column.max(1);
+
+        let mut current_line = 1;
+        let mut line_start = 0usize;
+
+        if target_line > 1 {
+            for (byte_offset, character) in content.char_indices() {
+                if character == '\n' {
+                    current_line += 1;
+                    line_start = byte_offset + character.len_utf8();
+                    if current_line == target_line {
+                        break;
+                    }
+                }
+            }
+        }
+
+        if current_line != target_line {
+            return content.len();
+        }
+
+        let rest = &content[line_start..];
+        let line_end = rest.find('\n').unwrap_or(rest.len());
+        let line_slice = &rest[..line_end];
+
+        line_start + Self::byte_index_for_char_offset(line_slice, target_column.saturating_sub(1))
+    }
+
+    fn apply_text_edits(content: &str, edits: &[serde_json::Value]) -> String {
+        let mut replacements: Vec<(usize, usize, String)> = Vec::new();
+
+        for edit in edits {
+            let replacement = edit.get("text")
+                .and_then(|value| value.as_str())
+                .unwrap_or("")
+                .to_string();
+
+            let Some(range) = edit.get("range") else {
+                return replacement;
+            };
+
+            let start_line = range.get("startLineNumber")
+                .and_then(|value| value.as_u64())
+                .unwrap_or(1) as usize;
+            let start_column = range.get("startColumn")
+                .and_then(|value| value.as_u64())
+                .unwrap_or(1) as usize;
+            let end_line = range.get("endLineNumber")
+                .and_then(|value| value.as_u64())
+                .unwrap_or(start_line as u64) as usize;
+            let end_column = range.get("endColumn")
+                .and_then(|value| value.as_u64())
+                .unwrap_or(start_column as u64) as usize;
+
+            let start = Self::byte_index_for_position(content, start_line, start_column);
+            let end = Self::byte_index_for_position(content, end_line, end_column);
+            replacements.push((start.min(content.len()), end.min(content.len()), replacement));
+        }
+
+        replacements.sort_by(|left, right| right.0.cmp(&left.0).then_with(|| right.1.cmp(&left.1)));
+
+        let mut next = content.to_string();
+        for (start, end, replacement) in replacements {
+            let start = start.min(next.len());
+            let end = end.min(next.len()).max(start);
+            next.replace_range(start..end, &replacement);
+        }
+
+        next
+    }
+
+    fn build_unified_diff(file_path: &str, before: &str, after: &str) -> String {
+        let old_label = if before.is_empty() && !after.is_empty() {
+            "/dev/null".to_string()
+        } else {
+            format!("a/{}", file_path)
+        };
+        let new_label = if !before.is_empty() && after.is_empty() {
+            "/dev/null".to_string()
+        } else {
+            format!("b/{}", file_path)
+        };
+
+        TextDiff::from_lines(before, after)
+            .unified_diff()
+            .header(&old_label, &new_label)
+            .to_string()
+    }
+
+    fn collect_request_edit_parts(state: &serde_json::Value) -> HashMap<String, Vec<serde_json::Value>> {
+        let baselines = Self::collect_file_baselines(state);
+        let mut grouped: HashMap<String, HashMap<String, Vec<EditOperation>>> = HashMap::new();
+
+        let Some(operations) = state.get("timeline")
+            .and_then(|timeline| timeline.get("operations"))
+            .and_then(|operations| operations.as_array())
+        else {
+            return HashMap::new();
+        };
+
+        for (index, operation) in operations.iter().enumerate() {
+            let Some(request_id) = operation.get("requestId").and_then(|value| value.as_str()) else {
+                continue;
+            };
+
+            let path = operation.get("uri")
+                .map(Self::extract_path_from_value)
+                .unwrap_or_default();
+            if path.is_empty() {
+                continue;
+            }
+
+            let epoch = operation.get("epoch")
+                .and_then(|value| value.as_i64())
+                .unwrap_or(index as i64);
+
+            let kind = match operation.get("type").and_then(|value| value.as_str()) {
+                Some("create") => EditOperationKind::Create {
+                    initial_content: operation.get("initialContent")
+                        .and_then(|value| value.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                },
+                Some("delete") => EditOperationKind::Delete {
+                    final_content: operation.get("finalContent")
+                        .and_then(|value| value.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                },
+                Some("textEdit") => EditOperationKind::TextEdit {
+                    edits: operation.get("edits")
+                        .and_then(|value| value.as_array())
+                        .cloned()
+                        .unwrap_or_default(),
+                },
+                _ => continue,
+            };
+
+            grouped.entry(request_id.to_string())
+                .or_default()
+                .entry(path)
+                .or_default()
+                .push(EditOperation { epoch, index, kind });
+        }
+
+        let mut request_parts = HashMap::new();
+
+        for (request_id, files) in grouped {
+            let mut file_entries: Vec<_> = files.into_iter().collect();
+            file_entries.sort_by(|left, right| left.0.cmp(&right.0));
+
+            let mut parts = Vec::new();
+            for (file_path, mut operations) in file_entries {
+                operations.sort_by_key(|operation| (operation.epoch, operation.index));
+
+                let mut before = baselines.get(&(request_id.clone(), file_path.clone()))
+                    .cloned()
+                    .unwrap_or_default();
+
+                if before.is_empty() {
+                    if let Some(first) = operations.first() {
+                        before = match &first.kind {
+                            EditOperationKind::Create { initial_content } => initial_content.clone(),
+                            EditOperationKind::Delete { final_content } => final_content.clone(),
+                            EditOperationKind::TextEdit { .. } => String::new(),
+                        };
+                    }
+                }
+
+                let original = before.clone();
+                let mut current = before;
+
+                for operation in &operations {
+                    match &operation.kind {
+                        EditOperationKind::Create { initial_content } => {
+                            current = initial_content.clone();
+                        }
+                        EditOperationKind::Delete { .. } => {
+                            current.clear();
+                        }
+                        EditOperationKind::TextEdit { edits } => {
+                            current = Self::apply_text_edits(&current, edits);
+                        }
+                    }
+                }
+
+                if original == current {
+                    continue;
+                }
+
+                let change_kind = if original.is_empty() && !current.is_empty() {
+                    "create"
+                } else if !original.is_empty() && current.is_empty() {
+                    "delete"
+                } else {
+                    "edit"
+                };
+
+                parts.push(serde_json::json!({
+                    "type": "text_edit",
+                    "file_path": file_path,
+                    "content": current,
+                    "diff": Self::build_unified_diff(&file_path, &original, &current),
+                    "change_kind": change_kind,
+                    "done": true,
+                }));
+            }
+
+            if !parts.is_empty() {
+                request_parts.insert(request_id, parts);
+            }
+        }
+
+        request_parts
+    }
+
+    fn load_edit_session_data(chat_session_path: &Path, session_id: &str) -> EditSessionData {
+        let state_path = Self::edit_session_state_path(chat_session_path, session_id);
+        let source_mtime = Self::path_mtime_rfc3339(&state_path);
+
+        let Some(content) = fs::read_to_string(&state_path).ok() else {
+            return EditSessionData {
+                request_parts: HashMap::new(),
+                source_mtime,
+            };
+        };
+
+        let Some(state) = serde_json::from_str::<serde_json::Value>(&content).ok() else {
+            return EditSessionData {
+                request_parts: HashMap::new(),
+                source_mtime,
+            };
+        };
+
+        EditSessionData {
+            request_parts: Self::collect_request_edit_parts(&state),
+            source_mtime,
+        }
     }
 
     /// Navigate into a nested serde_json::Value by a key path, returning a mutable reference.
@@ -208,6 +635,7 @@ impl CopilotConnector {
             .and_then(|s| s.as_str())
             .map(|s| s.to_string())
             .unwrap_or_else(|| path.file_stem().unwrap_or_default().to_string_lossy().to_string());
+        let edit_session_data = Self::load_edit_session_data(path, &session_id);
 
         let creation_date = state.get("creationDate").and_then(|d| d.as_i64());
         let custom_title = state.get("customTitle").and_then(|t| t.as_str()).map(|s| s.to_string());
@@ -224,6 +652,7 @@ impl CopilotConnector {
         let mut last_timestamp: Option<i64> = None;
 
         for req in requests {
+            let request_id = req.get("requestId").and_then(|value| value.as_str());
             // Extract user message
             let user_text = req.get("message")
                 .and_then(|m| m.get("text"))
@@ -260,13 +689,14 @@ impl CopilotConnector {
             if let Some(resp_parts) = req.get("response").and_then(|r| r.as_array()) {
                 let mut plain_text: Vec<String> = Vec::new();
                 let mut structured_parts: Vec<serde_json::Value> = Vec::new();
+                let mut fallback_edit_parts: Vec<serde_json::Value> = Vec::new();
 
                 for part in resp_parts {
                     let part_kind = part.get("kind").and_then(|k| k.as_str());
                     match part_kind {
                         // No kind = plain text/markdown content
                         None => {
-                            if let Some(val) = part.get("value").and_then(|v| v.as_str()) {
+                            if let Some(val) = part.get("value").and_then(Self::extract_content_text) {
                                 if !val.is_empty() {
                                     plain_text.push(val.to_string());
                                     structured_parts.push(serde_json::json!({
@@ -278,7 +708,7 @@ impl CopilotConnector {
                         }
                         // Thinking/reasoning blocks
                         Some("thinking") => {
-                            if let Some(val) = part.get("value").and_then(|v| v.as_str()) {
+                            if let Some(val) = part.get("value").and_then(Self::extract_content_text) {
                                 if !val.trim().is_empty() {
                                     let title = part.get("generatedTitle")
                                         .and_then(|t| t.as_str())
@@ -298,8 +728,8 @@ impl CopilotConnector {
                                 .and_then(|t| t.as_str())
                                 .unwrap_or("unknown");
                             let message = part.get("invocationMessage")
-                                .and_then(|m| m.as_str())
-                                .unwrap_or("");
+                                .and_then(Self::extract_display_text)
+                                .unwrap_or_default();
                             let is_complete = part.get("isComplete")
                                 .and_then(|c| c.as_bool())
                                 .unwrap_or(false);
@@ -309,13 +739,8 @@ impl CopilotConnector {
                                 "message": message,
                                 "complete": is_complete,
                             });
-                            // Try to extract result from toolSpecificData
-                            if let Some(tsd) = part.get("toolSpecificData").and_then(|d| d.as_str()) {
-                                if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(tsd) {
-                                    if let Some(desc) = parsed.get("description").and_then(|d| d.as_str()) {
-                                        tool_data["description"] = serde_json::json!(desc);
-                                    }
-                                }
+                            if let Some(description) = Self::extract_tool_description(part) {
+                                tool_data["description"] = serde_json::json!(description);
                             }
                             structured_parts.push(tool_data);
                         }
@@ -343,7 +768,7 @@ impl CopilotConnector {
                             }
 
                             if !edit_text.is_empty() || !file_path.is_empty() {
-                                structured_parts.push(serde_json::json!({
+                                fallback_edit_parts.push(serde_json::json!({
                                     "type": "text_edit",
                                     "file_path": file_path,
                                     "content": edit_text,
@@ -351,37 +776,10 @@ impl CopilotConnector {
                                 }));
                             }
                         }
-                        // Code block URI markers (file context before code blocks)
-                        Some("codeblockUri") => {
-                            let uri_path = part.get("uri")
-                                .and_then(|u| u.get("path"))
-                                .and_then(|p| p.as_str())
-                                .unwrap_or("");
-                            let is_edit = part.get("isEdit").and_then(|e| e.as_bool()).unwrap_or(false);
-                            if !uri_path.is_empty() {
-                                let ref_kind = if is_edit { "file_edit" } else { "file" };
-                                structured_parts.push(serde_json::json!({
-                                    "type": "reference",
-                                    "name": Self::extract_path_from_uri(uri_path),
-                                    "uri": uri_path,
-                                    "ref_kind": ref_kind,
-                                }));
-                            }
-                        }
-                        // Progress tasks (compacting, searching, etc.)
-                        Some("progressTaskSerialized") => {
-                            if let Some(content) = part.get("content")
-                                .and_then(|c| c.get("value"))
-                                .and_then(|v| v.as_str())
-                            {
-                                if !content.is_empty() {
-                                    structured_parts.push(serde_json::json!({
-                                        "type": "progress",
-                                        "content": content,
-                                    }));
-                                }
-                            }
-                        }
+                        // Code block URI markers — noise in history view, skip
+                        Some("codeblockUri") => {}
+                        // Progress tasks — ephemeral status, skip
+                        Some("progressTaskSerialized") => {}
                         // Inline file/folder references
                         Some("inlineReference") => {
                             if let Some(ref_val) = part.get("inlineReference") {
@@ -406,6 +804,14 @@ impl CopilotConnector {
                         // undoStop, questionCarousel, etc. — skip
                         _ => {}
                     }
+                }
+
+                if let Some(edit_parts) = request_id
+                    .and_then(|id| edit_session_data.request_parts.get(id))
+                {
+                    structured_parts.extend(edit_parts.iter().cloned());
+                } else {
+                    structured_parts.extend(fallback_edit_parts);
                 }
 
                 let response_text = plain_text.join("");
@@ -447,9 +853,12 @@ impl CopilotConnector {
         let ended_at = last_timestamp.map(Self::millis_to_rfc3339)
             .or_else(|| started_at.clone());
 
-        let file_mtime = fs::metadata(path).ok()
-            .and_then(|m| m.modified().ok())
-            .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339());
+        let file_mtime = match (Self::path_mtime_rfc3339(path), edit_session_data.source_mtime.clone()) {
+            (Some(chat_mtime), Some(edit_mtime)) => Some(chat_mtime.max(edit_mtime)),
+            (Some(chat_mtime), None) => Some(chat_mtime),
+            (None, Some(edit_mtime)) => Some(edit_mtime),
+            (None, None) => None,
+        };
 
         Some(NormalizedConversation {
             agent_slug: "copilot".to_string(),
@@ -509,11 +918,8 @@ impl Connector for CopilotConnector {
 
                             // Filter by mtime
                             if let Some(since) = since_ts {
-                                if let Ok(meta) = fs::metadata(&path) {
-                                    if let Ok(mtime) = meta.modified() {
-                                        let mtime_str = chrono::DateTime::<chrono::Utc>::from(mtime).to_rfc3339();
-                                        if mtime_str.as_str() < since { continue; }
-                                    }
+                                if let Some(mtime_str) = Self::latest_session_source_mtime(&path) {
+                                    if mtime_str.as_str() < since { continue; }
                                 }
                             }
 

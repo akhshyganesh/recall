@@ -26,7 +26,7 @@ impl CodexConnector {
         let content = fs::read_to_string(path).ok()?;
         let mut messages: Vec<NormalizedMessage> = Vec::new();
         let mut workspace = None;
-        let mut model = None;
+        let model = None;
         let mut session_meta = serde_json::json!({});
 
         for line in content.lines() {

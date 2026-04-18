@@ -15,7 +15,6 @@ export async function scanIncremental(sinceTs?: string): Promise<number> {
 
 export async function getSessions(params: {
   tool?: string;
-  repo?: string;
   dateFrom?: string;
   dateTo?: string;
   limit?: number;
@@ -23,7 +22,6 @@ export async function getSessions(params: {
 }): Promise<SessionSummary[]> {
   return invoke('get_sessions', {
     tool: params.tool ?? null,
-    repo: params.repo ?? null,
     dateFrom: params.dateFrom ?? null,
     dateTo: params.dateTo ?? null,
     limit: params.limit ?? 50,
@@ -38,7 +36,6 @@ export async function getSession(id: string): Promise<Session | null> {
 export async function searchSessions(params: {
   query: string;
   tool?: string;
-  repo?: string;
   dateFrom?: string;
   dateTo?: string;
   limit?: number;
@@ -46,7 +43,6 @@ export async function searchSessions(params: {
   return invoke('search_sessions', {
     query: params.query,
     tool: params.tool ?? null,
-    repo: params.repo ?? null,
     dateFrom: params.dateFrom ?? null,
     dateTo: params.dateTo ?? null,
     limit: params.limit ?? 50,
@@ -65,16 +61,8 @@ export async function getTools(): Promise<string[]> {
   return invoke('get_tools');
 }
 
-export async function getRepos(): Promise<string[]> {
-  return invoke('get_repos');
-}
-
 export async function getStats(): Promise<Stats> {
   return invoke('get_stats');
-}
-
-export async function deleteSession(id: string): Promise<void> {
-  return invoke('delete_session', { id });
 }
 
 export async function clearDatabase(): Promise<void> {
@@ -83,8 +71,4 @@ export async function clearDatabase(): Promise<void> {
 
 export async function exportSession(id: string, format: string): Promise<ExportData> {
   return invoke('export_session', { id, format });
-}
-
-export async function getScanStatus(): Promise<{ initial_scan_done: boolean; last_scan_ts: string | null }> {
-  return invoke('get_scan_status');
 }

@@ -7,16 +7,11 @@ use db::Database;
 use models::{SessionSummary, SearchResult, ExportData};
 use indexer::Indexer;
 use std::path::PathBuf;
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use tauri::{Manager, State};
 
 struct AppState {
-    db: Mutex<Option<Database>>,
-    /// Set to true once the initial background scan completes
-    initial_scan_done: AtomicBool,
-    /// Timestamp of the last completed scan (RFC 3339)
-    last_scan_ts: Mutex<Option<String>>,
+    db: Arc<Mutex<Option<Database>>>,
 }
 
 fn get_db_path() -> PathBuf {
@@ -51,42 +46,47 @@ fn detect_sources() -> Result<Vec<serde_json::Value>, String> {
 }
 
 #[tauri::command]
-fn scan_all(state: State<AppState>) -> Result<usize, String> {
-    let result = with_db(&state, |db| Indexer::scan_all(db, None))?;
-    // Update last scan timestamp
-    if let Ok(mut ts) = state.last_scan_ts.lock() {
-        *ts = Some(chrono::Utc::now().to_rfc3339());
-    }
-    Ok(result)
+async fn scan_all(state: State<'_, AppState>) -> Result<usize, String> {
+    let db_arc = state.db.clone();
+    tokio::task::spawn_blocking(move || {
+        let rx = Indexer::collect_sessions(None);
+        let mut total = 0usize;
+        for session in rx {
+            let guard = db_arc.lock().map_err(|e| e.to_string())?;
+            let db = guard.as_ref().ok_or("Database not initialized")?;
+            db.upsert_session(&session)?;
+            drop(guard);
+            total += 1;
+        }
+        Ok(total)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn scan_incremental(state: State<AppState>, since_ts: Option<String>) -> Result<usize, String> {
-    let result = with_db(&state, |db| Indexer::scan_all(db, since_ts.as_deref()))?;
-    if let Ok(mut ts) = state.last_scan_ts.lock() {
-        *ts = Some(chrono::Utc::now().to_rfc3339());
-    }
-    Ok(result)
-}
-
-/// Returns scan status: whether initial scan is done, last scan timestamp
-#[tauri::command]
-fn get_scan_status(state: State<AppState>) -> Result<serde_json::Value, String> {
-    let initial_done = state.initial_scan_done.load(Ordering::Relaxed);
-    let last_ts = state.last_scan_ts.lock()
-        .map_err(|e| e.to_string())?
-        .clone();
-    Ok(serde_json::json!({
-        "initial_scan_done": initial_done,
-        "last_scan_ts": last_ts,
-    }))
+async fn scan_incremental(state: State<'_, AppState>, since_ts: Option<String>) -> Result<usize, String> {
+    let db_arc = state.db.clone();
+    tokio::task::spawn_blocking(move || {
+        let rx = Indexer::collect_sessions(since_ts.as_deref());
+        let mut total = 0usize;
+        for session in rx {
+            let guard = db_arc.lock().map_err(|e| e.to_string())?;
+            let db = guard.as_ref().ok_or("Database not initialized")?;
+            db.upsert_session(&session)?;
+            drop(guard);
+            total += 1;
+        }
+        Ok(total)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
 fn get_sessions(
     state: State<AppState>,
     tool: Option<String>,
-    repo: Option<String>,
     date_from: Option<String>,
     date_to: Option<String>,
     limit: Option<usize>,
@@ -95,7 +95,6 @@ fn get_sessions(
     with_db(&state, |db| {
         db.get_session_summaries(
             tool.as_deref(),
-            repo.as_deref(),
             date_from.as_deref(),
             date_to.as_deref(),
             limit.unwrap_or(50),
@@ -114,7 +113,6 @@ fn search_sessions(
     state: State<AppState>,
     query: String,
     tool: Option<String>,
-    repo: Option<String>,
     date_from: Option<String>,
     date_to: Option<String>,
     limit: Option<usize>,
@@ -123,7 +121,6 @@ fn search_sessions(
         db.search(
             &query,
             tool.as_deref(),
-            repo.as_deref(),
             date_from.as_deref(),
             date_to.as_deref(),
             limit.unwrap_or(50),
@@ -147,18 +144,8 @@ fn get_tools(state: State<AppState>) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-fn get_repos(state: State<AppState>) -> Result<Vec<String>, String> {
-    with_db(&state, |db| db.get_repos())
-}
-
-#[tauri::command]
 fn get_stats(state: State<AppState>) -> Result<serde_json::Value, String> {
     with_db(&state, |db| db.get_stats())
-}
-
-#[tauri::command]
-fn delete_session(state: State<AppState>, id: String) -> Result<(), String> {
-    with_db(&state, |db| db.delete_session(&id))
 }
 
 #[tauri::command]
@@ -218,56 +205,44 @@ fn export_session(state: State<AppState>, id: String, format: String) -> Result<
     })
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let db_path = get_db_path();
     let db = Database::new(&db_path).expect("Failed to initialize database");
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
         .manage(AppState {
-            db: Mutex::new(Some(db)),
-            initial_scan_done: AtomicBool::new(false),
-            last_scan_ts: Mutex::new(None),
+            db: Arc::new(Mutex::new(Some(db))),
         })
         .setup(|app| {
-            // Run initial full scan in background thread on app launch
-            let state = app.state::<AppState>();
-            let db_guard = state.db.lock().map_err(|e| e.to_string())?;
-            if let Some(db) = db_guard.as_ref() {
-                // Do a quick initial scan — this populates the timeline immediately
-                match Indexer::scan_all(db, None) {
-                    Ok(count) => {
-                        eprintln!("[recall] Initial scan complete: {} sessions indexed", count);
-                        state.initial_scan_done.store(true, Ordering::Relaxed);
-                        if let Ok(mut ts) = state.last_scan_ts.lock() {
-                            *ts = Some(chrono::Utc::now().to_rfc3339());
+            let db_arc = app.state::<AppState>().db.clone();
+            // Run initial scan in background so the window appears immediately
+            std::thread::spawn(move || {
+                let rx = Indexer::collect_sessions(None);
+                let mut total = 0usize;
+                for session in rx {
+                    if let Ok(guard) = db_arc.lock() {
+                        if let Some(db) = guard.as_ref() {
+                            if db.upsert_session(&session).is_ok() {
+                                total += 1;
+                            }
                         }
                     }
-                    Err(e) => {
-                        eprintln!("[recall] Initial scan failed: {}", e);
-                        // Still mark as done so UI doesn't wait forever
-                        state.initial_scan_done.store(true, Ordering::Relaxed);
-                    }
                 }
-            }
-            drop(db_guard);
+                eprintln!("[recall] Initial scan complete: {} sessions indexed", total);
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             detect_sources,
             scan_all,
             scan_incremental,
-            get_scan_status,
             get_sessions,
             get_session,
             search_sessions,
             toggle_favorite,
             get_favorites,
             get_tools,
-            get_repos,
             get_stats,
-            delete_session,
             clear_database,
             export_session,
         ])

@@ -1,8 +1,53 @@
 import { useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
+import bash from 'react-syntax-highlighter/dist/esm/languages/prism/bash';
+import c from 'react-syntax-highlighter/dist/esm/languages/prism/c';
+import cpp from 'react-syntax-highlighter/dist/esm/languages/prism/cpp';
+import csharp from 'react-syntax-highlighter/dist/esm/languages/prism/csharp';
+import css from 'react-syntax-highlighter/dist/esm/languages/prism/css';
+import go from 'react-syntax-highlighter/dist/esm/languages/prism/go';
+import java from 'react-syntax-highlighter/dist/esm/languages/prism/java';
+import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript';
+import json from 'react-syntax-highlighter/dist/esm/languages/prism/json';
+import jsx from 'react-syntax-highlighter/dist/esm/languages/prism/jsx';
+import kotlin from 'react-syntax-highlighter/dist/esm/languages/prism/kotlin';
+import markdown from 'react-syntax-highlighter/dist/esm/languages/prism/markdown';
+import markup from 'react-syntax-highlighter/dist/esm/languages/prism/markup';
+import python from 'react-syntax-highlighter/dist/esm/languages/prism/python';
+import ruby from 'react-syntax-highlighter/dist/esm/languages/prism/ruby';
+import rust from 'react-syntax-highlighter/dist/esm/languages/prism/rust';
+import sql from 'react-syntax-highlighter/dist/esm/languages/prism/sql';
+import swift from 'react-syntax-highlighter/dist/esm/languages/prism/swift';
+import toml from 'react-syntax-highlighter/dist/esm/languages/prism/toml';
+import tsx from 'react-syntax-highlighter/dist/esm/languages/prism/tsx';
+import typescript from 'react-syntax-highlighter/dist/esm/languages/prism/typescript';
+import yaml from 'react-syntax-highlighter/dist/esm/languages/prism/yaml';
 import type { Components } from 'react-markdown';
+
+SyntaxHighlighter.registerLanguage('bash', bash);
+SyntaxHighlighter.registerLanguage('c', c);
+SyntaxHighlighter.registerLanguage('cpp', cpp);
+SyntaxHighlighter.registerLanguage('csharp', csharp);
+SyntaxHighlighter.registerLanguage('css', css);
+SyntaxHighlighter.registerLanguage('go', go);
+SyntaxHighlighter.registerLanguage('java', java);
+SyntaxHighlighter.registerLanguage('javascript', javascript);
+SyntaxHighlighter.registerLanguage('json', json);
+SyntaxHighlighter.registerLanguage('jsx', jsx);
+SyntaxHighlighter.registerLanguage('kotlin', kotlin);
+SyntaxHighlighter.registerLanguage('markdown', markdown);
+SyntaxHighlighter.registerLanguage('markup', markup);
+SyntaxHighlighter.registerLanguage('python', python);
+SyntaxHighlighter.registerLanguage('ruby', ruby);
+SyntaxHighlighter.registerLanguage('rust', rust);
+SyntaxHighlighter.registerLanguage('sql', sql);
+SyntaxHighlighter.registerLanguage('swift', swift);
+SyntaxHighlighter.registerLanguage('toml', toml);
+SyntaxHighlighter.registerLanguage('tsx', tsx);
+SyntaxHighlighter.registerLanguage('typescript', typescript);
+SyntaxHighlighter.registerLanguage('yaml', yaml);
 
 /*
  * VS Code Dark Modern–style token colors.
@@ -85,6 +130,17 @@ function DiffBlock({ code }: { code: string }) {
               <div key={i} className="diff-line diff-line-hunk">
                 <span className="diff-gutter diff-gutter-old">…</span>
                 <span className="diff-gutter diff-gutter-new">…</span>
+                <span className="diff-indicator"> </span>
+                <span className="diff-line-content">{line}</span>
+              </div>
+            );
+          }
+
+          if (line.startsWith('--- ') || line.startsWith('+++ ') || line.startsWith('diff --git ') || line === '\\ No newline at end of file') {
+            return (
+              <div key={i} className="diff-line diff-line-meta">
+                <span className="diff-gutter diff-gutter-old"></span>
+                <span className="diff-gutter diff-gutter-new"></span>
                 <span className="diff-indicator"> </span>
                 <span className="diff-line-content">{line}</span>
               </div>
@@ -258,7 +314,14 @@ const components: Components = {
 interface TextPart { type: 'text'; content: string }
 interface ThinkingPart { type: 'thinking'; content: string; title?: string }
 interface ToolCallPart { type: 'tool_call'; tool: string; message: string; description?: string; complete: boolean }
-interface TextEditPart { type: 'text_edit'; file_path: string; content: string; done: boolean }
+interface TextEditPart {
+  type: 'text_edit';
+  file_path: string;
+  content: string;
+  done: boolean;
+  diff?: string;
+  change_kind?: 'create' | 'edit' | 'delete';
+}
 interface ProgressPart { type: 'progress'; content: string }
 interface ReferencePart { type: 'reference'; name: string; uri: string; ref_kind: 'file' | 'file_edit' | 'symbol' }
 type StructuredPart = TextPart | ThinkingPart | ToolCallPart | TextEditPart | ProgressPart | ReferencePart;
@@ -332,6 +395,19 @@ function shortPath(path: string): string {
   return parts.slice(-3).join('/');
 }
 
+function diffStats(diff: string): { additions: number; deletions: number } {
+  let additions = 0;
+  let deletions = 0;
+
+  diff.split('\n').forEach((line) => {
+    if (line.startsWith('+++') || line.startsWith('---')) return;
+    if (line.startsWith('+')) additions += 1;
+    if (line.startsWith('-')) deletions += 1;
+  });
+
+  return { additions, deletions };
+}
+
 /** Tool ID to friendly display name */
 function toolDisplayName(toolId: string): string {
   const map: Record<string, string> = {
@@ -380,7 +456,10 @@ function Accordion({ label, icon, variant, defaultOpen = false, children }: {
 function FileEditBlock({ part }: { part: TextEditPart }) {
   const [open, setOpen] = useState(false);
   const lang = langFromPath(part.file_path);
-  const lineCount = part.content.split('\n').length;
+  const lineCount = part.content ? part.content.split('\n').length : 0;
+  const stats = part.diff ? diffStats(part.diff) : null;
+  const changeKind = part.change_kind || 'edit';
+  const changeKindLabel = changeKind === 'create' ? 'Created' : changeKind === 'delete' ? 'Deleted' : 'Edited';
 
   return (
     <div className={`file-edit-block ${open ? 'open' : ''}`}>
@@ -391,37 +470,61 @@ function FileEditBlock({ part }: { part: TextEditPart }) {
         <span className="file-edit-icon">{Icons.filePen}</span>
         <span className="file-edit-path">{shortPath(part.file_path)}</span>
         <span className="file-edit-meta">
-          <span className="file-edit-lines">+{lineCount} lines</span>
+          <span className={`file-edit-kind file-edit-kind-${changeKind}`}>{changeKindLabel}</span>
+          {stats ? (
+            <span className="file-edit-stats">
+              {stats.additions > 0 && <span className="add">+{stats.additions}</span>}
+              {stats.deletions > 0 && <span className="del">-{stats.deletions}</span>}
+            </span>
+          ) : lineCount > 0 ? (
+            <span className="file-edit-lines">{lineCount} lines</span>
+          ) : null}
           {part.done && <span className="file-edit-status">{Icons.check}</span>}
         </span>
       </button>
       {open && (
         <div className="file-edit-body">
-          <div className="code-block-wrapper" style={{ margin: 0 }}>
-            <div className="code-block-header">
-              <span className="code-block-lang">{lang}</span>
-              <CopyButton text={part.content} />
+          {part.diff && (
+            <div className="file-edit-section">
+              <div className="code-block-wrapper" style={{ margin: 0 }}>
+                <div className="code-block-header">
+                  <span className="code-block-lang">patch</span>
+                  <CopyButton text={part.diff} />
+                </div>
+                <DiffBlock code={part.diff} />
+              </div>
             </div>
-            <SyntaxHighlighter
-              style={vscDarkModern}
-              language={lang}
-              PreTag="div"
-              showLineNumbers
-              lineNumberStyle={{ color: '#3a3a3a', fontSize: '11px', minWidth: '36px', paddingRight: '12px' }}
-              customStyle={{
-                margin: 0,
-                borderRadius: '0 0 6px 6px',
-                border: 'none',
-                background: '#1a1a1a',
-                maxHeight: '500px',
-              }}
-              codeTagProps={{
-                style: { fontFamily: 'var(--mono)', fontSize: '12.5px', lineHeight: '1.55' },
-              }}
-            >
-              {part.content}
-            </SyntaxHighlighter>
-          </div>
+          )}
+          {part.content && changeKind !== 'delete' && (
+            <div className="file-edit-section">
+              <div className="file-edit-result-head">Resulting file</div>
+              <div className="code-block-wrapper" style={{ margin: 0 }}>
+                <div className="code-block-header">
+                  <span className="code-block-lang">{lang}</span>
+                  <CopyButton text={part.content} />
+                </div>
+                <SyntaxHighlighter
+                  style={vscDarkModern}
+                  language={lang}
+                  PreTag="div"
+                  showLineNumbers
+                  lineNumberStyle={{ color: '#3a3a3a', fontSize: '11px', minWidth: '36px', paddingRight: '12px' }}
+                  customStyle={{
+                    margin: 0,
+                    borderRadius: '0 0 6px 6px',
+                    border: 'none',
+                    background: '#1a1a1a',
+                    maxHeight: '500px',
+                  }}
+                  codeTagProps={{
+                    style: { fontFamily: 'var(--mono)', fontSize: '12.5px', lineHeight: '1.55' },
+                  }}
+                >
+                  {part.content}
+                </SyntaxHighlighter>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -447,9 +550,13 @@ export default function MessageBody({ content, extra }: { content: string; extra
 
   // If we have structured parts, render them in order
   if (parts && parts.length > 0) {
+    // Separate text_edit parts from the rest so we can group them visually
+    const editParts = parts.filter((p): p is TextEditPart => p.type === 'text_edit');
+    const otherParts = parts.filter((p) => p.type !== 'text_edit' && p.type !== 'reference' && p.type !== 'progress');
+
     return (
       <div className="msg-body">
-        {parts.map((part, i) => {
+        {otherParts.map((part, i) => {
           switch (part.type) {
             case 'text':
               return part.content.trim() ? (
@@ -509,31 +616,21 @@ export default function MessageBody({ content, extra }: { content: string; extra
                 </Accordion>
               );
 
-            case 'text_edit':
-              return <FileEditBlock key={i} part={part} />;
-
-            case 'reference':
-              return (
-                <span key={i} className={`inline-ref inline-ref-${part.ref_kind}`}>
-                  <span className="inline-ref-icon">
-                    {part.ref_kind === 'symbol' ? Icons.symbol : part.ref_kind === 'file_edit' ? Icons.filePen : Icons.file}
-                  </span>
-                  <span className="inline-ref-name">{part.name || shortPath(part.uri)}</span>
-                </span>
-              );
-
-            case 'progress':
-              return (
-                <div key={i} className="progress-part">
-                  <span className="progress-icon">{Icons.spinner}</span>
-                  <span>{part.content}</span>
-                </div>
-              );
-
             default:
               return null;
           }
         })}
+        {editParts.length > 0 && (
+          <div className="file-edits-group">
+            <div className="file-edits-group-header">
+              {Icons.filePen}
+              <span>{editParts.length} file{editParts.length !== 1 ? 's' : ''} changed</span>
+            </div>
+            {editParts.map((part, i) => (
+              <FileEditBlock key={`edit-${i}`} part={part} />
+            ))}
+          </div>
+        )}
       </div>
     );
   }

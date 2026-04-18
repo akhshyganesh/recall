@@ -113,14 +113,6 @@ pub struct DetectionResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScanSource {
-    pub id: String,
-    pub tool: String,
-    pub path: String,
-    pub enabled: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportData {
     pub format: String,
     pub content: String,

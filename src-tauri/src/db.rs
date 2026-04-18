@@ -71,14 +71,6 @@ impl Database {
                 FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
             );
 
-            CREATE TABLE IF NOT EXISTS scan_sources (
-                id TEXT PRIMARY KEY,
-                tool TEXT NOT NULL,
-                path TEXT NOT NULL,
-                enabled INTEGER DEFAULT 1,
-                last_scanned TEXT
-            );
-
             CREATE VIRTUAL TABLE IF NOT EXISTS search_index USING fts5(
                 session_id,
                 role,
@@ -182,7 +174,7 @@ impl Database {
         Ok(())
     }
 
-    pub fn get_session_summaries(&self, tool_filter: Option<&str>, repo_filter: Option<&str>, date_from: Option<&str>, date_to: Option<&str>, limit: usize, offset: usize) -> Result<Vec<SessionSummary>, String> {
+    pub fn get_session_summaries(&self, tool_filter: Option<&str>, date_from: Option<&str>, date_to: Option<&str>, limit: usize, offset: usize) -> Result<Vec<SessionSummary>, String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         let mut sql = String::from(
             "SELECT s.id, s.tool, s.agent_slug, s.title, s.repo_name, s.repo_path, s.started_at, s.ended_at, s.message_count, s.file_count, s.model, s.workspace,
@@ -196,10 +188,6 @@ impl Database {
         if let Some(tool) = tool_filter {
             sql.push_str(&format!(" AND s.tool = ?{}", param_values.len() + 1));
             param_values.push(Box::new(tool.to_string()));
-        }
-        if let Some(repo) = repo_filter {
-            sql.push_str(&format!(" AND s.repo_path = ?{}", param_values.len() + 1));
-            param_values.push(Box::new(repo.to_string()));
         }
         if let Some(from) = date_from {
             sql.push_str(&format!(" AND s.started_at >= ?{}", param_values.len() + 1));
@@ -317,7 +305,7 @@ impl Database {
         }
     }
 
-    pub fn search(&self, query: &str, tool_filter: Option<&str>, repo_filter: Option<&str>, date_from: Option<&str>, date_to: Option<&str>, limit: usize) -> Result<Vec<SearchResult>, String> {
+    pub fn search(&self, query: &str, tool_filter: Option<&str>, date_from: Option<&str>, date_to: Option<&str>, limit: usize) -> Result<Vec<SearchResult>, String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         let mut sql = String::from(
             "SELECT DISTINCT s.id, s.tool, s.agent_slug, s.title, s.repo_name, s.repo_path, s.started_at, s.message_count, s.model, s.workspace,
@@ -332,10 +320,6 @@ impl Database {
         if let Some(tool) = tool_filter {
             sql.push_str(&format!(" AND s.tool = ?{}", param_values.len() + 1));
             param_values.push(Box::new(tool.to_string()));
-        }
-        if let Some(repo) = repo_filter {
-            sql.push_str(&format!(" AND s.repo_path = ?{}", param_values.len() + 1));
-            param_values.push(Box::new(repo.to_string()));
         }
         if let Some(from) = date_from {
             sql.push_str(&format!(" AND s.started_at >= ?{}", param_values.len() + 1));
@@ -444,19 +428,6 @@ impl Database {
         Ok(tools)
     }
 
-    pub fn get_repos(&self) -> Result<Vec<String>, String> {
-        let conn = self.conn.lock().map_err(|e| e.to_string())?;
-        let mut stmt = conn.prepare("SELECT DISTINCT repo_path FROM sessions WHERE repo_path IS NOT NULL ORDER BY repo_path")
-            .map_err(|e| e.to_string())?;
-        let rows = stmt.query_map([], |row| row.get(0))
-            .map_err(|e| e.to_string())?;
-        let mut repos = Vec::new();
-        for row in rows {
-            repos.push(row.map_err(|e| e.to_string())?);
-        }
-        Ok(repos)
-    }
-
     pub fn get_stats(&self) -> Result<serde_json::Value, String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         let total_sessions: i64 = conn.query_row("SELECT COUNT(*) FROM sessions", [], |r| r.get(0))
@@ -473,31 +444,6 @@ impl Database {
         }))
     }
 
-    pub fn get_session_mtime(&self, external_id: &str) -> Result<Option<String>, String> {
-        let conn = self.conn.lock().map_err(|e| e.to_string())?;
-        let result = conn.query_row(
-            "SELECT source_mtime FROM sessions WHERE external_id = ?1",
-            params![external_id],
-            |row| row.get(0),
-        ).ok();
-        Ok(result)
-    }
-
-    pub fn delete_session(&self, id: &str) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| e.to_string())?;
-        conn.execute("DELETE FROM search_index WHERE session_id = ?1", params![id])
-            .map_err(|e| e.to_string())?;
-        conn.execute("DELETE FROM file_changes WHERE session_id = ?1", params![id])
-            .map_err(|e| e.to_string())?;
-        conn.execute("DELETE FROM messages WHERE session_id = ?1", params![id])
-            .map_err(|e| e.to_string())?;
-        conn.execute("DELETE FROM favorites WHERE session_id = ?1", params![id])
-            .map_err(|e| e.to_string())?;
-        conn.execute("DELETE FROM sessions WHERE id = ?1", params![id])
-            .map_err(|e| e.to_string())?;
-        Ok(())
-    }
-
     pub fn clear_all(&self) -> Result<(), String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         conn.execute_batch(
@@ -505,8 +451,7 @@ impl Database {
              DELETE FROM file_changes;
              DELETE FROM messages;
              DELETE FROM favorites;
-             DELETE FROM sessions;
-             DELETE FROM scan_sources;"
+             DELETE FROM sessions;"
         ).map_err(|e| e.to_string())?;
         Ok(())
     }

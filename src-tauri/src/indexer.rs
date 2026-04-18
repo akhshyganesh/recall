@@ -1,7 +1,7 @@
-use crate::connectors::{self, Connector};
-use crate::db::Database;
-use crate::models::{NormalizedConversation, Session, Message, FileChange, DetectionResult};
+use crate::connectors;
+use crate::models::{DetectionResult, Message, NormalizedConversation, Session};
 use chrono::Utc;
+use std::sync::mpsc;
 
 pub struct Indexer;
 
@@ -14,41 +14,32 @@ impl Indexer {
         }).collect()
     }
 
-    pub fn scan_all(db: &Database, since_ts: Option<&str>) -> Result<usize, String> {
-        let connectors = connectors::all_connectors();
-        let mut total = 0;
+    /// Collect all sessions from connectors without touching the DB.
+    /// Sends sessions one at a time through a channel to keep memory bounded.
+    /// Returns a receiver that yields Session values as they are parsed.
+    pub fn collect_sessions(since_ts: Option<&str>) -> mpsc::Receiver<Session> {
+        let since_owned = since_ts.map(|s| s.to_string());
+        let (tx, rx) = mpsc::channel();
 
-        for connector in &connectors {
-            let detection = connector.detect();
-            if !detection.detected { continue; }
+        std::thread::spawn(move || {
+            let connectors = connectors::all_connectors();
+            for connector in &connectors {
+                let detection = connector.detect();
+                if !detection.detected { continue; }
 
-            let conversations = connector.scan(&detection.root_paths, since_ts);
-            for conv in conversations {
-                let session = normalize_to_session(conv);
-                db.upsert_session(&session)?;
-                total += 1;
+                let conversations = connector.scan(
+                    &detection.root_paths,
+                    since_owned.as_deref(),
+                );
+                for conv in conversations {
+                    if tx.send(normalize_to_session(conv)).is_err() {
+                        return; // receiver dropped, stop work
+                    }
+                }
             }
-        }
+        });
 
-        Ok(total)
-    }
-
-    pub fn scan_connector(db: &Database, agent_slug: &str, roots: &[String], since_ts: Option<&str>) -> Result<usize, String> {
-        let connectors = connectors::all_connectors();
-        let connector = connectors.iter()
-            .find(|c| c.agent_slug() == agent_slug)
-            .ok_or_else(|| format!("Unknown connector: {}", agent_slug))?;
-
-        let conversations = connector.scan(roots, since_ts);
-        let mut total = 0;
-
-        for conv in conversations {
-            let session = normalize_to_session(conv);
-            db.upsert_session(&session)?;
-            total += 1;
-        }
-
-        Ok(total)
+        rx
     }
 }
 

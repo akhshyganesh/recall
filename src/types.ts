@@ -92,4 +92,4 @@ export interface Stats {
 }
 
 export type View = 'timeline' | 'session' | 'search' | 'favorites' | 'settings';
-export type DateFilter = 'today' | 'yesterday' | '7days' | '30days' | 'all' | 'custom';
+export type DateFilter = 'today' | 'yesterday' | '7days' | '30days' | 'all';
