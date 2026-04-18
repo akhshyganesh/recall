@@ -101,13 +101,18 @@ jobs:
 
           chmod 600 "$key_path"
 
-          delimiter="TAURI_PWD_$(openssl rand -hex 16)"
+          delimiter_key="TAURI_KEY_$(openssl rand -hex 16)"
+          delimiter_pwd="TAURI_PWD_$(openssl rand -hex 16)"
           {
-            echo "TAURI_SIGNING_PRIVATE_KEY=$key_path"
-            echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD<<$delimiter"
+            echo "TAURI_SIGNING_PRIVATE_KEY<<$delimiter_key"
+            cat "$key_path"
+            echo "$delimiter_key"
+            echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD<<$delimiter_pwd"
             printf '%s\n' "${TAURI_PRIVATE_KEY_PASSWORD:-}"
-            echo "$delimiter"
+            echo "$delimiter_pwd"
           } >> "$GITHUB_ENV"
+
+          rm -f "$key_path"
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
