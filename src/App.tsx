@@ -81,6 +81,7 @@ export default function App() {
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchOriginViewRef = useRef<View>('timeline');
+  const appInfoRef = useRef<AppInfo | null>(null);
   const closeSidebar = useCallback(() => {
     setSidebarOpen(false);
   }, []);
@@ -88,6 +89,7 @@ export default function App() {
   const loadAppInfo = useCallback(async () => {
     try {
       const info = await api.getAppInfo();
+      appInfoRef.current = info;
       setAppInfo(info);
       setUpdateStatus((current) => ({ ...current, current_version: info.current_version }));
       return info;
@@ -98,7 +100,7 @@ export default function App() {
   }, []);
 
   const checkForUpdates = useCallback(async (info?: AppInfo | null) => {
-    const currentInfo = info ?? appInfo;
+    const currentInfo = info ?? appInfoRef.current;
     const currentVersion = currentInfo?.current_version ?? null;
 
     setUpdateStatus((current) => ({
@@ -145,7 +147,7 @@ export default function App() {
         error: error instanceof Error ? error.message : 'Failed to check for updates.',
       }));
     }
-  }, [appInfo]);
+  }, []);
 
   const handleOpenReleasePage = useCallback(async () => {
     const target = updateStatus.release_url ?? appInfo?.releases_url;
