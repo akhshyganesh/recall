@@ -1,21 +1,3 @@
-export function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) {
-    return '0 B';
-  }
-
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let value = bytes;
-  let unitIndex = 0;
-
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-
-  const precision = value >= 100 || unitIndex === 0 ? 0 : 1;
-  return `${value.toFixed(precision)} ${units[unitIndex]}`;
-}
-
 export function formatUpdateDate(value: string | null | undefined): string | null {
   if (!value) {
     return null;
@@ -48,4 +30,40 @@ export function trimReleaseNotes(notes: string | null | undefined, maxLength = 2
   }
 
   return `${normalized.slice(0, maxLength).trimEnd()}...`;
+}
+
+/**
+ * Strip a leading 'v' and any build metadata, then compare semver-ish numeric segments.
+ * Returns 1 if a > b, -1 if a < b, 0 if equal. Non-numeric segments compare lexically.
+ */
+export function compareVersions(a: string, b: string): number {
+  const normalize = (value: string): (number | string)[] => value
+    .replace(/^v/i, '')
+    .split(/[.+-]/)
+    .map((segment) => {
+      const numeric = Number(segment);
+      return Number.isFinite(numeric) ? numeric : segment;
+    });
+
+  const left = normalize(a);
+  const right = normalize(b);
+  const length = Math.max(left.length, right.length);
+
+  for (let i = 0; i < length; i += 1) {
+    const lv = left[i] ?? 0;
+    const rv = right[i] ?? 0;
+
+    if (typeof lv === 'number' && typeof rv === 'number') {
+      if (lv > rv) return 1;
+      if (lv < rv) return -1;
+      continue;
+    }
+
+    const ls = String(lv);
+    const rs = String(rv);
+    if (ls > rs) return 1;
+    if (ls < rs) return -1;
+  }
+
+  return 0;
 }

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { relaunch } from '@tauri-apps/plugin-process';
-import { check as checkForAppUpdate } from '@tauri-apps/plugin-updater';
+import { openUrl } from '@tauri-apps/plugin-opener';
 
 import * as api from './api';
 import { BackIcon, MenuIcon, ModelIcon, SearchIcon, StarIcon } from './components/AppIcons';
@@ -13,6 +12,7 @@ import SessionFeed from './components/SessionFeed';
 import SettingsPanel from './components/SettingsPanel';
 import Sidebar from './components/Sidebar';
 import { downloadExportFile } from './lib/download';
+import { fetchLatestRelease, isNewerVersion } from './lib/release-check';
 import { DATE_FILTERS, formatDateFilterLabel, getDateRange, getRepoShortName } from './lib/session-format';
 import { toolCssClass } from './lib/tool-style';
 import type {
@@ -39,16 +39,14 @@ const MOBILE_SIDEBAR_QUERY = '(max-width: 900px)';
 
 const INITIAL_UPDATE_STATUS: UpdateStatus = {
   state: 'idle',
-  available_version: null,
-  checked_at: null,
+  current_version: null,
+  latest_version: null,
+  release_url: null,
   release_date: null,
   release_notes: null,
-  downloaded_bytes: 0,
-  total_bytes: null,
+  checked_at: null,
   error: null,
 };
-
-type PendingUpdateHandle = Awaited<ReturnType<typeof checkForAppUpdate>>;
 
 export default function App() {
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
@@ -83,7 +81,6 @@ export default function App() {
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchOriginViewRef = useRef<View>('timeline');
-  const pendingUpdateRef = useRef<PendingUpdateHandle>(null);
   const closeSidebar = useCallback(() => {
     setSidebarOpen(false);
   }, []);
@@ -92,13 +89,7 @@ export default function App() {
     try {
       const info = await api.getAppInfo();
       setAppInfo(info);
-      setUpdateStatus((current) => (
-        info.updater_enabled
-          ? current.state === 'disabled'
-            ? { ...current, state: 'idle', error: null }
-            : current
-          : { ...INITIAL_UPDATE_STATUS, state: 'disabled' }
-      ));
+      setUpdateStatus((current) => ({ ...current, current_version: info.current_version }));
       return info;
     } catch (error) {
       console.error('Failed to load app info:', error);
@@ -106,132 +97,69 @@ export default function App() {
     }
   }, []);
 
-  const checkForUpdates = useCallback(async (updaterEnabled: boolean) => {
-    if (!updaterEnabled) {
-      pendingUpdateRef.current = null;
-      setUpdateStatus({ ...INITIAL_UPDATE_STATUS, state: 'disabled' });
-      return;
-    }
+  const checkForUpdates = useCallback(async (info?: AppInfo | null) => {
+    const currentInfo = info ?? appInfo;
+    const currentVersion = currentInfo?.current_version ?? null;
 
     setUpdateStatus((current) => ({
       ...current,
       state: 'checking',
-      downloaded_bytes: 0,
-      total_bytes: null,
+      current_version: currentVersion,
       error: null,
     }));
 
     try {
-      const update = await checkForAppUpdate();
+      const release = await fetchLatestRelease();
       const checkedAt = new Date().toISOString();
 
-      pendingUpdateRef.current = update;
-
-      if (update) {
+      if (currentVersion && isNewerVersion(release.version, currentVersion)) {
         setUpdateStatus({
           state: 'available',
-          available_version: update.version,
+          current_version: currentVersion,
+          latest_version: release.version,
+          release_url: release.release_url,
+          release_date: release.release_date,
+          release_notes: release.release_notes,
           checked_at: checkedAt,
-          release_date: update.date ?? null,
-          release_notes: update.body ?? null,
-          downloaded_bytes: 0,
-          total_bytes: null,
           error: null,
         });
         return;
       }
 
       setUpdateStatus({
-        ...INITIAL_UPDATE_STATUS,
         state: 'up-to-date',
+        current_version: currentVersion,
+        latest_version: release.version,
+        release_url: release.release_url,
+        release_date: release.release_date,
+        release_notes: release.release_notes,
         checked_at: checkedAt,
+        error: null,
       });
     } catch (error) {
-      pendingUpdateRef.current = null;
       console.error('Failed to check for updates:', error);
       setUpdateStatus((current) => ({
         ...current,
-        state: current.available_version ? 'available' : 'error',
+        state: 'error',
         checked_at: new Date().toISOString(),
         error: error instanceof Error ? error.message : 'Failed to check for updates.',
       }));
     }
-  }, []);
+  }, [appInfo]);
 
-  const handleInstallUpdate = useCallback(async () => {
-    if (!appInfo?.updater_enabled || updateStatus.state === 'installing' || updateStatus.state === 'restarting') {
+  const handleOpenReleasePage = useCallback(async () => {
+    const target = updateStatus.release_url ?? appInfo?.releases_url;
+
+    if (!target) {
       return;
     }
 
     try {
-      let update = pendingUpdateRef.current;
-
-      if (!update) {
-        update = await checkForAppUpdate();
-        pendingUpdateRef.current = update;
-      }
-
-      if (!update) {
-        setUpdateStatus({
-          ...INITIAL_UPDATE_STATUS,
-          state: 'up-to-date',
-          checked_at: new Date().toISOString(),
-        });
-        return;
-      }
-
-      let downloadedBytes = 0;
-
-      setUpdateStatus((current) => ({
-        ...current,
-        state: 'installing',
-        downloaded_bytes: 0,
-        total_bytes: null,
-        error: null,
-      }));
-
-      await update.downloadAndInstall((event) => {
-        switch (event.event) {
-          case 'Started':
-            downloadedBytes = 0;
-            setUpdateStatus((current) => ({
-              ...current,
-              state: 'installing',
-              downloaded_bytes: 0,
-              total_bytes: event.data.contentLength ?? null,
-            }));
-            break;
-          case 'Progress':
-            downloadedBytes += event.data.chunkLength;
-            setUpdateStatus((current) => ({
-              ...current,
-              state: 'installing',
-              downloaded_bytes: downloadedBytes,
-            }));
-            break;
-          case 'Finished':
-            setUpdateStatus((current) => ({
-              ...current,
-              state: 'restarting',
-              downloaded_bytes: current.total_bytes ?? current.downloaded_bytes,
-            }));
-            break;
-        }
-      });
-
-      pendingUpdateRef.current = null;
-      setUpdateStatus((current) => ({ ...current, state: 'restarting' }));
-      await relaunch();
+      await openUrl(target);
     } catch (error) {
-      pendingUpdateRef.current = null;
-      console.error('Failed to install update:', error);
-      setUpdateStatus((current) => ({
-        ...current,
-        state: current.available_version ? 'available' : 'error',
-        error: error instanceof Error ? error.message : 'Failed to install update.',
-      }));
+      console.error('Failed to open release page:', error);
     }
-  }, [appInfo?.updater_enabled, updateStatus.state]);
+  }, [appInfo?.releases_url, updateStatus.release_url]);
 
   const loadMeta = useCallback(async () => {
     try {
@@ -368,15 +296,15 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
 
-    const initializeUpdater = async () => {
+    const initialize = async () => {
       const info = await loadAppInfo();
 
-      if (!cancelled && info?.updater_enabled) {
-        await checkForUpdates(info.updater_enabled);
+      if (!cancelled && info) {
+        await checkForUpdates(info);
       }
     };
 
-    void initializeUpdater();
+    void initialize();
 
     return () => {
       cancelled = true;
@@ -712,8 +640,8 @@ export default function App() {
           clearSearch();
           setView('favorites');
         }}
-        onInstallUpdate={() => {
-          void handleInstallUpdate();
+        onOpenReleasePage={() => {
+          void handleOpenReleasePage();
         }}
         onScan={() => {
           void handleScan();
@@ -897,11 +825,11 @@ export default function App() {
             <SettingsPanel
               appInfo={appInfo}
               onCheckForUpdates={() => {
-                void checkForUpdates(appInfo?.updater_enabled ?? false);
+                void checkForUpdates();
               }}
               onClearDatabase={handleClearDatabase}
-              onInstallUpdate={() => {
-                void handleInstallUpdate();
+              onOpenReleasePage={() => {
+                void handleOpenReleasePage();
               }}
               sources={sources}
               updateStatus={updateStatus}

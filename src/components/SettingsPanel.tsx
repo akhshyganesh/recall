@@ -1,5 +1,5 @@
 import type { AppInfo, DetectedSource, UpdateStatus } from '../types';
-import { formatBytes, formatUpdateDate, trimReleaseNotes } from '../lib/update-format';
+import { formatUpdateDate, trimReleaseNotes } from '../lib/update-format';
 import { DownloadIcon, RefreshIcon, TrashIcon } from './AppIcons';
 
 interface SettingsPanelProps {
@@ -7,7 +7,7 @@ interface SettingsPanelProps {
   sources: DetectedSource[];
   updateStatus: UpdateStatus;
   onCheckForUpdates: () => void;
-  onInstallUpdate: () => void;
+  onOpenReleasePage: () => void;
   onClearDatabase: () => Promise<void>;
 }
 
@@ -31,24 +31,18 @@ function formatCheckTime(value: string | null): string | null {
 
 function getUpdateTitle(updateStatus: UpdateStatus): string {
   switch (updateStatus.state) {
-    case 'disabled':
-      return 'Automatic updates are only enabled in signed release builds.';
     case 'checking':
       return 'Checking GitHub Releases for a newer build.';
     case 'available':
-      return updateStatus.available_version
-        ? `Version ${updateStatus.available_version} is ready to install.`
-        : 'A newer signed release is ready to install.';
+      return updateStatus.latest_version
+        ? `Version ${updateStatus.latest_version} is available.`
+        : 'A newer release is available.';
     case 'up-to-date':
       return 'This build already matches the latest published release.';
-    case 'installing':
-      return 'Downloading and installing the latest release.';
-    case 'restarting':
-      return 'Restarting Recall to finish the update.';
     case 'error':
       return 'The last update check did not complete.';
     default:
-      return 'Check GitHub Releases for a signed in-place update.';
+      return 'Check GitHub Releases for a newer build.';
   }
 }
 
@@ -57,42 +51,17 @@ function getUpdateMeta(appInfo: AppInfo | null, updateStatus: UpdateStatus): str
   const checkedAt = formatCheckTime(updateStatus.checked_at);
 
   switch (updateStatus.state) {
-    case 'disabled':
-      return appInfo ? `Running Recall ${appInfo.current_version}.` : null;
     case 'checking':
-      return 'Querying the latest release manifest.';
+      return 'Querying the latest release from GitHub.';
     case 'available':
-      if (releaseDate) {
-        return `Published ${releaseDate}.`;
-      }
-
-      return 'A newer signed release was found.';
+      return releaseDate ? `Published ${releaseDate}.` : 'Open the release page to download the new build.';
     case 'up-to-date':
       return checkedAt ? `Last checked ${checkedAt}.` : 'No newer release was found.';
-    case 'installing':
-      if (updateStatus.total_bytes) {
-        return `${formatBytes(updateStatus.downloaded_bytes)} of ${formatBytes(updateStatus.total_bytes)} downloaded.`;
-      }
-
-      return 'Preparing the update package.';
-    case 'restarting':
-      return 'The app will relaunch automatically when installation completes.';
     case 'error':
-      return checkedAt ? `Last attempted ${checkedAt}.` : 'The updater could not complete the request.';
+      return checkedAt ? `Last attempted ${checkedAt}.` : 'The release check could not complete.';
     default:
       return appInfo ? `Running Recall ${appInfo.current_version}.` : null;
   }
-}
-
-function getProgressPercent(updateStatus: UpdateStatus): number | null {
-  if (!updateStatus.total_bytes || updateStatus.total_bytes <= 0) {
-    return updateStatus.state === 'restarting' ? 100 : null;
-  }
-
-  return Math.max(
-    0,
-    Math.min(100, Math.round((updateStatus.downloaded_bytes / updateStatus.total_bytes) * 100)),
-  );
 }
 
 function getSourceLocationPreview(source: DetectedSource): { preview: string; full: string; truncated: boolean } {
@@ -126,14 +95,10 @@ export default function SettingsPanel({
   sources,
   updateStatus,
   onCheckForUpdates,
-  onInstallUpdate,
+  onOpenReleasePage,
   onClearDatabase,
 }: SettingsPanelProps) {
-  const checkDisabled = !appInfo?.updater_enabled
-    || updateStatus.state === 'checking'
-    || updateStatus.state === 'installing'
-    || updateStatus.state === 'restarting';
-  const progressPercent = getProgressPercent(updateStatus);
+  const checkDisabled = updateStatus.state === 'checking';
   const releaseNotes = trimReleaseNotes(updateStatus.release_notes, 360);
   const updateMeta = getUpdateMeta(appInfo, updateStatus);
 
@@ -188,35 +153,20 @@ export default function SettingsPanel({
                 <div className="update-card-notes">{releaseNotes}</div>
               )}
 
-              {(updateStatus.state === 'installing' || updateStatus.state === 'restarting') && progressPercent !== null && (
-                <div className="update-progress-row">
-                  <div className="update-progress-bar"><span style={{ width: `${progressPercent}%` }} /></div>
-                  <div className="update-progress-label">{progressPercent}%</div>
-                </div>
-              )}
-
               <div className="update-card-actions">
-                {appInfo?.updater_enabled && (
-                  <button
-                    className="update-secondary-btn"
-                    disabled={checkDisabled}
-                    onClick={onCheckForUpdates}
-                    type="button"
-                  >
-                    <RefreshIcon className={updateStatus.state === 'checking' ? 'spin-icon' : undefined} />
-                    <span>{updateStatus.state === 'checking' ? 'Checking...' : 'Check now'}</span>
-                  </button>
-                )}
+                <button
+                  className="update-secondary-btn"
+                  disabled={checkDisabled}
+                  onClick={onCheckForUpdates}
+                  type="button"
+                >
+                  <RefreshIcon className={updateStatus.state === 'checking' ? 'spin-icon' : undefined} />
+                  <span>{updateStatus.state === 'checking' ? 'Checking...' : 'Check now'}</span>
+                </button>
                 {updateStatus.state === 'available' && (
-                  <button className="update-primary-btn" onClick={onInstallUpdate} type="button">
+                  <button className="update-primary-btn" onClick={onOpenReleasePage} type="button">
                     <DownloadIcon />
-                    <span>Install update</span>
-                  </button>
-                )}
-                {(updateStatus.state === 'installing' || updateStatus.state === 'restarting') && (
-                  <button className="update-primary-btn" disabled type="button">
-                    <DownloadIcon />
-                    <span>{updateStatus.state === 'installing' ? 'Installing...' : 'Restarting...'}</span>
+                    <span>View release</span>
                   </button>
                 )}
               </div>
@@ -258,7 +208,7 @@ export default function SettingsPanel({
                 <span className="about-label">Source</span>
                 <a
                   className="about-link"
-                  href="https://github.com/akhshyganesh/recall"
+                  href={appInfo?.repository_url ?? 'https://github.com/akhshyganesh/recall'}
                   rel="noopener noreferrer"
                   target="_blank"
                 >

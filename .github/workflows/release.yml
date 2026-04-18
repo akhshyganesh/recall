@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   build:
-    environment: production
     strategy:
       fail-fast: false
       matrix:
@@ -58,62 +57,6 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Prepare updater signing key
-        shell: bash
-        env:
-          TAURI_PRIVATE_KEY_SECRET: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-
-          if [[ -z "${TAURI_PRIVATE_KEY_SECRET:-}" ]]; then
-            echo "TAURI_SIGNING_PRIVATE_KEY secret is required for updater builds." >&2
-            exit 1
-          fi
-
-          decode_base64() {
-            if base64 --help 2>&1 | grep -q -- '--decode'; then
-              base64 --decode
-            else
-              base64 -D
-            fi
-          }
-
-          key_path="$RUNNER_TEMP/tauri-updater.key"
-          decoded_path="$RUNNER_TEMP/tauri-updater.key.decoded"
-          rm -f "$key_path" "$decoded_path"
-
-          if printf '%s' "$TAURI_PRIVATE_KEY_SECRET" | grep -q '^untrusted comment:'; then
-            printf '%s' "$TAURI_PRIVATE_KEY_SECRET" > "$key_path"
-          else
-            if ! printf '%s' "$TAURI_PRIVATE_KEY_SECRET" | decode_base64 > "$decoded_path" 2>/dev/null; then
-              echo "TAURI_SIGNING_PRIVATE_KEY must be the full minisign private key or a base64-encoded copy of that file." >&2
-              exit 1
-            fi
-
-            if ! grep -q '^untrusted comment:' "$decoded_path"; then
-              echo "Decoded TAURI_SIGNING_PRIVATE_KEY is missing the minisign comment header." >&2
-              exit 1
-            fi
-
-            mv "$decoded_path" "$key_path"
-          fi
-
-          chmod 600 "$key_path"
-
-          delimiter_key="TAURI_KEY_$(openssl rand -hex 16)"
-          delimiter_pwd="TAURI_PWD_$(openssl rand -hex 16)"
-          {
-            echo "TAURI_SIGNING_PRIVATE_KEY<<$delimiter_key"
-            cat "$key_path"
-            echo "$delimiter_key"
-            echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD<<$delimiter_pwd"
-            printf '%s\n' "${TAURI_PRIVATE_KEY_PASSWORD:-}"
-            echo "$delimiter_pwd"
-          } >> "$GITHUB_ENV"
-
-          rm -f "$key_path"
-
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -124,5 +67,4 @@ jobs:
           releaseBody: 'Download the appropriate binary for your platform below.'
           releaseDraft: false
           prerelease: false
-          includeUpdaterJson: true
           args: --target ${{ matrix.target }}

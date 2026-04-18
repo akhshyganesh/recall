@@ -30,12 +30,12 @@ struct DetectedSourcePayload {
 #[derive(Serialize)]
 struct AppInfoPayload {
     current_version: String,
-    updater_enabled: bool,
+    repository_url: String,
+    releases_url: String,
 }
 
-fn updater_enabled() -> bool {
-    !cfg!(debug_assertions)
-}
+const REPOSITORY_URL: &str = "https://github.com/akhshyganesh/recall";
+const RELEASES_URL: &str = "https://github.com/akhshyganesh/recall/releases";
 
 fn get_db_path() -> AppResult<PathBuf> {
     let data_dir = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("."));
@@ -173,7 +173,8 @@ fn detect_sources() -> AppResult<Vec<DetectedSourcePayload>> {
 fn get_app_info(app: AppHandle) -> AppInfoPayload {
     AppInfoPayload {
         current_version: app.package_info().version.to_string(),
-        updater_enabled: updater_enabled(),
+        repository_url: REPOSITORY_URL.to_string(),
+        releases_url: RELEASES_URL.to_string(),
     }
 }
 
@@ -317,16 +318,11 @@ pub fn run() {
     let db = Database::new(&db_path).expect("Failed to initialize database");
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(AppState {
             db: Arc::new(Mutex::new(Some(db))),
         })
         .setup(|app| {
-            if updater_enabled() {
-                app.handle()
-                    .plugin(tauri_plugin_updater::Builder::new().build())?;
-            }
-
             spawn_initial_scan(app.state::<AppState>().db.clone());
             Ok(())
         })

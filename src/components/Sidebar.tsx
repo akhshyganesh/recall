@@ -1,6 +1,5 @@
 import type { OpenTab, Stats, UpdateStatus, View } from '../types';
 import { toolCssClass } from '../lib/tool-style';
-import { formatBytes } from '../lib/update-format';
 import AppLogo from './AppLogo';
 import { CloseIcon, DownloadIcon, PinIcon, RefreshIcon, SettingsIcon, StarIcon, TimelineIcon } from './AppIcons';
 
@@ -15,7 +14,7 @@ interface SidebarProps {
   onTimeline: () => void;
   onFavorites: () => void;
   onSettings: () => void;
-  onInstallUpdate: () => void;
+  onOpenReleasePage: () => void;
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string) => void;
   onTogglePinTab: (id: string) => void;
@@ -23,47 +22,10 @@ interface SidebarProps {
   onClose?: () => void;
 }
 
-function getUpdateBannerTitle(updateStatus: UpdateStatus): string {
-  switch (updateStatus.state) {
-    case 'available':
-      return 'Update available';
-    case 'installing':
-      return 'Updating Recall';
-    case 'restarting':
-      return 'Restarting Recall';
-    default:
-      return '';
-  }
-}
-
 function getUpdateBannerSubtitle(updateStatus: UpdateStatus): string {
-  switch (updateStatus.state) {
-    case 'available':
-      return updateStatus.available_version
-        ? `Version ${updateStatus.available_version} is ready to install`
-        : 'A newer signed build is ready to install';
-    case 'installing':
-      if (updateStatus.total_bytes) {
-        return `${formatBytes(updateStatus.downloaded_bytes)} of ${formatBytes(updateStatus.total_bytes)}`;
-      }
-
-      return 'Downloading the signed update bundle';
-    case 'restarting':
-      return 'Finishing installation and relaunching';
-    default:
-      return '';
-  }
-}
-
-function getUpdateProgress(updateStatus: UpdateStatus): number | null {
-  if (!updateStatus.total_bytes || updateStatus.total_bytes <= 0) {
-    return null;
-  }
-
-  return Math.max(
-    0,
-    Math.min(100, Math.round((updateStatus.downloaded_bytes / updateStatus.total_bytes) * 100)),
-  );
+  return updateStatus.latest_version
+    ? `Version ${updateStatus.latest_version} is available on GitHub`
+    : 'A newer release is available on GitHub';
 }
 
 export default function Sidebar({
@@ -77,17 +39,14 @@ export default function Sidebar({
   onTimeline,
   onFavorites,
   onSettings,
-  onInstallUpdate,
+  onOpenReleasePage,
   onSelectTab,
   onCloseTab,
   onTogglePinTab,
   onScan,
   onClose = () => {},
 }: SidebarProps) {
-  const showUpdateBanner = updateStatus.state === 'available'
-    || updateStatus.state === 'installing'
-    || updateStatus.state === 'restarting';
-  const updateProgress = getUpdateProgress(updateStatus);
+  const showUpdateBanner = updateStatus.state === 'available';
   const sortedTabs = [...openTabs].sort((a, b) => {
     if (a.pinned !== b.pinned) {
       return a.pinned ? -1 : 1;
@@ -209,26 +168,16 @@ export default function Sidebar({
         </button>
         {showUpdateBanner && (
           <button
-            className={`update-banner ${updateStatus.state}`}
-            disabled={updateStatus.state !== 'available'}
-            onClick={() => {
-              if (updateStatus.state === 'available') {
-                onInstallUpdate();
-              }
-            }}
+            className="update-banner available"
+            onClick={onOpenReleasePage}
             type="button"
           >
             <span className="update-banner-icon"><DownloadIcon /></span>
             <span className="update-banner-copy">
-              <span className="update-banner-title">{getUpdateBannerTitle(updateStatus)}</span>
+              <span className="update-banner-title">Update available</span>
               <span className="update-banner-sub">{getUpdateBannerSubtitle(updateStatus)}</span>
             </span>
-            {updateStatus.state === 'available' && <span className="update-banner-action">Install</span>}
-            {updateProgress !== null && (
-              <span className="update-banner-progress">
-                <span style={{ width: `${updateProgress}%` }} />
-              </span>
-            )}
+            <span className="update-banner-action">View</span>
           </button>
         )}
         <button

@@ -93,27 +93,25 @@ export interface Stats {
 
 export interface AppInfo {
   current_version: string;
-  updater_enabled: boolean;
+  repository_url: string;
+  releases_url: string;
 }
 
 export type UpdateState =
   | 'idle'
-  | 'disabled'
   | 'checking'
   | 'available'
   | 'up-to-date'
-  | 'installing'
-  | 'restarting'
   | 'error';
 
 export interface UpdateStatus {
   state: UpdateState;
-  available_version: string | null;
-  checked_at: string | null;
+  current_version: string | null;
+  latest_version: string | null;
+  release_url: string | null;
   release_date: string | null;
   release_notes: string | null;
-  downloaded_bytes: number;
-  total_bytes: number | null;
+  checked_at: string | null;
   error: string | null;
 }
 
