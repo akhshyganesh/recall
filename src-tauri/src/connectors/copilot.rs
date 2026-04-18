@@ -28,7 +28,9 @@ struct EditSessionData {
 }
 
 impl CopilotConnector {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 
     /// VS Code stores full Copilot chat sessions in per-workspace storage:
     /// ~/Library/Application Support/Code/User/workspaceStorage/<hash>/chatSessions/<session-uuid>.jsonl
@@ -40,8 +42,11 @@ impl CopilotConnector {
         let mut roots = Vec::new();
         let candidates = if cfg!(target_os = "macos") {
             vec![
-                dirs::home_dir().map(|h| h.join("Library/Application Support/Code/User/workspaceStorage")),
-                dirs::home_dir().map(|h| h.join("Library/Application Support/Code - Insiders/User/workspaceStorage")),
+                dirs::home_dir()
+                    .map(|h| h.join("Library/Application Support/Code/User/workspaceStorage")),
+                dirs::home_dir().map(|h| {
+                    h.join("Library/Application Support/Code - Insiders/User/workspaceStorage")
+                }),
             ]
         } else {
             vec![
@@ -99,7 +104,9 @@ impl CopilotConnector {
     /// Extract a clean file path from a VS Code URI JSON string.
     /// The URI can be either a JSON object with a "path" field, or a plain string.
     fn extract_path_from_uri(uri_str: &str) -> String {
-        if uri_str.is_empty() { return String::new(); }
+        if uri_str.is_empty() {
+            return String::new();
+        }
         // Try parsing as JSON object first
         if let Ok(val) = serde_json::from_str::<serde_json::Value>(uri_str) {
             if let Some(path) = val.get("path").and_then(|p| p.as_str()) {
@@ -111,7 +118,9 @@ impl CopilotConnector {
         }
         // Fallback: try as file:// URL
         if let Some(stripped) = uri_str.strip_prefix("file://") {
-            return urlencoding::decode(stripped).unwrap_or_default().to_string();
+            return urlencoding::decode(stripped)
+                .unwrap_or_default()
+                .to_string();
         }
         uri_str.to_string()
     }
@@ -126,33 +135,55 @@ impl CopilotConnector {
         if let Some(external) = value.get("external").and_then(|p| p.as_str()) {
             return Self::extract_path_from_uri(external);
         }
-        value.as_str().map(Self::extract_path_from_uri).unwrap_or_default()
+        value
+            .as_str()
+            .map(Self::extract_path_from_uri)
+            .unwrap_or_default()
     }
 
     fn extract_display_text(value: &serde_json::Value) -> Option<String> {
         match value {
             serde_json::Value::String(text) => {
                 let trimmed = text.trim();
-                if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(trimmed.to_string())
+                }
             }
             serde_json::Value::Number(number) => Some(number.to_string()),
             serde_json::Value::Bool(boolean) => Some(boolean.to_string()),
             serde_json::Value::Array(items) => {
-                let joined = items.iter()
+                let joined = items
+                    .iter()
                     .filter_map(Self::extract_display_text)
                     .collect::<Vec<_>>()
                     .join(" ");
-                if joined.is_empty() { None } else { Some(joined) }
+                if joined.is_empty() {
+                    None
+                } else {
+                    Some(joined)
+                }
             }
             serde_json::Value::Object(_) => {
-                for key in ["value", "title", "label", "name", "message", "description", "content", "original"] {
+                for key in [
+                    "value",
+                    "title",
+                    "label",
+                    "name",
+                    "message",
+                    "description",
+                    "content",
+                    "original",
+                ] {
                     if let Some(text) = value.get(key).and_then(Self::extract_display_text) {
                         return Some(text);
                     }
                 }
 
                 if let Some(parts) = value.get("parts").and_then(|parts| parts.as_array()) {
-                    let joined = parts.iter()
+                    let joined = parts
+                        .iter()
                         .filter_map(Self::extract_display_text)
                         .collect::<Vec<_>>()
                         .join(" ");
@@ -183,7 +214,13 @@ impl CopilotConnector {
             _ => return None,
         };
 
-        for key in ["description", "progressMessage", "message", "content", "commandLine"] {
+        for key in [
+            "description",
+            "progressMessage",
+            "message",
+            "content",
+            "commandLine",
+        ] {
             if let Some(text) = parsed.get(key).and_then(Self::extract_display_text) {
                 return Some(text);
             }
@@ -203,7 +240,8 @@ impl CopilotConnector {
     }
 
     fn path_mtime_rfc3339(path: &Path) -> Option<String> {
-        fs::metadata(path).ok()
+        fs::metadata(path)
+            .ok()
             .and_then(|meta| meta.modified().ok())
             .map(|time| chrono::DateTime::<chrono::Utc>::from(time).to_rfc3339())
     }
@@ -228,7 +266,8 @@ impl CopilotConnector {
     fn collect_file_baselines(state: &serde_json::Value) -> HashMap<(String, String), String> {
         let mut baselines = HashMap::new();
 
-        let Some(file_baselines) = state.get("timeline")
+        let Some(file_baselines) = state
+            .get("timeline")
             .and_then(|timeline| timeline.get("fileBaselines"))
         else {
             return baselines;
@@ -246,14 +285,17 @@ impl CopilotConnector {
                 _ => entry,
             };
 
-            let Some(request_id) = baseline.get("requestId").and_then(|value| value.as_str()) else {
+            let Some(request_id) = baseline.get("requestId").and_then(|value| value.as_str())
+            else {
                 continue;
             };
 
-            let path = baseline.get("uri")
+            let path = baseline
+                .get("uri")
                 .map(Self::extract_path_from_value)
                 .unwrap_or_default();
-            let content = baseline.get("content")
+            let content = baseline
+                .get("content")
                 .and_then(|value| value.as_str())
                 .unwrap_or("");
 
@@ -313,7 +355,8 @@ impl CopilotConnector {
         let mut replacements: Vec<(usize, usize, String)> = Vec::new();
 
         for edit in edits {
-            let replacement = edit.get("text")
+            let replacement = edit
+                .get("text")
                 .and_then(|value| value.as_str())
                 .unwrap_or("")
                 .to_string();
@@ -322,22 +365,30 @@ impl CopilotConnector {
                 return replacement;
             };
 
-            let start_line = range.get("startLineNumber")
+            let start_line = range
+                .get("startLineNumber")
                 .and_then(|value| value.as_u64())
                 .unwrap_or(1) as usize;
-            let start_column = range.get("startColumn")
+            let start_column = range
+                .get("startColumn")
                 .and_then(|value| value.as_u64())
                 .unwrap_or(1) as usize;
-            let end_line = range.get("endLineNumber")
+            let end_line = range
+                .get("endLineNumber")
                 .and_then(|value| value.as_u64())
                 .unwrap_or(start_line as u64) as usize;
-            let end_column = range.get("endColumn")
+            let end_column = range
+                .get("endColumn")
                 .and_then(|value| value.as_u64())
                 .unwrap_or(start_column as u64) as usize;
 
             let start = Self::byte_index_for_position(content, start_line, start_column);
             let end = Self::byte_index_for_position(content, end_line, end_column);
-            replacements.push((start.min(content.len()), end.min(content.len()), replacement));
+            replacements.push((
+                start.min(content.len()),
+                end.min(content.len()),
+                replacement,
+            ));
         }
 
         replacements.sort_by(|left, right| right.0.cmp(&left.0).then_with(|| right.1.cmp(&left.1)));
@@ -370,11 +421,14 @@ impl CopilotConnector {
             .to_string()
     }
 
-    fn collect_request_edit_parts(state: &serde_json::Value) -> HashMap<String, Vec<serde_json::Value>> {
+    fn collect_request_edit_parts(
+        state: &serde_json::Value,
+    ) -> HashMap<String, Vec<serde_json::Value>> {
         let baselines = Self::collect_file_baselines(state);
         let mut grouped: HashMap<String, HashMap<String, Vec<EditOperation>>> = HashMap::new();
 
-        let Some(operations) = state.get("timeline")
+        let Some(operations) = state
+            .get("timeline")
             .and_then(|timeline| timeline.get("operations"))
             .and_then(|operations| operations.as_array())
         else {
@@ -382,36 +436,42 @@ impl CopilotConnector {
         };
 
         for (index, operation) in operations.iter().enumerate() {
-            let Some(request_id) = operation.get("requestId").and_then(|value| value.as_str()) else {
+            let Some(request_id) = operation.get("requestId").and_then(|value| value.as_str())
+            else {
                 continue;
             };
 
-            let path = operation.get("uri")
+            let path = operation
+                .get("uri")
                 .map(Self::extract_path_from_value)
                 .unwrap_or_default();
             if path.is_empty() {
                 continue;
             }
 
-            let epoch = operation.get("epoch")
+            let epoch = operation
+                .get("epoch")
                 .and_then(|value| value.as_i64())
                 .unwrap_or(index as i64);
 
             let kind = match operation.get("type").and_then(|value| value.as_str()) {
                 Some("create") => EditOperationKind::Create {
-                    initial_content: operation.get("initialContent")
+                    initial_content: operation
+                        .get("initialContent")
                         .and_then(|value| value.as_str())
                         .unwrap_or("")
                         .to_string(),
                 },
                 Some("delete") => EditOperationKind::Delete {
-                    final_content: operation.get("finalContent")
+                    final_content: operation
+                        .get("finalContent")
                         .and_then(|value| value.as_str())
                         .unwrap_or("")
                         .to_string(),
                 },
                 Some("textEdit") => EditOperationKind::TextEdit {
-                    edits: operation.get("edits")
+                    edits: operation
+                        .get("edits")
                         .and_then(|value| value.as_array())
                         .cloned()
                         .unwrap_or_default(),
@@ -419,7 +479,8 @@ impl CopilotConnector {
                 _ => continue,
             };
 
-            grouped.entry(request_id.to_string())
+            grouped
+                .entry(request_id.to_string())
                 .or_default()
                 .entry(path)
                 .or_default()
@@ -436,14 +497,17 @@ impl CopilotConnector {
             for (file_path, mut operations) in file_entries {
                 operations.sort_by_key(|operation| (operation.epoch, operation.index));
 
-                let mut before = baselines.get(&(request_id.clone(), file_path.clone()))
+                let mut before = baselines
+                    .get(&(request_id.clone(), file_path.clone()))
                     .cloned()
                     .unwrap_or_default();
 
                 if before.is_empty() {
                     if let Some(first) = operations.first() {
                         before = match &first.kind {
-                            EditOperationKind::Create { initial_content } => initial_content.clone(),
+                            EditOperationKind::Create { initial_content } => {
+                                initial_content.clone()
+                            }
                             EditOperationKind::Delete { final_content } => final_content.clone(),
                             EditOperationKind::TextEdit { .. } => String::new(),
                         };
@@ -523,7 +587,10 @@ impl CopilotConnector {
 
     /// Navigate into a nested serde_json::Value by a key path, returning a mutable reference.
     /// Keys can be strings (for objects) or integers (for arrays).
-    fn navigate_mut<'a>(root: &'a mut serde_json::Value, keys: &[serde_json::Value]) -> Option<&'a mut serde_json::Value> {
+    fn navigate_mut<'a>(
+        root: &'a mut serde_json::Value,
+        keys: &[serde_json::Value],
+    ) -> Option<&'a mut serde_json::Value> {
         let mut current = root;
         for key in keys {
             match key {
@@ -531,7 +598,10 @@ impl CopilotConnector {
                     if !current.is_object() {
                         *current = serde_json::json!({});
                     }
-                    current = current.as_object_mut()?.entry(s.clone()).or_insert(serde_json::Value::Null);
+                    current = current
+                        .as_object_mut()?
+                        .entry(s.clone())
+                        .or_insert(serde_json::Value::Null);
                 }
                 serde_json::Value::Number(n) => {
                     let idx = n.as_u64()? as usize;
@@ -557,7 +627,9 @@ impl CopilotConnector {
 
         for line in content.lines() {
             let line = line.trim();
-            if line.is_empty() { continue; }
+            if line.is_empty() {
+                continue;
+            }
             let obj: serde_json::Value = match serde_json::from_str(line) {
                 Ok(v) => v,
                 Err(_) => continue,
@@ -576,7 +648,9 @@ impl CopilotConnector {
                         obj.get("k").and_then(|k| k.as_array()),
                         obj.get("v"),
                     ) {
-                        if keys.is_empty() { continue; }
+                        if keys.is_empty() {
+                            continue;
+                        }
                         let parent_keys = &keys[..keys.len() - 1];
                         let last_key = &keys[keys.len() - 1];
                         if let Some(parent) = Self::navigate_mut(s, parent_keys) {
@@ -627,24 +701,39 @@ impl CopilotConnector {
     }
 
     /// Parse a chatSessions JSONL file into a NormalizedConversation.
-    fn parse_chat_session(&self, path: &Path, workspace_folder: Option<String>) -> Option<NormalizedConversation> {
+    fn parse_chat_session(
+        &self,
+        path: &Path,
+        workspace_folder: Option<String>,
+    ) -> Option<NormalizedConversation> {
         let content = fs::read_to_string(path).ok()?;
         let state = Self::replay_jsonl(&content)?;
 
-        let session_id = state.get("sessionId")
+        let session_id = state
+            .get("sessionId")
             .and_then(|s| s.as_str())
             .map(|s| s.to_string())
-            .unwrap_or_else(|| path.file_stem().unwrap_or_default().to_string_lossy().to_string());
+            .unwrap_or_else(|| {
+                path.file_stem()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string()
+            });
         let edit_session_data = Self::load_edit_session_data(path, &session_id);
 
         let creation_date = state.get("creationDate").and_then(|d| d.as_i64());
-        let custom_title = state.get("customTitle").and_then(|t| t.as_str()).map(|s| s.to_string());
+        let custom_title = state
+            .get("customTitle")
+            .and_then(|t| t.as_str())
+            .map(|s| s.to_string());
 
         let requests = match state.get("requests").and_then(|r| r.as_array()) {
             Some(r) => r,
             None => return None,
         };
-        if requests.is_empty() { return None; }
+        if requests.is_empty() {
+            return None;
+        }
 
         let mut messages: Vec<NormalizedMessage> = Vec::new();
         let mut first_model: Option<String> = None;
@@ -654,7 +743,8 @@ impl CopilotConnector {
         for req in requests {
             let request_id = req.get("requestId").and_then(|value| value.as_str());
             // Extract user message
-            let user_text = req.get("message")
+            let user_text = req
+                .get("message")
                 .and_then(|m| m.get("text"))
                 .and_then(|t| t.as_str())
                 .unwrap_or("");
@@ -680,7 +770,8 @@ impl CopilotConnector {
 
             // Extract model
             if first_model.is_none() {
-                first_model = req.get("modelId")
+                first_model = req
+                    .get("modelId")
                     .and_then(|m| m.as_str())
                     .map(|s| s.strip_prefix("copilot/").unwrap_or(s).to_string());
             }
@@ -696,7 +787,9 @@ impl CopilotConnector {
                     match part_kind {
                         // No kind = plain text/markdown content
                         None => {
-                            if let Some(val) = part.get("value").and_then(Self::extract_content_text) {
+                            if let Some(val) =
+                                part.get("value").and_then(Self::extract_content_text)
+                            {
                                 if !val.is_empty() {
                                     plain_text.push(val.to_string());
                                     structured_parts.push(serde_json::json!({
@@ -708,9 +801,12 @@ impl CopilotConnector {
                         }
                         // Thinking/reasoning blocks
                         Some("thinking") => {
-                            if let Some(val) = part.get("value").and_then(Self::extract_content_text) {
+                            if let Some(val) =
+                                part.get("value").and_then(Self::extract_content_text)
+                            {
                                 if !val.trim().is_empty() {
-                                    let title = part.get("generatedTitle")
+                                    let title = part
+                                        .get("generatedTitle")
                                         .and_then(|t| t.as_str())
                                         .unwrap_or("Thinking…");
                                     structured_parts.push(serde_json::json!({
@@ -724,13 +820,16 @@ impl CopilotConnector {
                         }
                         // Tool invocations (sub-agents, file reads, searches, etc.)
                         Some("toolInvocationSerialized") => {
-                            let tool_id = part.get("toolId")
+                            let tool_id = part
+                                .get("toolId")
                                 .and_then(|t| t.as_str())
                                 .unwrap_or("unknown");
-                            let message = part.get("invocationMessage")
+                            let message = part
+                                .get("invocationMessage")
                                 .and_then(Self::extract_display_text)
                                 .unwrap_or_default();
-                            let is_complete = part.get("isComplete")
+                            let is_complete = part
+                                .get("isComplete")
                                 .and_then(|c| c.as_bool())
                                 .unwrap_or(false);
                             let mut tool_data = serde_json::json!({
@@ -748,17 +847,23 @@ impl CopilotConnector {
                         Some("textEditGroup") => {
                             let uri_str = part.get("uri").and_then(|u| u.as_str()).unwrap_or("");
                             let file_path = Self::extract_path_from_uri(uri_str);
-                            let edits_str = part.get("edits").and_then(|e| e.as_str()).unwrap_or("[]");
-                            let is_done = part.get("done").and_then(|d| d.as_bool()).unwrap_or(false);
+                            let edits_str =
+                                part.get("edits").and_then(|e| e.as_str()).unwrap_or("[]");
+                            let is_done =
+                                part.get("done").and_then(|d| d.as_bool()).unwrap_or(false);
 
                             // Parse edits JSON — it's a nested array: [[{text, range}], ...]
                             let mut edit_text = String::new();
-                            if let Ok(edits_arr) = serde_json::from_str::<serde_json::Value>(edits_str) {
+                            if let Ok(edits_arr) =
+                                serde_json::from_str::<serde_json::Value>(edits_str)
+                            {
                                 if let Some(outer) = edits_arr.as_array() {
                                     for group in outer {
                                         if let Some(inner) = group.as_array() {
                                             for edit in inner {
-                                                if let Some(text) = edit.get("text").and_then(|t| t.as_str()) {
+                                                if let Some(text) =
+                                                    edit.get("text").and_then(|t| t.as_str())
+                                                {
                                                     edit_text.push_str(text);
                                                 }
                                             }
@@ -783,10 +888,10 @@ impl CopilotConnector {
                         // Inline file/folder references
                         Some("inlineReference") => {
                             if let Some(ref_val) = part.get("inlineReference") {
-                                let name = ref_val.get("name")
-                                    .and_then(|n| n.as_str())
-                                    .unwrap_or("");
-                                let uri_path = ref_val.get("location")
+                                let name =
+                                    ref_val.get("name").and_then(|n| n.as_str()).unwrap_or("");
+                                let uri_path = ref_val
+                                    .get("location")
                                     .and_then(|l| l.get("uri"))
                                     .and_then(|u| u.get("path"))
                                     .and_then(|p| p.as_str())
@@ -806,8 +911,8 @@ impl CopilotConnector {
                     }
                 }
 
-                if let Some(edit_parts) = request_id
-                    .and_then(|id| edit_session_data.request_parts.get(id))
+                if let Some(edit_parts) =
+                    request_id.and_then(|id| edit_session_data.request_parts.get(id))
                 {
                     structured_parts.extend(edit_parts.iter().cloned());
                 } else {
@@ -816,8 +921,8 @@ impl CopilotConnector {
 
                 let response_text = plain_text.join("");
                 // Only create message if there's actual content (text or structured)
-                let has_content = !response_text.trim().is_empty() || 
-                    structured_parts.iter().any(|p| {
+                let has_content = !response_text.trim().is_empty()
+                    || structured_parts.iter().any(|p| {
                         let t = p.get("type").and_then(|t| t.as_str()).unwrap_or("");
                         t == "thinking" || t == "tool_call" || t == "text_edit"
                     });
@@ -835,7 +940,9 @@ impl CopilotConnector {
             }
         }
 
-        if messages.is_empty() { return None; }
+        if messages.is_empty() {
+            return None;
+        }
 
         // Title: prefer customTitle, then first user message truncated
         let title = custom_title.or_else(|| {
@@ -850,10 +957,14 @@ impl CopilotConnector {
         });
 
         let started_at = creation_date.map(Self::millis_to_rfc3339);
-        let ended_at = last_timestamp.map(Self::millis_to_rfc3339)
+        let ended_at = last_timestamp
+            .map(Self::millis_to_rfc3339)
             .or_else(|| started_at.clone());
 
-        let file_mtime = match (Self::path_mtime_rfc3339(path), edit_session_data.source_mtime.clone()) {
+        let file_mtime = match (
+            Self::path_mtime_rfc3339(path),
+            edit_session_data.source_mtime.clone(),
+        ) {
             (Some(chat_mtime), Some(edit_mtime)) => Some(chat_mtime.max(edit_mtime)),
             (Some(chat_mtime), None) => Some(chat_mtime),
             (None, Some(edit_mtime)) => Some(edit_mtime),
@@ -878,16 +989,26 @@ impl CopilotConnector {
 }
 
 impl Connector for CopilotConnector {
-    fn name(&self) -> &str { "GitHub Copilot" }
-    fn agent_slug(&self) -> &str { "copilot" }
+    fn name(&self) -> &str {
+        "GitHub Copilot"
+    }
+    fn agent_slug(&self) -> &str {
+        "copilot"
+    }
 
     fn detect(&self) -> DetectionResult {
         let ws_dirs = self.find_workspace_dirs();
         if !ws_dirs.is_empty() {
             DetectionResult {
                 detected: true,
-                root_paths: ws_dirs.iter().map(|p| p.to_string_lossy().to_string()).collect(),
-                evidence: format!("Found {} workspace(s) with Copilot Chat sessions", ws_dirs.len()),
+                root_paths: ws_dirs
+                    .iter()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .collect(),
+                evidence: format!(
+                    "Found {} workspace(s) with Copilot Chat sessions",
+                    ws_dirs.len()
+                ),
             }
         } else {
             DetectionResult {
@@ -906,24 +1027,34 @@ impl Connector for CopilotConnector {
                 for entry in entries.flatten() {
                     let ws_hash_dir = entry.path();
                     let chat_sessions_dir = ws_hash_dir.join("chatSessions");
-                    if !chat_sessions_dir.is_dir() { continue; }
+                    if !chat_sessions_dir.is_dir() {
+                        continue;
+                    }
 
                     let workspace_folder = Self::read_workspace_folder(&ws_hash_dir);
 
                     if let Ok(files) = fs::read_dir(&chat_sessions_dir) {
                         for file_entry in files.flatten() {
                             let path = file_entry.path();
-                            if path.extension().and_then(|e| e.to_str()) != Some("jsonl") { continue; }
-                            if !path.is_file() { continue; }
+                            if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+                                continue;
+                            }
+                            if !path.is_file() {
+                                continue;
+                            }
 
                             // Filter by mtime
                             if let Some(since) = since_ts {
                                 if let Some(mtime_str) = Self::latest_session_source_mtime(&path) {
-                                    if mtime_str.as_str() < since { continue; }
+                                    if mtime_str.as_str() < since {
+                                        continue;
+                                    }
                                 }
                             }
 
-                            if let Some(conv) = self.parse_chat_session(&path, workspace_folder.clone()) {
+                            if let Some(conv) =
+                                self.parse_chat_session(&path, workspace_folder.clone())
+                            {
                                 conversations.push(conv);
                             }
                         }

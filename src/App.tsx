@@ -2,15 +2,23 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import * as api from './api';
 import { BackIcon, ModelIcon, SearchIcon, StarIcon } from './components/AppIcons';
+import LandingHero from './components/LandingHero';
 import SearchResults from './components/SearchResults';
 import SessionDetail from './components/SessionDetail';
 import SessionFeed from './components/SessionFeed';
 import SettingsPanel from './components/SettingsPanel';
 import Sidebar from './components/Sidebar';
+import { downloadExportFile } from './lib/download';
 import { DATE_FILTERS, formatDateFilterLabel, getDateRange } from './lib/session-format';
 import { toolCssClass } from './lib/tool-style';
 import type { DateFilter, DetectedSource, SearchResult, Session, SessionSummary, Stats, View } from './types';
 import './styles.css';
+
+const RESULT_LIMIT = 200;
+const SEARCH_DEBOUNCE_MS = 160;
+const INCREMENTAL_SCAN_INTERVAL_MS = 30_000;
+const INCREMENTAL_SCAN_LOOKBACK_MS = 30_000;
+const SESSION_REFRESH_INTERVAL_MS = 10_000;
 
 export default function App() {
   const [view, setView] = useState<View>('timeline');
@@ -50,7 +58,7 @@ export default function App() {
         tool: toolFilter,
         dateFrom: range.from,
         dateTo: range.to,
-        limit: 200,
+        limit: RESULT_LIMIT,
       });
       setSessions(data);
     } catch (error) {
@@ -64,7 +72,7 @@ export default function App() {
     setLoading(true);
 
     try {
-      const favorites = await api.getFavorites(200, 0);
+      const favorites = await api.getFavorites(RESULT_LIMIT, 0);
       setSessions(favorites);
     } catch (error) {
       console.error('Failed to load favorites:', error);
@@ -89,7 +97,7 @@ export default function App() {
       tool: toolFilter,
       dateFrom: range.from,
       dateTo: range.to,
-      limit: 200,
+      limit: RESULT_LIMIT,
     });
   }, [dateFilter, toolFilter]);
 
@@ -169,7 +177,9 @@ export default function App() {
   useEffect(() => {
     const runIncrementalScan = async () => {
       try {
-        const count = await api.scanIncremental(new Date(Date.now() - 30_000).toISOString());
+        const count = await api.scanIncremental(
+          new Date(Date.now() - INCREMENTAL_SCAN_LOOKBACK_MS).toISOString(),
+        );
 
         if (count > 0) {
           await loadMeta();
@@ -182,7 +192,7 @@ export default function App() {
 
     const interval = window.setInterval(() => {
       void runIncrementalScan();
-    }, 30_000);
+    }, INCREMENTAL_SCAN_INTERVAL_MS);
 
     return () => window.clearInterval(interval);
   }, [loadMeta, refreshCurrentView]);
@@ -208,7 +218,7 @@ export default function App() {
 
     const interval = window.setInterval(() => {
       void refresh();
-    }, 10_000);
+    }, SESSION_REFRESH_INTERVAL_MS);
 
     return () => {
       cancelled = true;
@@ -254,7 +264,7 @@ export default function App() {
           setSearching(false);
         }
       }
-    }, 160);
+    }, SEARCH_DEBOUNCE_MS);
 
     return () => {
       cancelled = true;
@@ -315,13 +325,7 @@ export default function App() {
 
     try {
       const data = await api.exportSession(selectedSession.id, format);
-      const blob = new Blob([data.content], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = data.filename;
-      link.click();
-      URL.revokeObjectURL(url);
+      downloadExportFile(data);
     } catch (error) {
       console.error('Export failed:', error);
     }
@@ -463,6 +467,7 @@ export default function App() {
         <div className="content">
           {view === 'timeline' && (
             <div className="enter">
+              <LandingHero stats={stats} onScan={() => void handleScan()} scanning={scanning} />
               <SessionFeed
                 emptyState={{
                   icon: <SearchIcon />,

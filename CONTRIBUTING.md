@@ -7,6 +7,7 @@ Thanks for contributing. This repository is a local-first desktop app that index
 - Keep docs and UI copy aligned with the **actual behavior in code today**
 - Preserve the app's **local-first** model; indexed session data should stay on the user's machine
 - Prefer extending the existing normalization flow instead of creating source-specific UI paths when a shared model already exists
+- Keep README media in `docs/screenshots/` so public-facing assets stay easy to find
 
 ## Local setup
 
@@ -28,7 +29,13 @@ Build the frontend bundle:
 npm run build
 ```
 
-At the moment, `npm run build` is the only existing repository-level verification command in `package.json`. There are no lint or test scripts yet.
+Run the repository-level verification command:
+
+```bash
+npm run check
+```
+
+There is no dedicated lint script yet.
 
 ## Where to make changes
 
@@ -63,14 +70,14 @@ Try to keep extracted fields consistent with the rest of the app:
 
 If you change GitHub Copilot parsing, keep `src-tauri/src/connectors/copilot.rs` and `src/MessageBody.tsx` in sync. The frontend currently understands structured Copilot message parts such as thinking blocks, tool calls, and inline file edits reconstructed from Copilot edit state.
 
-Also note the current limitation in this codebase: session-level `file_changes` storage exists in the database schema and UI, but normal indexing does not populate it yet. Avoid documenting or relying on persisted file-change rows unless you implement that end to end.
+Session-level `file_changes` are now derived from structured `text_edit` message parts during indexing. If you change that contract, keep the Rust extraction logic and the frontend detail views in sync. At the moment, structured file-edit data mainly comes from the GitHub Copilot connector.
 
 ## Pull request expectations
 
 - Keep changes focused
 - Update docs when behavior changes
 - Do not describe roadmap features as if they already ship
-- Run `npm run build`
+- Run `npm run check`
 - If you changed desktop/runtime behavior, also smoke-test with `npm run tauri dev` when your environment has Tauri prerequisites installed
 
 ## License

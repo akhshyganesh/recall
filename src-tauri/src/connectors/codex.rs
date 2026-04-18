@@ -7,7 +7,9 @@ use walkdir::WalkDir;
 pub struct CodexConnector;
 
 impl CodexConnector {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 
     fn default_roots(&self) -> Vec<PathBuf> {
         let mut roots = Vec::new();
@@ -31,7 +33,9 @@ impl CodexConnector {
 
         for line in content.lines() {
             let line = line.trim();
-            if line.is_empty() { continue; }
+            if line.is_empty() {
+                continue;
+            }
 
             let val: serde_json::Value = match serde_json::from_str(line) {
                 Ok(v) => v,
@@ -42,21 +46,33 @@ impl CodexConnector {
 
             match event_type {
                 "session_meta" => {
-                    workspace = val.get("cwd").and_then(|c| c.as_str()).map(|s| s.to_string());
+                    workspace = val
+                        .get("cwd")
+                        .and_then(|c| c.as_str())
+                        .map(|s| s.to_string());
                     session_meta = val.clone();
                 }
                 "response_item" => {
                     if let Some(payload) = val.get("payload") {
-                        let payload_type = payload.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                        let payload_type =
+                            payload.get("type").and_then(|t| t.as_str()).unwrap_or("");
                         if payload_type == "message" {
-                            let role = payload.get("role").and_then(|r| r.as_str()).unwrap_or("assistant");
+                            let role = payload
+                                .get("role")
+                                .and_then(|r| r.as_str())
+                                .unwrap_or("assistant");
                             let content_str = extract_content_blocks(payload);
-                            if content_str.is_empty() { continue; }
+                            if content_str.is_empty() {
+                                continue;
+                            }
                             messages.push(NormalizedMessage {
                                 idx: 0,
                                 role: role.to_string(),
                                 author: model.clone(),
-                                created_at: val.get("timestamp").and_then(|t| t.as_str()).map(|s| s.to_string()),
+                                created_at: val
+                                    .get("timestamp")
+                                    .and_then(|t| t.as_str())
+                                    .map(|s| s.to_string()),
                                 content: content_str,
                                 extra: serde_json::json!({}),
                             });
@@ -67,30 +83,50 @@ impl CodexConnector {
                     let variant = val.get("variant").and_then(|v| v.as_str()).unwrap_or("");
                     match variant {
                         "user_message" => {
-                            let content_str = val.get("content").and_then(|c| c.as_str())
-                                .or_else(|| val.get("data").and_then(|d| d.get("content")).and_then(|c| c.as_str()))
-                                .unwrap_or("").to_string();
+                            let content_str = val
+                                .get("content")
+                                .and_then(|c| c.as_str())
+                                .or_else(|| {
+                                    val.get("data")
+                                        .and_then(|d| d.get("content"))
+                                        .and_then(|c| c.as_str())
+                                })
+                                .unwrap_or("")
+                                .to_string();
                             if !content_str.is_empty() {
                                 messages.push(NormalizedMessage {
                                     idx: 0,
                                     role: "user".to_string(),
                                     author: None,
-                                    created_at: val.get("timestamp").and_then(|t| t.as_str()).map(|s| s.to_string()),
+                                    created_at: val
+                                        .get("timestamp")
+                                        .and_then(|t| t.as_str())
+                                        .map(|s| s.to_string()),
                                     content: content_str,
                                     extra: serde_json::json!({}),
                                 });
                             }
                         }
                         "agent_reasoning" => {
-                            let content_str = val.get("content").and_then(|c| c.as_str())
-                                .or_else(|| val.get("data").and_then(|d| d.get("content")).and_then(|c| c.as_str()))
-                                .unwrap_or("").to_string();
+                            let content_str = val
+                                .get("content")
+                                .and_then(|c| c.as_str())
+                                .or_else(|| {
+                                    val.get("data")
+                                        .and_then(|d| d.get("content"))
+                                        .and_then(|c| c.as_str())
+                                })
+                                .unwrap_or("")
+                                .to_string();
                             if !content_str.is_empty() {
                                 messages.push(NormalizedMessage {
                                     idx: 0,
                                     role: "assistant".to_string(),
                                     author: Some("reasoning".to_string()),
-                                    created_at: val.get("timestamp").and_then(|t| t.as_str()).map(|s| s.to_string()),
+                                    created_at: val
+                                        .get("timestamp")
+                                        .and_then(|t| t.as_str())
+                                        .map(|s| s.to_string()),
                                     content: format!("[Reasoning] {}", content_str),
                                     extra: serde_json::json!({}),
                                 });
@@ -103,24 +139,29 @@ impl CodexConnector {
             }
         }
 
-        if messages.is_empty() { return None; }
+        if messages.is_empty() {
+            return None;
+        }
 
         for (i, msg) in messages.iter_mut().enumerate() {
             msg.idx = i;
         }
 
-        let title = messages.iter()
+        let title = messages
+            .iter()
             .find(|m| m.role == "user")
             .map(|m| first_line(&m.content, 100));
 
         // external_id: relative path from sessions dir without extension
-        let external_id = path.file_stem()
+        let external_id = path
+            .file_stem()
             .map(|s| s.to_string_lossy().to_string())
             .unwrap_or_else(|| path.to_string_lossy().to_string());
 
         let started_at = messages.first().and_then(|m| m.created_at.clone());
         let ended_at = messages.last().and_then(|m| m.created_at.clone());
-        let file_mtime = fs::metadata(path).ok()
+        let file_mtime = fs::metadata(path)
+            .ok()
             .and_then(|m| m.modified().ok())
             .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339());
 
@@ -148,34 +189,55 @@ impl CodexConnector {
         let mut messages: Vec<NormalizedMessage> = Vec::new();
 
         for item in items {
-            let role = item.get("role").and_then(|r| r.as_str()).unwrap_or("assistant");
+            let role = item
+                .get("role")
+                .and_then(|r| r.as_str())
+                .unwrap_or("assistant");
             let content_str = extract_content_blocks(item);
-            if content_str.is_empty() { continue; }
+            if content_str.is_empty() {
+                continue;
+            }
             messages.push(NormalizedMessage {
                 idx: 0,
                 role: role.to_string(),
                 author: None,
-                created_at: item.get("created_at").and_then(|t| t.as_str()).map(|s| s.to_string()),
+                created_at: item
+                    .get("created_at")
+                    .and_then(|t| t.as_str())
+                    .map(|s| s.to_string()),
                 content: content_str,
                 extra: serde_json::json!({}),
             });
         }
 
-        if messages.is_empty() { return None; }
+        if messages.is_empty() {
+            return None;
+        }
 
         for (i, msg) in messages.iter_mut().enumerate() {
             msg.idx = i;
         }
 
-        let workspace = val.get("session").and_then(|s| s.get("cwd")).and_then(|c| c.as_str()).map(|s| s.to_string());
-        let title = messages.iter().find(|m| m.role == "user").map(|m| first_line(&m.content, 100));
-        let file_mtime = fs::metadata(path).ok()
+        let workspace = val
+            .get("session")
+            .and_then(|s| s.get("cwd"))
+            .and_then(|c| c.as_str())
+            .map(|s| s.to_string());
+        let title = messages
+            .iter()
+            .find(|m| m.role == "user")
+            .map(|m| first_line(&m.content, 100));
+        let file_mtime = fs::metadata(path)
+            .ok()
             .and_then(|m| m.modified().ok())
             .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339());
 
         Some(NormalizedConversation {
             agent_slug: "codex".to_string(),
-            external_id: path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default(),
+            external_id: path
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_default(),
             title,
             workspace,
             source_path: path.to_string_lossy().to_string(),
@@ -191,8 +253,12 @@ impl CodexConnector {
 }
 
 impl Connector for CodexConnector {
-    fn name(&self) -> &str { "Codex CLI" }
-    fn agent_slug(&self) -> &str { "codex" }
+    fn name(&self) -> &str {
+        "Codex CLI"
+    }
+    fn agent_slug(&self) -> &str {
+        "codex"
+    }
 
     fn detect(&self) -> DetectionResult {
         for root in self.default_roots() {
@@ -223,20 +289,32 @@ impl Connector for CodexConnector {
 
         for root in scan_roots {
             let sessions_dir = root.join("sessions");
-            if !sessions_dir.is_dir() { continue; }
+            if !sessions_dir.is_dir() {
+                continue;
+            }
 
-            for entry in WalkDir::new(&sessions_dir).into_iter().filter_map(|e| e.ok()) {
+            for entry in WalkDir::new(&sessions_dir)
+                .into_iter()
+                .filter_map(|e| e.ok())
+            {
                 let path = entry.path();
-                if !path.is_file() { continue; }
+                if !path.is_file() {
+                    continue;
+                }
 
                 let fname = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                if !fname.starts_with("rollout-") { continue; }
+                if !fname.starts_with("rollout-") {
+                    continue;
+                }
 
                 if let Some(since) = since_ts {
                     if let Ok(meta) = fs::metadata(path) {
                         if let Ok(mtime) = meta.modified() {
-                            let mtime_str = chrono::DateTime::<chrono::Utc>::from(mtime).to_rfc3339();
-                            if mtime_str.as_str() < since { continue; }
+                            let mtime_str =
+                                chrono::DateTime::<chrono::Utc>::from(mtime).to_rfc3339();
+                            if mtime_str.as_str() < since {
+                                continue;
+                            }
                         }
                     }
                 }

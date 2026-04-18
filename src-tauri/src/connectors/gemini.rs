@@ -7,7 +7,9 @@ use walkdir::WalkDir;
 pub struct GeminiConnector;
 
 impl GeminiConnector {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 
     fn default_roots(&self) -> Vec<PathBuf> {
         let mut roots = Vec::new();
@@ -23,14 +25,19 @@ impl GeminiConnector {
         let val: serde_json::Value = serde_json::from_str(&content).ok()?;
 
         let session_id = val.get("sessionId").and_then(|s| s.as_str())?.to_string();
-        let project_hash = val.get("projectHash").and_then(|p| p.as_str()).map(|s| s.to_string());
+        let project_hash = val
+            .get("projectHash")
+            .and_then(|p| p.as_str())
+            .map(|s| s.to_string());
         let msgs = val.get("messages").and_then(|m| m.as_array())?;
 
         let mut messages: Vec<NormalizedMessage> = Vec::new();
         let mut workspace = None;
 
         for msg in msgs {
-            let msg_type = msg.get("type").and_then(|t| t.as_str())
+            let msg_type = msg
+                .get("type")
+                .and_then(|t| t.as_str())
                 .or_else(|| msg.get("role").and_then(|r| r.as_str()))
                 .unwrap_or("user");
 
@@ -40,11 +47,16 @@ impl GeminiConnector {
                 other => other,
             };
 
-            let content_str = msg.get("content").and_then(|c| c.as_str())
+            let content_str = msg
+                .get("content")
+                .and_then(|c| c.as_str())
                 .or_else(|| msg.get("text").and_then(|t| t.as_str()))
-                .unwrap_or("").to_string();
+                .unwrap_or("")
+                .to_string();
 
-            if content_str.is_empty() { continue; }
+            if content_str.is_empty() {
+                continue;
+            }
 
             // Extract workspace from message content patterns
             if workspace.is_none() {
@@ -53,8 +65,15 @@ impl GeminiConnector {
                 }
             }
 
-            let created_at = msg.get("timestamp").and_then(|t| t.as_str()).map(|s| s.to_string())
-                .or_else(|| msg.get("created_at").and_then(|t| t.as_str()).map(|s| s.to_string()));
+            let created_at = msg
+                .get("timestamp")
+                .and_then(|t| t.as_str())
+                .map(|s| s.to_string())
+                .or_else(|| {
+                    msg.get("created_at")
+                        .and_then(|t| t.as_str())
+                        .map(|s| s.to_string())
+                });
 
             messages.push(NormalizedMessage {
                 idx: 0,
@@ -66,21 +85,31 @@ impl GeminiConnector {
             });
         }
 
-        if messages.is_empty() { return None; }
+        if messages.is_empty() {
+            return None;
+        }
 
         for (i, msg) in messages.iter_mut().enumerate() {
             msg.idx = i;
         }
 
-        let title = messages.iter()
+        let title = messages
+            .iter()
             .find(|m| m.role == "user")
             .map(|m| first_line(&m.content, 100));
 
-        let started_at = val.get("startTime").and_then(|s| s.as_str()).map(|s| s.to_string())
+        let started_at = val
+            .get("startTime")
+            .and_then(|s| s.as_str())
+            .map(|s| s.to_string())
             .or_else(|| messages.first().and_then(|m| m.created_at.clone()));
-        let ended_at = val.get("lastUpdated").and_then(|s| s.as_str()).map(|s| s.to_string())
+        let ended_at = val
+            .get("lastUpdated")
+            .and_then(|s| s.as_str())
+            .map(|s| s.to_string())
             .or_else(|| messages.last().and_then(|m| m.created_at.clone()));
-        let file_mtime = fs::metadata(path).ok()
+        let file_mtime = fs::metadata(path)
+            .ok()
             .and_then(|m| m.modified().ok())
             .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339());
 
@@ -107,8 +136,12 @@ impl GeminiConnector {
 }
 
 impl Connector for GeminiConnector {
-    fn name(&self) -> &str { "Gemini CLI" }
-    fn agent_slug(&self) -> &str { "gemini" }
+    fn name(&self) -> &str {
+        "Gemini CLI"
+    }
+    fn agent_slug(&self) -> &str {
+        "gemini"
+    }
 
     fn detect(&self) -> DetectionResult {
         for root in self.default_roots() {
@@ -154,22 +187,37 @@ impl Connector for GeminiConnector {
         let mut conversations = Vec::new();
 
         for root in scan_roots {
-            if !root.is_dir() { continue; }
+            if !root.is_dir() {
+                continue;
+            }
 
             for entry in WalkDir::new(&root).into_iter().filter_map(|e| e.ok()) {
                 let path = entry.path();
-                if path.extension().and_then(|e| e.to_str()) != Some("json") { continue; }
-                if !path.is_file() { continue; }
+                if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                    continue;
+                }
+                if !path.is_file() {
+                    continue;
+                }
 
                 // Only scan files under chats/ directories
-                let parent_name = path.parent().and_then(|p| p.file_name()).and_then(|n| n.to_str()).unwrap_or("");
-                if parent_name != "chats" { continue; }
+                let parent_name = path
+                    .parent()
+                    .and_then(|p| p.file_name())
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("");
+                if parent_name != "chats" {
+                    continue;
+                }
 
                 if let Some(since) = since_ts {
                     if let Ok(meta) = fs::metadata(path) {
                         if let Ok(mtime) = meta.modified() {
-                            let mtime_str = chrono::DateTime::<chrono::Utc>::from(mtime).to_rfc3339();
-                            if mtime_str.as_str() < since { continue; }
+                            let mtime_str =
+                                chrono::DateTime::<chrono::Utc>::from(mtime).to_rfc3339();
+                            if mtime_str.as_str() < since {
+                                continue;
+                            }
                         }
                     }
                 }

@@ -6,17 +6,22 @@ use std::path::{Path, PathBuf};
 pub struct ClineConnector;
 
 impl ClineConnector {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 
     fn default_roots(&self) -> Vec<PathBuf> {
         let mut roots = Vec::new();
         if let Some(home) = dirs::home_dir() {
             // macOS
-            roots.push(home.join("Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev"));
+            roots.push(home.join(
+                "Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev",
+            ));
             // Linux
             roots.push(home.join(".config/Code/User/globalStorage/saoudrizwan.claude-dev"));
             // Also check Cline-specific paths
-            roots.push(home.join("Library/Application Support/Code/User/globalStorage/cline.cline"));
+            roots
+                .push(home.join("Library/Application Support/Code/User/globalStorage/cline.cline"));
             roots.push(home.join(".config/Code/User/globalStorage/cline.cline"));
         }
         roots
@@ -28,7 +33,13 @@ impl ClineConnector {
         let api_path = task_dir.join("api_conversation_history.json");
         let meta_path = task_dir.join("task_metadata.json");
 
-        let messages_path = if ui_path.is_file() { &ui_path } else if api_path.is_file() { &api_path } else { return None; };
+        let messages_path = if ui_path.is_file() {
+            &ui_path
+        } else if api_path.is_file() {
+            &api_path
+        } else {
+            return None;
+        };
 
         let content = fs::read_to_string(messages_path).ok()?;
         let arr: Vec<serde_json::Value> = serde_json::from_str(&content).ok()?;
@@ -36,16 +47,23 @@ impl ClineConnector {
         let mut messages: Vec<NormalizedMessage> = Vec::new();
 
         for msg in &arr {
-            let role = msg.get("role").and_then(|r| r.as_str())
+            let role = msg
+                .get("role")
+                .and_then(|r| r.as_str())
                 .or_else(|| msg.get("type").and_then(|t| t.as_str()))
                 .unwrap_or("user");
 
-            let content_str = msg.get("content").and_then(|c| c.as_str())
+            let content_str = msg
+                .get("content")
+                .and_then(|c| c.as_str())
                 .or_else(|| msg.get("text").and_then(|t| t.as_str()))
                 .or_else(|| msg.get("message").and_then(|m| m.as_str()))
-                .unwrap_or("").to_string();
+                .unwrap_or("")
+                .to_string();
 
-            if content_str.is_empty() { continue; }
+            if content_str.is_empty() {
+                continue;
+            }
 
             let created_at = extract_timestamp(msg);
 
@@ -62,7 +80,9 @@ impl ClineConnector {
         // Sort by timestamp
         messages.sort_by(|a, b| a.created_at.cmp(&b.created_at));
 
-        if messages.is_empty() { return None; }
+        if messages.is_empty() {
+            return None;
+        }
 
         for (i, msg) in messages.iter_mut().enumerate() {
             msg.idx = i;
@@ -71,8 +91,13 @@ impl ClineConnector {
         // Read metadata
         let (title, workspace) = if let Ok(meta_content) = fs::read_to_string(&meta_path) {
             if let Ok(meta) = serde_json::from_str::<serde_json::Value>(&meta_content) {
-                let t = meta.get("title").and_then(|t| t.as_str()).map(|s| truncate(s, 100));
-                let w = meta.get("rootPath").and_then(|r| r.as_str())
+                let t = meta
+                    .get("title")
+                    .and_then(|t| t.as_str())
+                    .map(|s| truncate(s, 100));
+                let w = meta
+                    .get("rootPath")
+                    .and_then(|r| r.as_str())
                     .or_else(|| meta.get("cwd").and_then(|c| c.as_str()))
                     .map(|s| s.to_string());
                 (t, w)
@@ -84,13 +109,20 @@ impl ClineConnector {
         };
 
         let title = title.or_else(|| {
-            messages.iter().find(|m| m.role == "user").map(|m| truncate(&first_line(&m.content), 100))
+            messages
+                .iter()
+                .find(|m| m.role == "user")
+                .map(|m| truncate(&first_line(&m.content), 100))
         });
 
-        let task_name = task_dir.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        let task_name = task_dir
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
         let started_at = messages.first().and_then(|m| m.created_at.clone());
         let ended_at = messages.last().and_then(|m| m.created_at.clone());
-        let file_mtime = fs::metadata(messages_path).ok()
+        let file_mtime = fs::metadata(messages_path)
+            .ok()
             .and_then(|m| m.modified().ok())
             .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339());
 
@@ -112,8 +144,12 @@ impl ClineConnector {
 }
 
 impl Connector for ClineConnector {
-    fn name(&self) -> &str { "Cline" }
-    fn agent_slug(&self) -> &str { "cline" }
+    fn name(&self) -> &str {
+        "Cline"
+    }
+    fn agent_slug(&self) -> &str {
+        "cline"
+    }
 
     fn detect(&self) -> DetectionResult {
         for root in self.default_roots() {
@@ -142,7 +178,9 @@ impl Connector for ClineConnector {
         let mut conversations = Vec::new();
 
         for root in scan_roots {
-            if !root.is_dir() { continue; }
+            if !root.is_dir() {
+                continue;
+            }
 
             // Scan task directories
             let entries = match fs::read_dir(&root) {
@@ -152,18 +190,25 @@ impl Connector for ClineConnector {
 
             for entry in entries.filter_map(|e| e.ok()) {
                 let path = entry.path();
-                if !path.is_dir() { continue; }
+                if !path.is_dir() {
+                    continue;
+                }
 
                 // Ignore taskHistory directories
                 let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                if name == "taskHistory" { continue; }
+                if name == "taskHistory" {
+                    continue;
+                }
 
                 if let Some(since) = since_ts {
                     // Use directory mtime for incremental filtering
                     if let Ok(meta) = fs::metadata(&path) {
                         if let Ok(mtime) = meta.modified() {
-                            let mtime_str = chrono::DateTime::<chrono::Utc>::from(mtime).to_rfc3339();
-                            if mtime_str.as_str() < since { continue; }
+                            let mtime_str =
+                                chrono::DateTime::<chrono::Utc>::from(mtime).to_rfc3339();
+                            if mtime_str.as_str() < since {
+                                continue;
+                            }
                         }
                     }
                 }

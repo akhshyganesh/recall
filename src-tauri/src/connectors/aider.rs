@@ -7,7 +7,9 @@ use walkdir::WalkDir;
 pub struct AiderConnector;
 
 impl AiderConnector {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 
     fn parse_history_file(&self, path: &Path) -> Option<NormalizedConversation> {
         let content = fs::read_to_string(path).ok()?;
@@ -71,19 +73,23 @@ impl AiderConnector {
             }
         }
 
-        if messages.is_empty() { return None; }
+        if messages.is_empty() {
+            return None;
+        }
 
         for (i, msg) in messages.iter_mut().enumerate() {
             msg.idx = i;
         }
 
         let workspace = path.parent().map(|p| p.to_string_lossy().to_string());
-        let dir_name = path.parent()
+        let dir_name = path
+            .parent()
             .and_then(|p| p.file_name())
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_default();
         let title = format!("Aider Chat: {}", dir_name);
-        let file_mtime = fs::metadata(path).ok()
+        let file_mtime = fs::metadata(path)
+            .ok()
             .and_then(|m| m.modified().ok())
             .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339());
 
@@ -105,8 +111,12 @@ impl AiderConnector {
 }
 
 impl Connector for AiderConnector {
-    fn name(&self) -> &str { "Aider" }
-    fn agent_slug(&self) -> &str { "aider" }
+    fn name(&self) -> &str {
+        "Aider"
+    }
+    fn agent_slug(&self) -> &str {
+        "aider"
+    }
 
     fn detect(&self) -> DetectionResult {
         if let Some(home) = dirs::home_dir() {
@@ -157,7 +167,17 @@ impl Connector for AiderConnector {
                     let name = e.file_name().to_str().unwrap_or("");
                     // Skip hidden dirs except .aider files, and skip node_modules etc.
                     if e.file_type().is_dir() {
-                        !matches!(name, "node_modules" | ".git" | "target" | "build" | "dist" | "__pycache__" | ".venv" | "venv")
+                        !matches!(
+                            name,
+                            "node_modules"
+                                | ".git"
+                                | "target"
+                                | "build"
+                                | "dist"
+                                | "__pycache__"
+                                | ".venv"
+                                | "venv"
+                        )
                     } else {
                         true
                     }
@@ -165,13 +185,18 @@ impl Connector for AiderConnector {
                 .filter_map(|e| e.ok())
             {
                 let path = entry.path();
-                if path.file_name().and_then(|n| n.to_str()) != Some(".aider.chat.history.md") { continue; }
+                if path.file_name().and_then(|n| n.to_str()) != Some(".aider.chat.history.md") {
+                    continue;
+                }
 
                 if let Some(since) = since_ts {
                     if let Ok(meta) = fs::metadata(path) {
                         if let Ok(mtime) = meta.modified() {
-                            let mtime_str = chrono::DateTime::<chrono::Utc>::from(mtime).to_rfc3339();
-                            if mtime_str.as_str() < since { continue; }
+                            let mtime_str =
+                                chrono::DateTime::<chrono::Utc>::from(mtime).to_rfc3339();
+                            if mtime_str.as_str() < since {
+                                continue;
+                            }
                         }
                     }
                 }

@@ -1,86 +1,181 @@
-mod db;
-mod models;
 mod connectors;
+mod db;
 mod indexer;
+mod models;
 
 use db::Database;
-use models::{SessionSummary, SearchResult, ExportData};
 use indexer::Indexer;
+use models::{ExportData, SearchResult, Session, SessionSummary};
+use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tauri::{Manager, State};
 
+type AppResult<T> = Result<T, String>;
+type SharedDb = Arc<Mutex<Option<Database>>>;
+
 struct AppState {
-    db: Arc<Mutex<Option<Database>>>,
+    db: SharedDb,
 }
 
-fn get_db_path() -> PathBuf {
-    let data_dir = dirs::data_local_dir()
-        .unwrap_or_else(|| PathBuf::from("."));
+#[derive(Serialize)]
+struct DetectedSourcePayload {
+    name: String,
+    agent_slug: String,
+    detected: bool,
+    root_paths: Vec<String>,
+    evidence: String,
+}
+
+fn get_db_path() -> AppResult<PathBuf> {
+    let data_dir = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("."));
     let app_dir = data_dir.join("com.recall.app");
-    std::fs::create_dir_all(&app_dir).ok();
-    app_dir.join("recall.db")
+    std::fs::create_dir_all(&app_dir).map_err(|err| err.to_string())?;
+    Ok(app_dir.join("recall.db"))
 }
 
-fn with_db<F, T>(state: &State<AppState>, f: F) -> Result<T, String>
+fn with_db<F, T>(state: &State<AppState>, f: F) -> AppResult<T>
 where
-    F: FnOnce(&Database) -> Result<T, String>,
+    F: FnOnce(&Database) -> AppResult<T>,
 {
-    let guard = state.db.lock().map_err(|e| e.to_string())?;
-    let db = guard.as_ref().ok_or("Database not initialized")?;
+    let guard = state.db.lock().map_err(|err| err.to_string())?;
+    let db = guard
+        .as_ref()
+        .ok_or_else(|| "Database not initialized".to_string())?;
     f(db)
 }
 
-#[tauri::command]
-fn detect_sources() -> Result<Vec<serde_json::Value>, String> {
-    let results = Indexer::detect_all();
-    Ok(results.into_iter().map(|(name, slug, det)| {
-        serde_json::json!({
-            "name": name,
-            "agent_slug": slug,
-            "detected": det.detected,
-            "root_paths": det.root_paths,
-            "evidence": det.evidence,
+fn persist_scanned_sessions(db: SharedDb, since_ts: Option<String>) -> AppResult<usize> {
+    let receiver = Indexer::collect_sessions(since_ts.as_deref());
+    let mut total = 0usize;
+
+    for session in receiver {
+        let guard = db.lock().map_err(|err| err.to_string())?;
+        let database = guard
+            .as_ref()
+            .ok_or_else(|| "Database not initialized".to_string())?;
+        database.upsert_session(&session)?;
+        drop(guard);
+        total += 1;
+    }
+
+    Ok(total)
+}
+
+fn spawn_initial_scan(db: SharedDb) {
+    std::thread::spawn(move || match persist_scanned_sessions(db, None) {
+        Ok(total) => eprintln!("[recall] Initial scan complete: {} sessions indexed", total),
+        Err(error) => eprintln!("[recall] Initial scan failed: {error}"),
+    });
+}
+
+fn build_markdown_export(session: &Session) -> String {
+    let mut markdown = String::new();
+
+    markdown.push_str(&format!(
+        "# {}\n\n",
+        session.title.as_deref().unwrap_or("Untitled Session")
+    ));
+    markdown.push_str(&format!("**Tool:** {}\n", session.tool));
+
+    if let Some(repo_path) = &session.repo_path {
+        markdown.push_str(&format!("**Repository:** {}\n", repo_path));
+    }
+
+    if let Some(started_at) = &session.started_at {
+        markdown.push_str(&format!("**Started:** {}\n", started_at));
+    }
+
+    markdown.push_str("\n---\n\n");
+
+    for message in &session.messages {
+        let role_label = match message.role.as_str() {
+            "user" => "**You**",
+            "assistant" => "**AI**",
+            _ => &message.role,
+        };
+
+        markdown.push_str(&format!("### {}\n\n{}\n\n", role_label, message.content));
+    }
+
+    markdown
+}
+
+fn build_text_export(session: &Session) -> String {
+    let mut text = String::new();
+
+    text.push_str(&format!(
+        "{}\n",
+        session.title.as_deref().unwrap_or("Untitled Session")
+    ));
+    text.push_str(&format!("Tool: {}\n", session.tool));
+    text.push_str("---\n\n");
+
+    for message in &session.messages {
+        text.push_str(&format!("[{}]: {}\n\n", message.role, message.content));
+    }
+
+    text
+}
+
+fn build_export_content(session: &Session, format: &str) -> AppResult<(String, &'static str)> {
+    match format {
+        "json" => Ok((
+            serde_json::to_string_pretty(session).map_err(|err| err.to_string())?,
+            "json",
+        )),
+        "markdown" | "md" => Ok((build_markdown_export(session), "md")),
+        _ => Ok((build_text_export(session), "txt")),
+    }
+}
+
+fn sanitize_filename_fragment(title: Option<&str>) -> String {
+    title
+        .unwrap_or("session")
+        .chars()
+        .take(30)
+        .map(|character| {
+            if character.is_ascii_alphanumeric() {
+                character
+            } else {
+                '-'
+            }
         })
-    }).collect())
+        .collect()
 }
 
 #[tauri::command]
-async fn scan_all(state: State<'_, AppState>) -> Result<usize, String> {
-    let db_arc = state.db.clone();
-    tokio::task::spawn_blocking(move || {
-        let rx = Indexer::collect_sessions(None);
-        let mut total = 0usize;
-        for session in rx {
-            let guard = db_arc.lock().map_err(|e| e.to_string())?;
-            let db = guard.as_ref().ok_or("Database not initialized")?;
-            db.upsert_session(&session)?;
-            drop(guard);
-            total += 1;
-        }
-        Ok(total)
-    })
-    .await
-    .map_err(|e| e.to_string())?
+fn detect_sources() -> AppResult<Vec<DetectedSourcePayload>> {
+    let results = Indexer::detect_all();
+    Ok(results
+        .into_iter()
+        .map(|(name, agent_slug, detection)| DetectedSourcePayload {
+            name,
+            agent_slug,
+            detected: detection.detected,
+            root_paths: detection.root_paths,
+            evidence: detection.evidence,
+        })
+        .collect())
 }
 
 #[tauri::command]
-async fn scan_incremental(state: State<'_, AppState>, since_ts: Option<String>) -> Result<usize, String> {
-    let db_arc = state.db.clone();
-    tokio::task::spawn_blocking(move || {
-        let rx = Indexer::collect_sessions(since_ts.as_deref());
-        let mut total = 0usize;
-        for session in rx {
-            let guard = db_arc.lock().map_err(|e| e.to_string())?;
-            let db = guard.as_ref().ok_or("Database not initialized")?;
-            db.upsert_session(&session)?;
-            drop(guard);
-            total += 1;
-        }
-        Ok(total)
-    })
-    .await
-    .map_err(|e| e.to_string())?
+async fn scan_all(state: State<'_, AppState>) -> AppResult<usize> {
+    let db = state.db.clone();
+    tokio::task::spawn_blocking(move || persist_scanned_sessions(db, None))
+        .await
+        .map_err(|err| err.to_string())?
+}
+
+#[tauri::command]
+async fn scan_incremental(
+    state: State<'_, AppState>,
+    since_ts: Option<String>,
+) -> AppResult<usize> {
+    let db = state.db.clone();
+    tokio::task::spawn_blocking(move || persist_scanned_sessions(db, since_ts))
+        .await
+        .map_err(|err| err.to_string())?
 }
 
 #[tauri::command]
@@ -91,7 +186,7 @@ fn get_sessions(
     date_to: Option<String>,
     limit: Option<usize>,
     offset: Option<usize>,
-) -> Result<Vec<SessionSummary>, String> {
+) -> AppResult<Vec<SessionSummary>> {
     with_db(&state, |db| {
         db.get_session_summaries(
             tool.as_deref(),
@@ -104,7 +199,7 @@ fn get_sessions(
 }
 
 #[tauri::command]
-fn get_session(state: State<AppState>, id: String) -> Result<Option<models::Session>, String> {
+fn get_session(state: State<AppState>, id: String) -> AppResult<Option<models::Session>> {
     with_db(&state, |db| db.get_session(&id))
 }
 
@@ -116,7 +211,7 @@ fn search_sessions(
     date_from: Option<String>,
     date_to: Option<String>,
     limit: Option<usize>,
-) -> Result<Vec<SearchResult>, String> {
+) -> AppResult<Vec<SearchResult>> {
     with_db(&state, |db| {
         db.search(
             &query,
@@ -129,84 +224,63 @@ fn search_sessions(
 }
 
 #[tauri::command]
-fn toggle_favorite(state: State<AppState>, session_id: String) -> Result<bool, String> {
+fn toggle_favorite(state: State<AppState>, session_id: String) -> AppResult<bool> {
     with_db(&state, |db| db.toggle_favorite(&session_id))
 }
 
 #[tauri::command]
-fn get_favorites(state: State<AppState>, limit: Option<usize>, offset: Option<usize>) -> Result<Vec<SessionSummary>, String> {
-    with_db(&state, |db| db.get_favorites(limit.unwrap_or(50), offset.unwrap_or(0)))
+fn get_favorites(
+    state: State<AppState>,
+    limit: Option<usize>,
+    offset: Option<usize>,
+) -> AppResult<Vec<SessionSummary>> {
+    with_db(&state, |db| {
+        db.get_favorites(limit.unwrap_or(50), offset.unwrap_or(0))
+    })
 }
 
 #[tauri::command]
-fn get_tools(state: State<AppState>) -> Result<Vec<String>, String> {
+fn get_tools(state: State<AppState>) -> AppResult<Vec<String>> {
     with_db(&state, |db| db.get_tools())
 }
 
 #[tauri::command]
-fn get_stats(state: State<AppState>) -> Result<serde_json::Value, String> {
+fn get_stats(state: State<AppState>) -> AppResult<serde_json::Value> {
     with_db(&state, |db| db.get_stats())
 }
 
 #[tauri::command]
-fn clear_database(state: State<AppState>) -> Result<(), String> {
+fn clear_database(state: State<AppState>) -> AppResult<()> {
     with_db(&state, |db| db.clear_all())
 }
 
 #[tauri::command]
-fn export_session(state: State<AppState>, id: String, format: String) -> Result<ExportData, String> {
+fn export_session(
+    state: State<AppState>,
+    id: String,
+    format: String,
+) -> AppResult<ExportData> {
     with_db(&state, |db| {
-        let session = db.get_session(&id)?.ok_or("Session not found")?;
-        let (content, ext) = match format.as_str() {
-            "json" => {
-                (serde_json::to_string_pretty(&session).map_err(|e| e.to_string())?, "json")
-            }
-            "markdown" | "md" => {
-                let mut md = String::new();
-                md.push_str(&format!("# {}\n\n", session.title.as_deref().unwrap_or("Untitled Session")));
-                md.push_str(&format!("**Tool:** {}\n", session.tool));
-                if let Some(ref repo) = session.repo_path {
-                    md.push_str(&format!("**Repository:** {}\n", repo));
-                }
-                if let Some(ref started) = session.started_at {
-                    md.push_str(&format!("**Started:** {}\n", started));
-                }
-                md.push_str("\n---\n\n");
-                for msg in &session.messages {
-                    let role_label = match msg.role.as_str() {
-                        "user" => "**You**",
-                        "assistant" => "**AI**",
-                        _ => &msg.role,
-                    };
-                    md.push_str(&format!("### {}\n\n{}\n\n", role_label, msg.content));
-                }
-                (md, "md")
-            }
-            _ => {
-                // Plain text
-                let mut txt = String::new();
-                txt.push_str(&format!("{}\n", session.title.as_deref().unwrap_or("Untitled Session")));
-                txt.push_str(&format!("Tool: {}\n", session.tool));
-                txt.push_str(&format!("---\n\n"));
-                for msg in &session.messages {
-                    txt.push_str(&format!("[{}]: {}\n\n", msg.role, msg.content));
-                }
-                (txt, "txt")
-            }
-        };
+        let session = db
+            .get_session(&id)?
+            .ok_or_else(|| "Session not found".to_string())?;
+        let (content, extension) = build_export_content(&session, format.as_str())?;
+        let filename = format!(
+            "{}.{}",
+            sanitize_filename_fragment(session.title.as_deref()),
+            extension
+        );
 
-        let title_slug = session.title.as_deref().unwrap_or("session")
-            .chars().take(30)
-            .map(|c| if c.is_alphanumeric() { c } else { '-' })
-            .collect::<String>();
-        let filename = format!("{}.{}", title_slug, ext);
-
-        Ok(ExportData { format: format.clone(), content, filename })
+        Ok(ExportData {
+            format,
+            content,
+            filename,
+        })
     })
 }
 
 pub fn run() {
-    let db_path = get_db_path();
+    let db_path = get_db_path().expect("Failed to create app data directory");
     let db = Database::new(&db_path).expect("Failed to initialize database");
 
     tauri::Builder::default()
@@ -214,22 +288,7 @@ pub fn run() {
             db: Arc::new(Mutex::new(Some(db))),
         })
         .setup(|app| {
-            let db_arc = app.state::<AppState>().db.clone();
-            // Run initial scan in background so the window appears immediately
-            std::thread::spawn(move || {
-                let rx = Indexer::collect_sessions(None);
-                let mut total = 0usize;
-                for session in rx {
-                    if let Ok(guard) = db_arc.lock() {
-                        if let Some(db) = guard.as_ref() {
-                            if db.upsert_session(&session).is_ok() {
-                                total += 1;
-                            }
-                        }
-                    }
-                }
-                eprintln!("[recall] Initial scan complete: {} sessions indexed", total);
-            });
+            spawn_initial_scan(app.state::<AppState>().db.clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

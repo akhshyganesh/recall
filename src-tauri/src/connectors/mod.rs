@@ -1,9 +1,9 @@
+pub mod aider;
 pub mod claude_code;
+pub mod cline;
+pub mod codex;
 pub mod copilot;
 pub mod cursor;
-pub mod aider;
-pub mod codex;
-pub mod cline;
 pub mod gemini;
 
 use crate::models::{DetectionResult, NormalizedConversation};

@@ -4,6 +4,14 @@ Recall is a local-first Tauri desktop app for browsing AI coding session history
 
 The current codebase is centered around **React 19 + Vite** in `src/`, **Tauri 2** for the desktop shell, and a **Rust + SQLite FTS5** backend in `src-tauri/src/`.
 
+## Screenshots
+
+| Timeline overview | Session detail |
+| --- | --- |
+| ![Timeline overview showing Recall's searchable local session history dashboard.](docs/screenshots/welcome.png) | ![Session detail view showing rich message rendering, metadata, and file changes.](docs/screenshots/session-chat.png) |
+
+The screenshots above show the macOS build. The Linux desktop app uses the same layout and workflow.
+
 ## What the app does today
 
 - Detects and indexes local session history from **Claude Code, GitHub Copilot, Cursor, Aider, Codex CLI, Cline, and Gemini CLI**
@@ -62,6 +70,7 @@ These paths come directly from the connector implementations in `src-tauri/src/c
   - start/end timestamps
   - repo path and branch when available
   - all normalized messages in order
+  - persisted session-level file change entries when the indexed source exposes structured edits
   - export buttons for Markdown / JSON / text
   - copy-to-clipboard for repo path and individual messages
 
@@ -79,8 +88,8 @@ These paths come directly from the connector implementations in `src-tauri/src/c
 
 - Source detection and connector paths are implemented for **macOS and Linux**. There is no Windows connector-path support in the current code.
 - Full-text search indexes **message content** only; it does not currently index session metadata or file diffs.
-- The database schema includes a `file_changes` table and the UI has a dedicated file-changes section, but the current indexer does **not** populate `session.file_changes` during normal scans. Rich file edit output currently appears inline inside Copilot assistant messages instead.
-- There are currently **no lint or test scripts** in `package.json`. The available verification command in this repo today is `npm run build`.
+- Persisted session-level file changes currently depend on connectors emitting structured `text_edit` parts. In the current codebase, that primarily means **GitHub Copilot** sessions.
+- There is no dedicated lint script yet. The repository-level verification command is `npm run check`.
 
 ## Development
 
@@ -108,6 +117,12 @@ npm run tauri dev
 npm run build
 ```
 
+### Verify frontend and backend
+
+```bash
+npm run check
+```
+
 ## Project layout
 
 | Path | Purpose |
@@ -117,6 +132,7 @@ npm run build
 | `src/MessageBody.tsx` | Markdown, syntax highlighting, diff rendering, Copilot structured-part rendering |
 | `src/api.ts` | frontend wrappers around Tauri commands |
 | `src/lib/` | date grouping/filter helpers and tool styling |
+| `docs/screenshots/` | README screenshots and public-facing repository media |
 | `src-tauri/src/lib.rs` | Tauri commands, database initialization, app startup scan |
 | `src-tauri/src/indexer.rs` | connector orchestration and session normalization |
 | `src-tauri/src/db.rs` | SQLite schema, upsert/search/favorites/export logic |
