@@ -95,7 +95,7 @@ NODE
 
 npm run check
 
-git add package.json package-lock.json src-tauri/Cargo.toml src-tauri/tauri.conf.json
+git add package.json package-lock.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json
 git commit -m "chore: release ${TAG}"
 git push origin "$CURRENT_BRANCH"
 git tag -a "$TAG" -m "$TAG"
