@@ -9,7 +9,7 @@ use models::{ActivityPoint, ExportData, SearchResult, Session, SessionSummary};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use tauri::{Manager, State};
+use tauri::{AppHandle, Manager, State};
 
 type AppResult<T> = Result<T, String>;
 type SharedDb = Arc<Mutex<Option<Database>>>;
@@ -25,6 +25,18 @@ struct DetectedSourcePayload {
     detected: bool,
     root_paths: Vec<String>,
     evidence: String,
+}
+
+#[derive(Serialize)]
+struct AppInfoPayload {
+    current_version: String,
+    updater_enabled: bool,
+}
+
+fn updater_pubkey() -> Option<&'static str> {
+    option_env!("RECALL_UPDATER_PUBLIC_KEY")
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
 }
 
 fn get_db_path() -> AppResult<PathBuf> {
@@ -157,6 +169,14 @@ fn detect_sources() -> AppResult<Vec<DetectedSourcePayload>> {
             evidence: detection.evidence,
         })
         .collect())
+}
+
+#[tauri::command]
+fn get_app_info(app: AppHandle) -> AppInfoPayload {
+    AppInfoPayload {
+        current_version: app.package_info().version.to_string(),
+        updater_enabled: updater_pubkey().is_some(),
+    }
 }
 
 #[tauri::command]
@@ -299,14 +319,25 @@ pub fn run() {
     let db = Database::new(&db_path).expect("Failed to initialize database");
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_process::init())
         .manage(AppState {
             db: Arc::new(Mutex::new(Some(db))),
         })
         .setup(|app| {
+            if let Some(pubkey) = updater_pubkey() {
+                app.handle()
+                    .plugin(tauri_plugin_updater::Builder::new().pubkey(pubkey).build())?;
+            } else {
+                eprintln!(
+                    "[recall] Updater disabled: RECALL_UPDATER_PUBLIC_KEY was not set at build time"
+                );
+            }
+
             spawn_initial_scan(app.state::<AppState>().db.clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            get_app_info,
             detect_sources,
             scan_all,
             scan_incremental,

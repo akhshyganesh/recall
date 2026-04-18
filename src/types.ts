@@ -91,10 +91,43 @@ export interface Stats {
   total_tools: number;
 }
 
+export interface AppInfo {
+  current_version: string;
+  updater_enabled: boolean;
+}
+
+export type UpdateState =
+  | 'idle'
+  | 'disabled'
+  | 'checking'
+  | 'available'
+  | 'up-to-date'
+  | 'installing'
+  | 'restarting'
+  | 'error';
+
+export interface UpdateStatus {
+  state: UpdateState;
+  available_version: string | null;
+  checked_at: string | null;
+  release_date: string | null;
+  release_notes: string | null;
+  downloaded_bytes: number;
+  total_bytes: number | null;
+  error: string | null;
+}
+
 export interface ActivityPoint {
   date: string;
   tool: string;
   session_count: number;
+}
+
+export interface OpenTab {
+  id: string;
+  title: string;
+  tool: string;
+  pinned: boolean;
 }
 
 export type View = 'timeline' | 'session' | 'search' | 'favorites' | 'settings';

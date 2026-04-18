@@ -26,6 +26,7 @@ The screenshots above show the macOS build. The Linux desktop app uses the same 
   - favorites
   - per-session export to **Markdown**, **JSON**, or **plain text**
   - source detection/status in Settings
+  - startup update checks against the latest signed GitHub Release on production builds
   - keyboard shortcuts: **Cmd/Ctrl+K** to focus search, **Escape** to leave search or session detail
 
 ## How the current architecture works
@@ -57,6 +58,7 @@ These paths come directly from the connector implementations in `src-tauri/src/c
 ### Timeline and browsing
 
 - The sidebar shows timeline, favorites, settings, detected tool filters, and a scan button.
+- When a newer signed release exists, the sidebar shows an **Update available** action above Settings and the Settings view exposes manual check/install controls.
 - Timeline sessions are grouped into labels such as **Today**, **Yesterday**, **This Week**, and **This Month**.
 - Date filters are currently: **All**, **Today**, **Yesterday**, **7d**, and **30d**.
 
@@ -88,6 +90,7 @@ These paths come directly from the connector implementations in `src-tauri/src/c
 ## Important current limitations
 
 - Source detection and connector paths are implemented for **macOS and Linux**. There is no Windows connector-path support in the current code.
+- In-app updates currently ship for the platforms built by the release workflow: **macOS arm64**, **macOS x64**, and **Linux x64**.
 - Full-text search indexes **message content** only; it does not currently index session metadata or file diffs.
 - Persisted session-level file changes currently depend on connectors emitting structured `text_edit` parts. In the current codebase, that primarily means **GitHub Copilot** VS Code sessions.
 - There is no dedicated lint script yet. The repository-level verification command is `npm run check`.
@@ -124,13 +127,37 @@ npm run build
 npm run check
 ```
 
+### Configure updater signing
+
+The in-app updater uses Tauri's signed updater flow with GitHub Releases as the update feed. You only need to do this once per app.
+
+1. Generate a signing keypair:
+
+```bash
+npm run tauri signer generate -- -w ~/.tauri/recall-updater.key
+```
+
+2. Add these GitHub repository secrets before cutting releases:
+
+- `TAURI_SIGNING_PRIVATE_KEY`: contents of your private key file
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: password for the private key, or an empty string if you generated it without one
+- `TAURI_SIGNING_PUBLIC_KEY`: contents of the generated public key file
+
+3. If you build signed release bundles locally, export the same public key into the Rust build environment:
+
+```bash
+export RECALL_UPDATER_PUBLIC_KEY="$(cat ~/.tauri/recall-updater.key.pub)"
+export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/recall-updater.key)"
+export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
+```
+
 ### Cut a release
 
 ```bash
 ./scripts/release.sh 0.2.1
 ```
 
-This updates `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`, runs `npm run check`, commits the version bump, pushes the current branch, creates tag `v<version>`, and pushes the tag to trigger the release workflow.
+This updates `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`, runs `npm run check`, commits the version bump, pushes the current branch, creates tag `v<version>`, and pushes the tag to trigger the release workflow. The GitHub Actions release job then builds signed updater artifacts, uploads them to the tagged GitHub Release, and refreshes `latest.json` for in-app updates.
 
 ## Project layout
 

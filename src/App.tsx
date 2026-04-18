@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { relaunch } from '@tauri-apps/plugin-process';
+import { check as checkForAppUpdate } from '@tauri-apps/plugin-updater';
+
 import * as api from './api';
 import { BackIcon, MenuIcon, ModelIcon, SearchIcon, StarIcon } from './components/AppIcons';
 import LandingHero from './components/LandingHero';
@@ -12,7 +15,19 @@ import Sidebar from './components/Sidebar';
 import { downloadExportFile } from './lib/download';
 import { DATE_FILTERS, formatDateFilterLabel, getDateRange, getRepoShortName } from './lib/session-format';
 import { toolCssClass } from './lib/tool-style';
-import type { ActivityPoint, DateFilter, DetectedSource, SearchResult, Session, SessionSummary, Stats, View } from './types';
+import type {
+  ActivityPoint,
+  AppInfo,
+  DateFilter,
+  DetectedSource,
+  OpenTab,
+  SearchResult,
+  Session,
+  SessionSummary,
+  Stats,
+  UpdateStatus,
+  View,
+} from './types';
 import './styles.css';
 
 const RESULT_LIMIT = 200;
@@ -22,7 +37,21 @@ const INCREMENTAL_SCAN_LOOKBACK_MS = 30_000;
 const SESSION_REFRESH_INTERVAL_MS = 10_000;
 const MOBILE_SIDEBAR_QUERY = '(max-width: 900px)';
 
+const INITIAL_UPDATE_STATUS: UpdateStatus = {
+  state: 'idle',
+  available_version: null,
+  checked_at: null,
+  release_date: null,
+  release_notes: null,
+  downloaded_bytes: 0,
+  total_bytes: null,
+  error: null,
+};
+
+type PendingUpdateHandle = Awaited<ReturnType<typeof checkForAppUpdate>>;
+
 export default function App() {
+  const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [view, setView] = useState<View>('timeline');
   const [prevView, setPrevView] = useState<View>('timeline');
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -30,7 +59,7 @@ export default function App() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
-  const [searchToolFilters, setSearchToolFilters] = useState<string[]>([]);
+  const [toolFilters, setToolFilters] = useState<string[]>([]);
   const [searchPathFilters, setSearchPathFilters] = useState<string[]>([]);
   const [tools, setTools] = useState<string[]>([]);
   const [searchPaths, setSearchPaths] = useState<string[]>([]);
@@ -38,9 +67,11 @@ export default function App() {
   const [activity, setActivity] = useState<ActivityPoint[]>([]);
   const [sources, setSources] = useState<DetectedSource[]>([]);
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
-  const [toolFilter, setToolFilter] = useState<string | undefined>();
+
   const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>(INITIAL_UPDATE_STATUS);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobileSidebar, setIsMobileSidebar] = useState(() => {
     if (typeof window === 'undefined') {
@@ -52,9 +83,155 @@ export default function App() {
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchOriginViewRef = useRef<View>('timeline');
+  const pendingUpdateRef = useRef<PendingUpdateHandle>(null);
   const closeSidebar = useCallback(() => {
     setSidebarOpen(false);
   }, []);
+
+  const loadAppInfo = useCallback(async () => {
+    try {
+      const info = await api.getAppInfo();
+      setAppInfo(info);
+      setUpdateStatus((current) => (
+        info.updater_enabled
+          ? current.state === 'disabled'
+            ? { ...current, state: 'idle', error: null }
+            : current
+          : { ...INITIAL_UPDATE_STATUS, state: 'disabled' }
+      ));
+      return info;
+    } catch (error) {
+      console.error('Failed to load app info:', error);
+      return null;
+    }
+  }, []);
+
+  const checkForUpdates = useCallback(async (updaterEnabled: boolean) => {
+    if (!updaterEnabled) {
+      pendingUpdateRef.current = null;
+      setUpdateStatus({ ...INITIAL_UPDATE_STATUS, state: 'disabled' });
+      return;
+    }
+
+    setUpdateStatus((current) => ({
+      ...current,
+      state: 'checking',
+      downloaded_bytes: 0,
+      total_bytes: null,
+      error: null,
+    }));
+
+    try {
+      const update = await checkForAppUpdate();
+      const checkedAt = new Date().toISOString();
+
+      pendingUpdateRef.current = update;
+
+      if (update) {
+        setUpdateStatus({
+          state: 'available',
+          available_version: update.version,
+          checked_at: checkedAt,
+          release_date: update.date ?? null,
+          release_notes: update.body ?? null,
+          downloaded_bytes: 0,
+          total_bytes: null,
+          error: null,
+        });
+        return;
+      }
+
+      setUpdateStatus({
+        ...INITIAL_UPDATE_STATUS,
+        state: 'up-to-date',
+        checked_at: checkedAt,
+      });
+    } catch (error) {
+      pendingUpdateRef.current = null;
+      console.error('Failed to check for updates:', error);
+      setUpdateStatus((current) => ({
+        ...current,
+        state: current.available_version ? 'available' : 'error',
+        checked_at: new Date().toISOString(),
+        error: error instanceof Error ? error.message : 'Failed to check for updates.',
+      }));
+    }
+  }, []);
+
+  const handleInstallUpdate = useCallback(async () => {
+    if (!appInfo?.updater_enabled || updateStatus.state === 'installing' || updateStatus.state === 'restarting') {
+      return;
+    }
+
+    try {
+      let update = pendingUpdateRef.current;
+
+      if (!update) {
+        update = await checkForAppUpdate();
+        pendingUpdateRef.current = update;
+      }
+
+      if (!update) {
+        setUpdateStatus({
+          ...INITIAL_UPDATE_STATUS,
+          state: 'up-to-date',
+          checked_at: new Date().toISOString(),
+        });
+        return;
+      }
+
+      let downloadedBytes = 0;
+
+      setUpdateStatus((current) => ({
+        ...current,
+        state: 'installing',
+        downloaded_bytes: 0,
+        total_bytes: null,
+        error: null,
+      }));
+
+      await update.downloadAndInstall((event) => {
+        switch (event.event) {
+          case 'Started':
+            downloadedBytes = 0;
+            setUpdateStatus((current) => ({
+              ...current,
+              state: 'installing',
+              downloaded_bytes: 0,
+              total_bytes: event.data.contentLength ?? null,
+            }));
+            break;
+          case 'Progress':
+            downloadedBytes += event.data.chunkLength;
+            setUpdateStatus((current) => ({
+              ...current,
+              state: 'installing',
+              downloaded_bytes: downloadedBytes,
+            }));
+            break;
+          case 'Finished':
+            setUpdateStatus((current) => ({
+              ...current,
+              state: 'restarting',
+              downloaded_bytes: current.total_bytes ?? current.downloaded_bytes,
+            }));
+            break;
+        }
+      });
+
+      pendingUpdateRef.current = null;
+      setUpdateStatus((current) => ({ ...current, state: 'restarting' }));
+      await relaunch();
+    } catch (error) {
+      pendingUpdateRef.current = null;
+      console.error('Failed to install update:', error);
+      setUpdateStatus((current) => ({
+        ...current,
+        state: current.available_version ? 'available' : 'error',
+        error: error instanceof Error ? error.message : 'Failed to install update.',
+      }));
+    }
+  }, [appInfo?.updater_enabled, updateStatus.state]);
 
   const loadMeta = useCallback(async () => {
     try {
@@ -79,18 +256,23 @@ export default function App() {
     try {
       const range = getDateRange(dateFilter);
       const data = await api.getSessions({
-        tool: toolFilter,
+        tool: toolFilters.length === 1 ? toolFilters[0] : undefined,
         dateFrom: range.from,
         dateTo: range.to,
         limit: RESULT_LIMIT,
       });
-      setSessions(data);
+
+      if (toolFilters.length > 1) {
+        setSessions(data.filter((s) => toolFilters.includes(s.tool)));
+      } else {
+        setSessions(data);
+      }
     } catch (error) {
       console.error('Failed to load sessions:', error);
     } finally {
       setLoading(false);
     }
-  }, [dateFilter, toolFilter]);
+  }, [dateFilter, toolFilters]);
 
   const loadFavorites = useCallback(async () => {
     setLoading(true);
@@ -118,13 +300,13 @@ export default function App() {
     const range = getDateRange(dateFilter);
     return api.searchSessions({
       query,
-      tools: searchToolFilters,
+      tools: toolFilters,
       paths: searchPathFilters,
       dateFrom: range.from,
       dateTo: range.to,
       limit: RESULT_LIMIT,
     });
-  }, [dateFilter, searchPathFilters, searchToolFilters]);
+  }, [dateFilter, searchPathFilters, toolFilters]);
 
   const refreshSelectedSession = useCallback(async () => {
     if (!selectedSession) {
@@ -184,6 +366,24 @@ export default function App() {
   }, [loadMeta]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const initializeUpdater = async () => {
+      const info = await loadAppInfo();
+
+      if (!cancelled && info?.updater_enabled) {
+        await checkForUpdates(info.updater_enabled);
+      }
+    };
+
+    void initializeUpdater();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [checkForUpdates, loadAppInfo]);
+
+  useEffect(() => {
     if (view === 'timeline') {
       void loadTimelineSessions();
       return;
@@ -200,7 +400,7 @@ export default function App() {
   }, [loadFavorites, loadSources, loadTimelineSessions, view]);
 
   useEffect(() => {
-    setSearchToolFilters((currentFilters) => currentFilters.filter((tool) => tools.includes(tool)));
+    setToolFilters((currentFilters) => currentFilters.filter((tool) => tools.includes(tool)));
   }, [tools]);
 
   useEffect(() => {
@@ -330,9 +530,60 @@ export default function App() {
       setSelectedSession(session);
       setPrevView(view);
       setView('session');
+
+      setOpenTabs((tabs) => {
+        if (tabs.some((t) => t.id === id)) {
+          return tabs;
+        }
+
+        return [...tabs, {
+          id,
+          title: session.title || 'Untitled Session',
+          tool: session.tool,
+          pinned: false,
+        }];
+      });
     } catch (error) {
       console.error('Failed to open session:', error);
     }
+  }, [view]);
+
+  const closeTab = useCallback((tabId: string) => {
+    setOpenTabs((tabs) => tabs.filter((t) => t.id !== tabId));
+
+    if (selectedSession?.id === tabId) {
+      setSelectedSession(null);
+      setView(prevView);
+    }
+  }, [prevView, selectedSession?.id]);
+
+  const togglePinTab = useCallback((tabId: string) => {
+    setOpenTabs((tabs) => tabs.map((t) => (
+      t.id === tabId ? { ...t, pinned: !t.pinned } : t
+    )));
+  }, []);
+
+  const selectTab = useCallback((tabId: string) => {
+    void (async () => {
+      try {
+        const session = await api.getSession(tabId);
+
+        if (!session) {
+          setOpenTabs((tabs) => tabs.filter((t) => t.id !== tabId));
+          return;
+        }
+
+        setSelectedSession(session);
+
+        if (view !== 'session') {
+          setPrevView(view);
+        }
+
+        setView('session');
+      } catch (error) {
+        console.error('Failed to open session tab:', error);
+      }
+    })();
   }, [view]);
 
   const toggleFavorite = useCallback(async (sessionId: string) => {
@@ -373,7 +624,7 @@ export default function App() {
       await api.clearDatabase();
       setSelectedSession(null);
       setSessions([]);
-      setSearchToolFilters([]);
+      setToolFilters([]);
       setSearchPathFilters([]);
       clearSearch();
       setView('timeline');
@@ -453,33 +704,34 @@ export default function App() {
         />
       )}
       <Sidebar
+        activeSessionId={selectedSession?.id ?? null}
         mobileOpen={sidebarOpen}
         onClose={closeSidebar}
+        onCloseTab={closeTab}
         onFavorites={() => {
           clearSearch();
           setView('favorites');
         }}
+        onInstallUpdate={() => {
+          void handleInstallUpdate();
+        }}
         onScan={() => {
           void handleScan();
         }}
+        onSelectTab={selectTab}
         onSettings={() => {
           clearSearch();
           setView('settings');
         }}
         onTimeline={() => {
           clearSearch();
-          setToolFilter(undefined);
           setView('timeline');
         }}
-        onToolSelect={(tool) => {
-          clearSearch();
-          setToolFilter((currentTool) => (currentTool === tool ? undefined : tool));
-          setView('timeline');
-        }}
+        onTogglePinTab={togglePinTab}
+        openTabs={openTabs}
         scanning={scanning}
         stats={stats}
-        toolFilter={toolFilter}
-        tools={tools}
+        updateStatus={updateStatus}
         view={view}
       />
 
@@ -513,10 +765,10 @@ export default function App() {
                 <MultiSelectFilter
                   emptyMessage="No tools indexed yet"
                   label="Tool"
-                  onChange={setSearchToolFilters}
+                  onChange={setToolFilters}
                   options={tools}
                   placeholder="All tools"
-                  selectedValues={searchToolFilters}
+                  selectedValues={toolFilters}
                   getSummaryLabel={(selectedValues) => (
                     selectedValues.length === 1 ? selectedValues[0] : `${selectedValues.length} tools`
                   )}
@@ -642,7 +894,19 @@ export default function App() {
           )}
 
           {view === 'settings' && (
-            <SettingsPanel onClearDatabase={handleClearDatabase} sources={sources} stats={stats} />
+            <SettingsPanel
+              appInfo={appInfo}
+              onCheckForUpdates={() => {
+                void checkForUpdates(appInfo?.updater_enabled ?? false);
+              }}
+              onClearDatabase={handleClearDatabase}
+              onInstallUpdate={() => {
+                void handleInstallUpdate();
+              }}
+              sources={sources}
+              stats={stats}
+              updateStatus={updateStatus}
+            />
           )}
         </div>
       </main>

@@ -29,4 +29,6 @@ urlencoding = "2"
 log = "0.4"
 env_logger = "0.11"
 similar = "2"
+tauri-plugin-process = "2"
+tauri-plugin-updater = "2"
 

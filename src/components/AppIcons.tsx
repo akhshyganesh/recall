@@ -57,6 +57,16 @@ export function CopyIcon(props: IconProps) {
   );
 }
 
+export function DownloadIcon(props: IconProps) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M12 3v10" />
+      <path d="M8 10l4 4 4-4" />
+      <path d="M4 19h16" />
+    </BaseIcon>
+  );
+}
+
 export function DatabaseIcon(props: IconProps) {
   return (
     <BaseIcon {...props}>
@@ -193,6 +203,17 @@ export function TrashIcon(props: IconProps) {
       <path d="M14 11v6" />
       <path d="M6 7l1 13a2 2 0 002 2h6a2 2 0 002-2l1-13" />
       <path d="M9 4h6l1 3H8l1-3z" />
+    </BaseIcon>
+  );
+}
+
+export function PinIcon(props: IconProps) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M12 2l0 5" />
+      <path d="M9 7h6l-1 5h-4l-1-5z" />
+      <path d="M8 12h8" />
+      <path d="M12 12v10" />
     </BaseIcon>
   );
 }

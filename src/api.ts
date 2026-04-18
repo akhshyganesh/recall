@@ -1,5 +1,18 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { ActivityPoint, SessionSummary, Session, SearchResult, DetectedSource, ExportData, Stats } from './types';
+import type {
+  ActivityPoint,
+  AppInfo,
+  SessionSummary,
+  Session,
+  SearchResult,
+  DetectedSource,
+  ExportData,
+  Stats,
+} from './types';
+
+export async function getAppInfo(): Promise<AppInfo> {
+  return invoke('get_app_info');
+}
 
 export async function detectSources(): Promise<DetectedSource[]> {
   return invoke('detect_sources');
