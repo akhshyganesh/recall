@@ -199,6 +199,7 @@ fn tool_display_name(slug: &str) -> String {
     match slug {
         "claude_code" => "Claude Code".to_string(),
         "copilot" => "GitHub Copilot".to_string(),
+        "copilot_cli" => "GitHub Copilot CLI".to_string(),
         "cursor" => "Cursor".to_string(),
         "aider" => "Aider".to_string(),
         "codex" => "Codex CLI".to_string(),

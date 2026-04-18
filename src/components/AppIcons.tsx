@@ -103,6 +103,16 @@ export function MessagesIcon(props: IconProps) {
   );
 }
 
+export function MenuIcon(props: IconProps) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M4 7h16" />
+      <path d="M4 12h16" />
+      <path d="M4 17h16" />
+    </BaseIcon>
+  );
+}
+
 export function ModelIcon(props: IconProps) {
   return (
     <BaseIcon {...props}>
@@ -132,6 +142,15 @@ export function SearchIcon(props: IconProps) {
     <BaseIcon {...props}>
       <circle cx="11" cy="11" r="7" />
       <path d="M20 20l-3.5-3.5" />
+    </BaseIcon>
+  );
+}
+
+export function CloseIcon(props: IconProps) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M6 6l12 12" />
+      <path d="M18 6L6 18" />
     </BaseIcon>
   );
 }

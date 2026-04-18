@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 import type { SearchResult } from '../types';
-import { formatTimeLabel } from '../lib/session-format';
+import { formatTimeLabel, getRepoShortName } from '../lib/session-format';
 import { toolCssClass } from '../lib/tool-style';
 import EmptyState from './EmptyState';
 
@@ -50,27 +50,33 @@ export default function SearchResults({ query, results, loading, emptyStateIcon,
       <EmptyState
         icon={emptyStateIcon}
         title="No results"
-        description={query.trim() ? 'Try a different search term or widen the time filter.' : 'Start typing to search indexed sessions.'}
+        description={query.trim() ? 'Try a different search term or widen the tool, path, or time filters.' : 'Start typing to search indexed sessions.'}
       />
     );
   }
 
   return (
     <div className="search-results">
-      {results.map((result) => (
-        <div key={result.id} className="search-hit" onClick={() => onOpen(result.id)}>
-          <div className="search-hit-title">{result.title || 'Untitled Session'}</div>
-          <div className="search-hit-snippet">
-            <HighlightedSnippet snippet={result.snippet} />
+      {results.map((result) => {
+        const resultPath = result.repo_path || result.workspace;
+        const resultPathLabel = resultPath ? getRepoShortName(resultPath) : null;
+
+        return (
+          <div key={result.id} className="search-hit" onClick={() => onOpen(result.id)}>
+            <div className="search-hit-title">{result.title || 'Untitled Session'}</div>
+            <div className="search-hit-snippet">
+              <HighlightedSnippet snippet={result.snippet} />
+            </div>
+            <div className="search-hit-meta">
+              <span className={`tool-pill ${toolCssClass(result.tool)}`}>{result.tool}</span>
+              <span>{formatTimeLabel(result.started_at)}</span>
+              {result.repo_name && <span>{result.repo_name}</span>}
+              {resultPathLabel && <span title={resultPath ?? undefined}>{resultPathLabel}</span>}
+              <span>{result.message_count} msgs</span>
+            </div>
           </div>
-          <div className="search-hit-meta">
-            <span className={`tool-pill ${toolCssClass(result.tool)}`}>{result.tool}</span>
-            <span>{formatTimeLabel(result.started_at)}</span>
-            {result.repo_name && <span>{result.repo_name}</span>}
-            <span>{result.message_count} msgs</span>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

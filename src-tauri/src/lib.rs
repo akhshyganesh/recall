@@ -5,7 +5,7 @@ mod models;
 
 use db::Database;
 use indexer::Indexer;
-use models::{ExportData, SearchResult, Session, SessionSummary};
+use models::{ActivityPoint, ExportData, SearchResult, Session, SessionSummary};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -207,7 +207,8 @@ fn get_session(state: State<AppState>, id: String) -> AppResult<Option<models::S
 fn search_sessions(
     state: State<AppState>,
     query: String,
-    tool: Option<String>,
+    tools: Option<Vec<String>>,
+    paths: Option<Vec<String>>,
     date_from: Option<String>,
     date_to: Option<String>,
     limit: Option<usize>,
@@ -215,7 +216,8 @@ fn search_sessions(
     with_db(&state, |db| {
         db.search(
             &query,
-            tool.as_deref(),
+            tools.as_deref(),
+            paths.as_deref(),
             date_from.as_deref(),
             date_to.as_deref(),
             limit.unwrap_or(50),
@@ -245,8 +247,21 @@ fn get_tools(state: State<AppState>) -> AppResult<Vec<String>> {
 }
 
 #[tauri::command]
+fn get_search_paths(state: State<AppState>) -> AppResult<Vec<String>> {
+    with_db(&state, |db| db.get_search_paths())
+}
+
+#[tauri::command]
 fn get_stats(state: State<AppState>) -> AppResult<serde_json::Value> {
     with_db(&state, |db| db.get_stats())
+}
+
+#[tauri::command]
+fn get_activity_heatmap(
+    state: State<AppState>,
+    days: Option<usize>,
+) -> AppResult<Vec<ActivityPoint>> {
+    with_db(&state, |db| db.get_activity_heatmap(days.unwrap_or(182)))
 }
 
 #[tauri::command]
@@ -301,7 +316,9 @@ pub fn run() {
             toggle_favorite,
             get_favorites,
             get_tools,
+            get_search_paths,
             get_stats,
+            get_activity_heatmap,
             clear_database,
             export_session,
         ])

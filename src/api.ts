@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { SessionSummary, Session, SearchResult, DetectedSource, ExportData, Stats } from './types';
+import type { ActivityPoint, SessionSummary, Session, SearchResult, DetectedSource, ExportData, Stats } from './types';
 
 export async function detectSources(): Promise<DetectedSource[]> {
   return invoke('detect_sources');
@@ -35,14 +35,16 @@ export async function getSession(id: string): Promise<Session | null> {
 
 export async function searchSessions(params: {
   query: string;
-  tool?: string;
+  tools?: string[];
+  paths?: string[];
   dateFrom?: string;
   dateTo?: string;
   limit?: number;
 }): Promise<SearchResult[]> {
   return invoke('search_sessions', {
     query: params.query,
-    tool: params.tool ?? null,
+    tools: params.tools && params.tools.length > 0 ? params.tools : null,
+    paths: params.paths && params.paths.length > 0 ? params.paths : null,
     dateFrom: params.dateFrom ?? null,
     dateTo: params.dateTo ?? null,
     limit: params.limit ?? 50,
@@ -61,8 +63,16 @@ export async function getTools(): Promise<string[]> {
   return invoke('get_tools');
 }
 
+export async function getSearchPaths(): Promise<string[]> {
+  return invoke('get_search_paths');
+}
+
 export async function getStats(): Promise<Stats> {
   return invoke('get_stats');
+}
+
+export async function getActivityHeatmap(days?: number): Promise<ActivityPoint[]> {
+  return invoke('get_activity_heatmap', { days: days ?? 182 });
 }
 
 export async function clearDatabase(): Promise<void> {

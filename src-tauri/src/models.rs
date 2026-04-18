@@ -78,6 +78,13 @@ pub struct SearchResult {
     pub snippet: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActivityPoint {
+    pub date: String,
+    pub tool: String,
+    pub session_count: i64,
+}
+
 /// Normalized conversation produced by connectors
 #[derive(Debug, Clone)]
 pub struct NormalizedConversation {

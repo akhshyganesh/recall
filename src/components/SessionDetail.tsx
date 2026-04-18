@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import MessageBody from '../MessageBody';
 import type { Session } from '../types';
@@ -18,6 +18,53 @@ import {
 interface SessionDetailProps {
   session: Session;
   onExport: (format: 'markdown' | 'json' | 'text') => void;
+}
+
+function DiffFileChange({
+  fileChange,
+}: {
+  fileChange: Session['file_changes'][number];
+}) {
+  const [open, setOpen] = useState(false);
+  const hasDiff = Boolean(fileChange.diff_text);
+
+  return (
+    <div className={`diff-file ${open ? 'open' : ''}`}>
+      <button
+        className={`diff-file-head ${hasDiff ? '' : 'no-toggle'}`.trim()}
+        onClick={hasDiff ? () => setOpen((current) => !current) : undefined}
+        type="button"
+        aria-expanded={hasDiff ? open : undefined}
+        disabled={!hasDiff}
+      >
+        {hasDiff && (
+          <span className={`accordion-chevron ${open ? 'open' : ''}`}>
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M6 4l4 4-4 4" />
+            </svg>
+          </span>
+        )}
+        <span className="diff-file-path">{fileChange.path}</span>
+        <div className="diff-stats">
+          {fileChange.additions > 0 && <span className="add">+{fileChange.additions}</span>}
+          {fileChange.deletions > 0 && <span className="del">-{fileChange.deletions}</span>}
+        </div>
+      </button>
+      {hasDiff && open && (
+        <div className="diff-body">
+          {fileChange.diff_text?.split('\n').map((line, index) => (
+            <div
+              key={`${fileChange.id}-${index}`}
+              className={`diff-ln ${line.startsWith('+') ? 'plus' : line.startsWith('-') ? 'minus' : ''}`}
+            >
+              <span className="diff-ln-num">{index + 1}</span>
+              <span>{line}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function DetailChip({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
@@ -85,30 +132,7 @@ export default function SessionDetail({ session, onExport }: SessionDetailProps)
             <span className="section-icon"><FileChangesIcon /></span>
             <span>Files Changed ({session.file_changes.length})</span>
           </div>
-          {session.file_changes.map((fileChange) => (
-            <div key={fileChange.id} className="diff-file">
-              <div className="diff-file-head">
-                <span>{fileChange.path}</span>
-                <div className="diff-stats">
-                  {fileChange.additions > 0 && <span className="add">+{fileChange.additions}</span>}
-                  {fileChange.deletions > 0 && <span className="del">-{fileChange.deletions}</span>}
-                </div>
-              </div>
-              {fileChange.diff_text && (
-                <div className="diff-body">
-                  {fileChange.diff_text.split('\n').map((line, index) => (
-                    <div
-                      key={`${fileChange.id}-${index}`}
-                      className={`diff-ln ${line.startsWith('+') ? 'plus' : line.startsWith('-') ? 'minus' : ''}`}
-                    >
-                      <span className="diff-ln-num">{index + 1}</span>
-                      <span>{line}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
+          {session.file_changes.map((fileChange) => <DiffFileChange key={fileChange.id} fileChange={fileChange} />)}
         </div>
       )}
 

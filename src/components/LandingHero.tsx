@@ -1,4 +1,5 @@
-import type { Stats } from '../types';
+import ActivityHeatmap from './ActivityHeatmap';
+import type { ActivityPoint, Stats } from '../types';
 
 const FEATURES = [
   {
@@ -55,8 +56,9 @@ function StatNumber({ value, label }: { value: number; label: string }) {
   );
 }
 
-export default function LandingHero({ stats, onScan, scanning }: {
+export default function LandingHero({ stats, activity, onScan, scanning }: {
   stats: Stats | null;
+  activity: ActivityPoint[];
   onScan: () => void;
   scanning: boolean;
 }) {
@@ -66,44 +68,50 @@ export default function LandingHero({ stats, onScan, scanning }: {
     <section className="landing-hero">
       <div className="hero-glow" />
 
-      <div className="hero-header">
-        <h1 className="hero-title">
-          <span className="hero-title-dim">Your AI coding history,</span>
-          <br />
-          <span className="hero-title-bright">searchable & local.</span>
-        </h1>
-        <p className="hero-subtitle">
-          Recall indexes every AI session across your tools — prompts, responses,
-          tool calls, and file diffs — into a single searchable timeline.
-          Never lose context again.
-        </p>
-      </div>
+      <div className="hero-showcase">
+        <div className="hero-copy-column">
+          <div className="hero-header">
+            <h1 className="hero-title">
+              <span className="hero-title-dim">Your AI coding history,</span>
+              <br />
+              <span className="hero-title-bright">searchable, local, and alive.</span>
+            </h1>
+            <p className="hero-subtitle">
+              Recall indexes every AI session across your tools — prompts, responses,
+              tool calls, and file diffs — into a single searchable timeline with a
+              vendor-colored activity map.
+            </p>
+          </div>
 
-      {hasSessions ? (
-        <div className="hero-stats-row">
-          <StatNumber value={stats.total_sessions} label="sessions" />
-          <span className="hero-stat-divider" />
-          <StatNumber value={stats.total_messages} label="messages" />
-          <span className="hero-stat-divider" />
-          <StatNumber value={stats.total_tools} label="tools" />
+          {hasSessions ? (
+            <div className="hero-stats-row">
+              <StatNumber value={stats.total_sessions} label="sessions" />
+              <span className="hero-stat-divider" />
+              <StatNumber value={stats.total_messages} label="messages" />
+              <span className="hero-stat-divider" />
+              <StatNumber value={stats.total_tools} label="tools" />
+            </div>
+          ) : (
+            <div className="hero-cta">
+              <button className="hero-scan-btn" onClick={onScan} disabled={scanning} type="button">
+                {scanning ? (
+                  <>
+                    <span className="hero-scan-spinner" />
+                    Scanning…
+                  </>
+                ) : (
+                  'Scan for Sessions'
+                )}
+              </button>
+              <p className="hero-cta-hint">
+                Discovers sessions from VS Code, terminals, and editor storage
+              </p>
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="hero-cta">
-          <button className="hero-scan-btn" onClick={onScan} disabled={scanning} type="button">
-            {scanning ? (
-              <>
-                <span className="hero-scan-spinner" />
-                Scanning…
-              </>
-            ) : (
-              'Scan for Sessions'
-            )}
-          </button>
-          <p className="hero-cta-hint">
-            Discovers sessions from VS Code, terminals, and editor storage
-          </p>
-        </div>
-      )}
+
+        <ActivityHeatmap activity={activity} />
+      </div>
 
       <div className="hero-features">
         {FEATURES.map((f) => (

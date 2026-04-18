@@ -14,7 +14,7 @@ The screenshots above show the macOS build. The Linux desktop app uses the same 
 
 ## What the app does today
 
-- Detects and indexes local session history from **Claude Code, GitHub Copilot, Cursor, Aider, Codex CLI, Cline, and Gemini CLI**
+- Detects and indexes local session history from **Claude Code, GitHub Copilot, GitHub Copilot CLI, Cursor, Aider, Codex CLI, Cline, and Gemini CLI**
 - Runs an initial background scan when the app starts, plus manual full scans from the sidebar
 - Runs an incremental rescan every **30 seconds** while the app is open
 - Stores normalized sessions and messages in a local SQLite database at:
@@ -43,6 +43,7 @@ Search is local-only. The current code does not send indexed session data to any
 | --- | --- | --- |
 | Claude Code | `~/.claude`, `~/.config/claude` | files under `projects/` with `.jsonl`, `.json`, or `.claude` extensions |
 | GitHub Copilot | VS Code `workspaceStorage` in stable and Insiders profiles | `chatSessions/*.jsonl` plus `chatEditingSessions/<session>/state.json` |
+| GitHub Copilot CLI | `~/.copilot/session-state` | per-session directories with `workspace.yaml` and `events.jsonl` |
 | Cursor | Cursor `globalStorage` and `workspaceStorage` on macOS/Linux | `state.vscdb` SQLite databases |
 | Aider | `$HOME`, `$HOME/projects`, `$HOME/code`, `$HOME/dev`, `$HOME/src`, `$HOME/workspace` | `.aider.chat.history.md` files |
 | Codex CLI | `$CODEX_HOME`, `~/.codex`, `~/.config/codex` | `sessions/rollout-*.jsonl` and `sessions/rollout-*.json` |
@@ -88,7 +89,7 @@ These paths come directly from the connector implementations in `src-tauri/src/c
 
 - Source detection and connector paths are implemented for **macOS and Linux**. There is no Windows connector-path support in the current code.
 - Full-text search indexes **message content** only; it does not currently index session metadata or file diffs.
-- Persisted session-level file changes currently depend on connectors emitting structured `text_edit` parts. In the current codebase, that primarily means **GitHub Copilot** sessions.
+- Persisted session-level file changes currently depend on connectors emitting structured `text_edit` parts. In the current codebase, that primarily means **GitHub Copilot** VS Code sessions.
 - There is no dedicated lint script yet. The repository-level verification command is `npm run check`.
 
 ## Development

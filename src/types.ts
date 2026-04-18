@@ -91,5 +91,11 @@ export interface Stats {
   total_tools: number;
 }
 
+export interface ActivityPoint {
+  date: string;
+  tool: string;
+  session_count: number;
+}
+
 export type View = 'timeline' | 'session' | 'search' | 'favorites' | 'settings';
 export type DateFilter = 'today' | 'yesterday' | '7days' | '30days' | 'all';

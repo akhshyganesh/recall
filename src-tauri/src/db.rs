@@ -1,11 +1,41 @@
+use chrono::{Duration, Utc};
 use rusqlite::{params, Connection};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use crate::models::{FileChange, Message, SearchResult, Session, SessionSummary};
+use crate::models::{ActivityPoint, FileChange, Message, SearchResult, Session, SessionSummary};
+
+const SESSION_PATH_EXPR: &str = "COALESCE(NULLIF(repo_path, ''), NULLIF(workspace, ''))";
+const SESSION_PATH_EXPR_WITH_ALIAS: &str = "COALESCE(NULLIF(s.repo_path, ''), NULLIF(s.workspace, ''))";
 
 pub struct Database {
     conn: Mutex<Connection>,
+}
+
+fn append_multi_value_filter(
+    sql: &mut String,
+    expression: &str,
+    values: Option<&[String]>,
+    param_values: &mut Vec<Box<dyn rusqlite::types::ToSql>>,
+) {
+    let Some(values) = values.filter(|current_values| !current_values.is_empty()) else {
+        return;
+    };
+
+    let placeholders = values
+        .iter()
+        .map(|value| {
+            param_values.push(Box::new(value.clone()));
+            format!("?{}", param_values.len())
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    sql.push_str(" AND ");
+    sql.push_str(expression);
+    sql.push_str(" IN (");
+    sql.push_str(&placeholders);
+    sql.push(')');
 }
 
 impl Database {
@@ -340,7 +370,8 @@ impl Database {
     pub fn search(
         &self,
         query: &str,
-        tool_filter: Option<&str>,
+        tool_filters: Option<&[String]>,
+        path_filters: Option<&[String]>,
         date_from: Option<&str>,
         date_to: Option<&str>,
         limit: usize,
@@ -356,10 +387,13 @@ impl Database {
         let mut param_values: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
         param_values.push(Box::new(query.to_string()));
 
-        if let Some(tool) = tool_filter {
-            sql.push_str(&format!(" AND s.tool = ?{}", param_values.len() + 1));
-            param_values.push(Box::new(tool.to_string()));
-        }
+        append_multi_value_filter(&mut sql, "s.tool", tool_filters, &mut param_values);
+        append_multi_value_filter(
+            &mut sql,
+            SESSION_PATH_EXPR_WITH_ALIAS,
+            path_filters,
+            &mut param_values,
+        );
         if let Some(from) = date_from {
             sql.push_str(&format!(" AND s.started_at >= ?{}", param_values.len() + 1));
             param_values.push(Box::new(from.to_string()));
@@ -484,6 +518,26 @@ impl Database {
         Ok(tools)
     }
 
+    pub fn get_search_paths(&self) -> Result<Vec<String>, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let mut stmt = conn
+            .prepare(&format!(
+                "SELECT DISTINCT {SESSION_PATH_EXPR} AS search_path
+                 FROM sessions
+                 WHERE {SESSION_PATH_EXPR} IS NOT NULL
+                 ORDER BY search_path"
+            ))
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| row.get(0))
+            .map_err(|e| e.to_string())?;
+        let mut paths = Vec::new();
+        for row in rows {
+            paths.push(row.map_err(|e| e.to_string())?);
+        }
+        Ok(paths)
+    }
+
     pub fn get_stats(&self) -> Result<serde_json::Value, String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         let total_sessions: i64 = conn
@@ -503,6 +557,43 @@ impl Database {
             "total_messages": total_messages,
             "total_tools": total_tools,
         }))
+    }
+
+    pub fn get_activity_heatmap(&self, days: usize) -> Result<Vec<ActivityPoint>, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let normalized_days = days.max(1);
+        let since_date = (Utc::now().date_naive()
+            - Duration::days(normalized_days.saturating_sub(1) as i64))
+        .format("%Y-%m-%d")
+        .to_string();
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT substr(COALESCE(started_at, indexed_at), 1, 10) AS activity_date,
+                        tool,
+                        COUNT(*) AS session_count
+                 FROM sessions
+                 WHERE substr(COALESCE(started_at, indexed_at), 1, 10) >= ?1
+                 GROUP BY activity_date, tool
+                 ORDER BY activity_date ASC, session_count DESC, tool ASC",
+            )
+            .map_err(|e| e.to_string())?;
+
+        let rows = stmt
+            .query_map(params![since_date], |row| {
+                Ok(ActivityPoint {
+                    date: row.get(0)?,
+                    tool: row.get(1)?,
+                    session_count: row.get(2)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+
+        let mut results = Vec::new();
+        for row in rows {
+            results.push(row.map_err(|e| e.to_string())?);
+        }
+        Ok(results)
     }
 
     pub fn clear_all(&self) -> Result<(), String> {
