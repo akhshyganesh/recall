@@ -124,6 +124,14 @@ npm run build
 npm run check
 ```
 
+### Cut a release
+
+```bash
+./scripts/release.sh 0.2.1
+```
+
+This updates `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`, runs `npm run check`, commits the version bump, pushes the current branch, creates tag `v<version>`, and pushes the tag to trigger the release workflow.
+
 ## Project layout
 
 | Path | Purpose |
