@@ -1,6 +1,6 @@
 {
   "name": "@recall/shared-types",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "private": true,
   "description": "TypeScript types generated from the Rust backend (ts-rs).",
   "license": "MIT",

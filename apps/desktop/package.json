@@ -1,7 +1,7 @@
 {
   "name": "@recall/desktop",
   "private": true,
-  "version": "0.4.6",
+  "version": "0.4.7",
   "description": "Recall desktop app (Tauri + React)",
   "license": "MIT",
   "type": "module",
