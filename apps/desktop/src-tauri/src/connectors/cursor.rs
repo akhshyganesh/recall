@@ -104,29 +104,21 @@ impl CursorConnector {
                             "ai" | "assistant" => "assistant",
                             _ => "assistant",
                         },
-                        Some(serde_json::Value::Number(n)) => {
-                            if n.as_i64() == Some(1) {
-                                "user"
-                            } else {
-                                "assistant"
-                            }
-                        }
+                        Some(serde_json::Value::Number(n)) if n.as_i64() == Some(1) => "user",
                         _ => "assistant",
                     };
 
-                    if role == "assistant" {
-                        if model.is_none() {
-                            model = bubble
-                                .get("model")
-                                .and_then(|m| m.as_str())
-                                .map(|s| s.to_string())
-                                .or_else(|| {
-                                    bubble
-                                        .get("modelType")
-                                        .and_then(|m| m.as_str())
-                                        .map(|s| s.to_string())
-                                });
-                        }
+                    if role == "assistant" && model.is_none() {
+                        model = bubble
+                            .get("model")
+                            .and_then(|m| m.as_str())
+                            .map(|s| s.to_string())
+                            .or_else(|| {
+                                bubble
+                                    .get("modelType")
+                                    .and_then(|m| m.as_str())
+                                    .map(|s| s.to_string())
+                            });
                     }
 
                     messages.push(NormalizedMessage {

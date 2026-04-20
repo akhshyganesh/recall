@@ -217,11 +217,9 @@ impl CopilotCliConnector {
                     model = Self::first_non_empty_text(&[data.get("newModel"), data.get("model")])
                         .or(model);
                 }
-                "system.message" => {
-                    if model.is_none() {
-                        if let Some(content) = Self::message_text(data.get("content")) {
-                            model = Self::extract_model_from_system_message(&content);
-                        }
+                "system.message" if model.is_none() => {
+                    if let Some(content) = Self::message_text(data.get("content")) {
+                        model = Self::extract_model_from_system_message(&content);
                     }
                 }
                 "user.message" => {
@@ -295,16 +293,12 @@ impl CopilotCliConnector {
                         extra: serde_json::json!({ "parts": structured_parts }),
                     });
                 }
-                "session.info" => {
-                    if model.is_none() {
-                        model = Self::message_text(data.get("message")).and_then(|message| {
-                            if let Some(rest) = message.strip_prefix("Model changed to:") {
-                                Some(rest.trim().to_string())
-                            } else {
-                                None
-                            }
-                        });
-                    }
+                "session.info" if model.is_none() => {
+                    model = Self::message_text(data.get("message")).and_then(|message| {
+                        message
+                            .strip_prefix("Model changed to:")
+                            .map(|rest| rest.trim().to_string())
+                    });
                 }
                 _ => {}
             }

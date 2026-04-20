@@ -18,7 +18,7 @@ impl AiderConnector {
         let mut current_lines: Vec<String> = Vec::new();
 
         for line in content.lines() {
-            if line.starts_with("> ") {
+            if let Some(stripped) = line.strip_prefix("> ") {
                 // User input line
                 if current_role != "user" && !current_lines.is_empty() {
                     let text = current_lines.join("\n").trim().to_string();
@@ -35,7 +35,7 @@ impl AiderConnector {
                     current_lines.clear();
                 }
                 current_role = "user";
-                current_lines.push(line[2..].to_string());
+                current_lines.push(stripped.to_string());
             } else {
                 if current_role == "user" && !current_lines.is_empty() {
                     let text = current_lines.join("\n").trim().to_string();

@@ -727,10 +727,7 @@ impl CopilotConnector {
             .and_then(|t| t.as_str())
             .map(|s| s.to_string());
 
-        let requests = match state.get("requests").and_then(|r| r.as_array()) {
-            Some(r) => r,
-            None => return None,
-        };
+        let requests = state.get("requests").and_then(|r| r.as_array())?;
         if requests.is_empty() {
             return None;
         }
