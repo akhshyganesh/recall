@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { AppInfo, DetectedSource, UpdateStatus } from '../types';
+import type { AppInfo, DetectedSource, McpStatus, UpdateStatus } from '../types';
 import { formatUpdateDate, trimReleaseNotes } from '../lib/update-format';
 import { DownloadIcon, RefreshIcon, TrashIcon } from './AppIcons';
 
@@ -7,9 +7,11 @@ interface SettingsPanelProps {
   appInfo: AppInfo | null;
   sources: DetectedSource[];
   updateStatus: UpdateStatus;
+  mcpStatus: McpStatus;
   onCheckForUpdates: () => void;
   onDownloadAndInstall: () => void;
   onClearDatabase: () => Promise<void>;
+  onToggleMcp: (enabled: boolean) => Promise<void>;
 }
 
 function formatCheckTime(value: string | null): string | null {
@@ -101,15 +103,18 @@ export default function SettingsPanel({
   appInfo,
   sources,
   updateStatus,
+  mcpStatus,
   onCheckForUpdates,
   onDownloadAndInstall,
   onClearDatabase,
+  onToggleMcp,
 }: SettingsPanelProps) {
   const checkDisabled = updateStatus.state === 'checking' || updateStatus.state === 'downloading' || updateStatus.state === 'installing';
   const releaseNotes = trimReleaseNotes(updateStatus.release_notes, 360);
   const updateMeta = getUpdateMeta(appInfo, updateStatus);
   const [clearing, setClearing] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [mcpToggling, setMcpToggling] = useState(false);
 
   return (
     <div className="settings enter">
@@ -250,6 +255,60 @@ export default function SettingsPanel({
                   </>
                 )}
               </div>
+            </div>
+          </section>
+
+          <section className="settings-section settings-section-mcp">
+            <div className="settings-heading">MCP Server</div>
+
+            <div className={`mcp-card ${mcpStatus.running ? 'active' : ''}`}>
+              <div className="mcp-card-top">
+                <div className={`mcp-dot ${mcpStatus.running ? 'on' : ''}`} />
+                <div className="mcp-card-copy">
+                  <div className="mcp-card-title">
+                    {mcpStatus.running ? 'MCP Server Running' : 'MCP Server Stopped'}
+                  </div>
+                  <div className="mcp-card-meta">
+                    {mcpStatus.running
+                      ? `Listening on port ${mcpStatus.port}`
+                      : 'Enable to let AI agents query your session history'}
+                  </div>
+                </div>
+                <label className="mcp-toggle">
+                  <input
+                    checked={mcpStatus.running}
+                    disabled={mcpToggling}
+                    onChange={async (e) => {
+                      setMcpToggling(true);
+                      try {
+                        await onToggleMcp(e.target.checked);
+                      } finally {
+                        setMcpToggling(false);
+                      }
+                    }}
+                    type="checkbox"
+                  />
+                  <span className="mcp-toggle-track" />
+                </label>
+              </div>
+
+              {mcpStatus.running && mcpStatus.url && (
+                <div className="mcp-connection-info">
+                  <div className="mcp-info-label">SSE Endpoint</div>
+                  <code className="mcp-info-url">{mcpStatus.url}</code>
+                  <div className="mcp-info-label" style={{ marginTop: 12 }}>Agent Configuration</div>
+                  <pre className="mcp-info-config">{`{
+  "mcpServers": {
+    "recall": {
+      "url": "${mcpStatus.url}"
+    }
+  }
+}`}</pre>
+                  <div className="mcp-info-hint">
+                    Add the config above to your AI agent's MCP settings to connect.
+                  </div>
+                </div>
+              )}
             </div>
           </section>
 

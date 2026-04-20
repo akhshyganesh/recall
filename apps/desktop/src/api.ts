@@ -7,6 +7,7 @@ import type {
   SearchResult,
   DetectedSource,
   ExportData,
+  McpStatus,
   Stats,
 } from './types';
 
@@ -94,4 +95,16 @@ export async function clearDatabase(): Promise<void> {
 
 export async function exportSession(id: string, format: string): Promise<ExportData> {
   return invoke('export_session', { id, format });
+}
+
+export async function startMcpServer(port?: number): Promise<number> {
+  return invoke('start_mcp_server', { port: port ?? null });
+}
+
+export async function stopMcpServer(): Promise<void> {
+  return invoke('stop_mcp_server');
+}
+
+export async function getMcpStatus(): Promise<McpStatus> {
+  return invoke('get_mcp_status');
 }

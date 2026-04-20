@@ -2227,6 +2227,134 @@ body {
 .danger-box-confirm-btn:hover { opacity: 0.9; }
 .danger-box-confirm-btn:disabled { opacity: 0.7; cursor: default; }
 
+/* === MCP Server === */
+.mcp-card {
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  padding: 18px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  transition: border-color var(--transition-fast);
+}
+.mcp-card.active {
+  border-color: rgba(106,153,85,0.25);
+}
+.mcp-card-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.mcp-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-4);
+  flex-shrink: 0;
+}
+.mcp-dot.on {
+  background: var(--green);
+  box-shadow: 0 0 8px rgba(106,153,85,0.5);
+}
+.mcp-card-copy {
+  flex: 1;
+  min-width: 0;
+}
+.mcp-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-1);
+}
+.mcp-card-meta {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.mcp-toggle {
+  position: relative;
+  display: inline-block;
+  width: 42px;
+  height: 24px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.mcp-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.mcp-toggle-track {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  transition: all var(--transition-fast);
+}
+.mcp-toggle-track::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  background: var(--text-3);
+  border-radius: 50%;
+  transition: all var(--transition-fast);
+}
+.mcp-toggle input:checked + .mcp-toggle-track {
+  background: rgba(106,153,85,0.2);
+  border-color: rgba(106,153,85,0.4);
+}
+.mcp-toggle input:checked + .mcp-toggle-track::after {
+  transform: translateX(18px);
+  background: var(--green);
+}
+.mcp-toggle input:disabled + .mcp-toggle-track {
+  opacity: 0.5;
+  cursor: default;
+}
+.mcp-connection-info {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(0,0,0,0.14);
+}
+.mcp-info-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-4);
+  margin-bottom: 6px;
+}
+.mcp-info-url {
+  display: block;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  word-break: break-all;
+}
+.mcp-info-config {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-2);
+  background: rgba(0,0,0,0.2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  white-space: pre;
+  overflow-x: auto;
+  margin: 0;
+}
+.mcp-info-hint {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-3);
+  line-height: 1.5;
+}
+
 /* === Keyboard Shortcuts === */
 .shortcut-list {
   display: flex;
