@@ -1,0 +1,33 @@
+{
+  "name": "recall-workspace",
+  "private": true,
+  "version": "0.4.5",
+  "description": "Local AI coding session history — workspace root",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/akhshyganesh/recall.git"
+  },
+  "engines": {
+    "node": ">=20.11",
+    "npm": ">=10"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @recall/desktop",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "check": "npm run typecheck && npm run cargo:check -w @recall/desktop",
+    "types:generate": "npm run types:generate -w @recall/desktop",
+    "tauri": "npm run tauri -w @recall/desktop",
+    "tauri:dev": "npm run tauri:dev -w @recall/desktop",
+    "tauri:build": "npm run tauri:build -w @recall/desktop",
+    "release": "bash scripts/release.sh"
+  },
+  "devDependencies": {
+    "typescript": "5.8.3"
+  }
+}

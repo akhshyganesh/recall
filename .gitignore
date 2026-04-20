@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Rust
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+target/
+
+# Generated types are committed (regenerated via `pnpm types:generate`)
+# so that fresh clones can typecheck without a Rust toolchain.
+
+
+# Editors & OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json
+*.swp
+*.log
+
+# Env
+.env
+.env.local
+
+# Legacy migration folder (kept temporarily — remove after cutover verified)
+# Uncomment once deletion is final:
+# old/

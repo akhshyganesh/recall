@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/akhshyganesh/recall/security/advisories/new
+    about: Report a security vulnerability privately.
+  - name: Discussion
+    url: https://github.com/akhshyganesh/recall/discussions
+    about: Open-ended questions, ideas, show-and-tell.
