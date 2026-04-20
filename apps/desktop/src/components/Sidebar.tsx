@@ -14,7 +14,7 @@ interface SidebarProps {
   onTimeline: () => void;
   onFavorites: () => void;
   onSettings: () => void;
-  onOpenReleasePage: () => void;
+  onDownloadAndInstall: () => void;
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string) => void;
   onTogglePinTab: (id: string) => void;
@@ -23,9 +23,15 @@ interface SidebarProps {
 }
 
 function getUpdateBannerSubtitle(updateStatus: UpdateStatus): string {
+  if (updateStatus.state === 'downloading') {
+    return `Downloading… ${updateStatus.download_progress ?? 0}%`;
+  }
+  if (updateStatus.state === 'installing') {
+    return 'Installing — restarting shortly';
+  }
   return updateStatus.latest_version
-    ? `Version ${updateStatus.latest_version} is available on GitHub`
-    : 'A newer release is available on GitHub';
+    ? `Version ${updateStatus.latest_version} available`
+    : 'A newer release is available';
 }
 
 export default function Sidebar({
@@ -39,14 +45,14 @@ export default function Sidebar({
   onTimeline,
   onFavorites,
   onSettings,
-  onOpenReleasePage,
+  onDownloadAndInstall,
   onSelectTab,
   onCloseTab,
   onTogglePinTab,
   onScan,
   onClose = () => {},
 }: SidebarProps) {
-  const showUpdateBanner = updateStatus.state === 'available';
+  const showUpdateBanner = updateStatus.state === 'available' || updateStatus.state === 'downloading' || updateStatus.state === 'installing';
   const sortedTabs = [...openTabs].sort((a, b) => {
     if (a.pinned !== b.pinned) {
       return a.pinned ? -1 : 1;
@@ -168,16 +174,27 @@ export default function Sidebar({
         </button>
         {showUpdateBanner && (
           <button
-            className="update-banner available"
-            onClick={onOpenReleasePage}
+            className={`update-banner available ${updateStatus.state === 'downloading' || updateStatus.state === 'installing' ? 'in-progress' : ''}`}
+            disabled={updateStatus.state === 'downloading' || updateStatus.state === 'installing'}
+            onClick={onDownloadAndInstall}
             type="button"
           >
-            <span className="update-banner-icon"><DownloadIcon /></span>
+            <span className="update-banner-icon">
+              {updateStatus.state === 'downloading' || updateStatus.state === 'installing'
+                ? <RefreshIcon className="spin-icon" />
+                : <DownloadIcon />}
+            </span>
             <span className="update-banner-copy">
-              <span className="update-banner-title">Update available</span>
+              <span className="update-banner-title">
+                {updateStatus.state === 'downloading' ? 'Downloading update' :
+                 updateStatus.state === 'installing' ? 'Installing update' :
+                 'Update available'}
+              </span>
               <span className="update-banner-sub">{getUpdateBannerSubtitle(updateStatus)}</span>
             </span>
-            <span className="update-banner-action">View</span>
+            <span className="update-banner-action">
+              {updateStatus.state === 'available' ? 'Install' : ''}
+            </span>
           </button>
         )}
         <button
