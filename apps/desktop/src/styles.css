@@ -454,10 +454,10 @@ body {
   position: absolute;
   bottom: 0;
   left: 0;
-  height: 3px;
-  background: var(--accent);
-  border-radius: 0 0 10px 10px;
-  animation: scan-progress 2s ease-in-out infinite;
+  height: 100%;
+  background: rgba(86,156,214,0.12);
+  border-radius: 10px;
+  animation: scan-fill 6s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
 }
 
 .sidebar-utility {
@@ -560,11 +560,13 @@ body {
   background: var(--accent);
   transition: width 120ms linear;
 }
-@keyframes scan-progress {
-  0%   { left: 0; width: 0; }
-  30%  { left: 0; width: 60%; }
-  70%  { left: 40%; width: 60%; }
-  100% { left: 100%; width: 0; }
+@keyframes scan-fill {
+  0%   { width: 0%; }
+  15%  { width: 25%; }
+  40%  { width: 55%; }
+  65%  { width: 75%; }
+  85%  { width: 88%; }
+  100% { width: 95%; }
 }
 
 /* === Main === */
@@ -1032,6 +1034,8 @@ body {
   border-radius: var(--radius-s);
   cursor: pointer;
   transition: all var(--transition-fast);
+  position: relative;
+  overflow: hidden;
 }
 .hero-scan-btn:hover:not(:disabled) {
   filter: brightness(1.15);
@@ -1041,6 +1045,15 @@ body {
   opacity: 0.8;
   cursor: default;
 }
+.hero-scan-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: rgba(0,0,0,0.12);
+  border-radius: var(--radius-s);
+  animation: scan-fill 6s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+}
 .hero-scan-spinner {
   display: inline-block;
   width: 14px;
@@ -1049,6 +1062,8 @@ body {
   border-top-color: #000;
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
+  position: relative;
+  z-index: 1;
 }
 .hero-cta-hint {
   margin-top: 10px;
@@ -2174,6 +2189,11 @@ body {
   gap: 6px;
 }
 .danger-box button:hover { background: var(--red-soft); }
+.danger-box button:disabled { opacity: 0.7; cursor: default; }
+.danger-box button .spin-icon {
+  display: inline-block;
+  animation: spin 0.8s linear infinite;
+}
 
 /* === Keyboard Shortcuts === */
 .shortcut-list {

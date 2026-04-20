@@ -93,7 +93,7 @@ export default function LandingHero({ stats, activity, onScan, scanning }: {
             </div>
           ) : (
             <div className="hero-cta">
-              <button className="hero-scan-btn" onClick={onScan} disabled={scanning} type="button">
+              <button className={`hero-scan-btn ${scanning ? 'scanning' : ''}`} onClick={onScan} disabled={scanning} type="button">
                 {scanning ? (
                   <>
                     <span className="hero-scan-spinner" />
@@ -102,6 +102,7 @@ export default function LandingHero({ stats, activity, onScan, scanning }: {
                 ) : (
                   'Scan for Sessions'
                 )}
+                {scanning && <span className="hero-scan-bar" />}
               </button>
               <p className="hero-cta-hint">
                 Discovers sessions from VS Code, terminals, and editor storage

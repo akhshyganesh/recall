@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { AppInfo, DetectedSource, UpdateStatus } from '../types';
 import { formatUpdateDate, trimReleaseNotes } from '../lib/update-format';
 import { DownloadIcon, RefreshIcon, TrashIcon } from './AppIcons';
@@ -101,6 +102,7 @@ export default function SettingsPanel({
   const checkDisabled = updateStatus.state === 'checking';
   const releaseNotes = trimReleaseNotes(updateStatus.release_notes, 360);
   const updateMeta = getUpdateMeta(appInfo, updateStatus);
+  const [clearing, setClearing] = useState(false);
 
   return (
     <div className="settings enter">
@@ -178,9 +180,29 @@ export default function SettingsPanel({
 
             <div className="danger-box">
               <p>Permanently clear all indexed sessions and messages. This will not delete your actual harness session data.</p>
-              <button onClick={() => void onClearDatabase()} type="button">
-                <TrashIcon />
-                Clear Database
+              <button
+                disabled={clearing}
+                onClick={async () => {
+                  setClearing(true);
+                  try {
+                    await onClearDatabase();
+                  } finally {
+                    setClearing(false);
+                  }
+                }}
+                type="button"
+              >
+                {clearing ? (
+                  <>
+                    <RefreshIcon className="spin-icon" />
+                    Clearing…
+                  </>
+                ) : (
+                  <>
+                    <TrashIcon />
+                    Clear Database
+                  </>
+                )}
               </button>
             </div>
           </section>

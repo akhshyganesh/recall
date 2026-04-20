@@ -36,6 +36,16 @@ Modern AI tools produce enormous amounts of useful context — edits, reasoning,
 
 Prebuilt binaries for macOS (arm64) and Linux (x86_64) are published on the [Releases page](https://github.com/akhshyganesh/recall/releases). Windows builds can be produced locally — see [`docs/development.md`](docs/development.md).
 
+### macOS — "damaged and can't be opened"
+
+macOS Gatekeeper quarantines unsigned apps downloaded from the internet. Because Recall is not notarized with an Apple Developer certificate, macOS will block it with a misleading "damaged" error. To fix this, open Terminal and run:
+
+```sh
+xattr -cr /Applications/Recall.app
+```
+
+This strips the quarantine attribute. The app itself is fine — Apple simply displays this message for all unsigned downloads on macOS Ventura and later.
+
 ## Repository layout
 
 ```
