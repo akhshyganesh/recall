@@ -3,10 +3,13 @@ use rusqlite::{params, Connection};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use crate::models::{ActivityPoint, FileChange, Message, SearchResult, Session, SessionSummary, Stats};
+use crate::models::{
+    ActivityPoint, FileChange, Message, SearchResult, Session, SessionSummary, Stats,
+};
 
 const SESSION_PATH_EXPR: &str = "COALESCE(NULLIF(repo_path, ''), NULLIF(workspace, ''))";
-const SESSION_PATH_EXPR_WITH_ALIAS: &str = "COALESCE(NULLIF(s.repo_path, ''), NULLIF(s.workspace, ''))";
+const SESSION_PATH_EXPR_WITH_ALIAS: &str =
+    "COALESCE(NULLIF(s.repo_path, ''), NULLIF(s.workspace, ''))";
 
 pub struct Database {
     conn: Mutex<Connection>,

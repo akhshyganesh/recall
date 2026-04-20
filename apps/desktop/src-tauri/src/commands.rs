@@ -183,11 +183,7 @@ pub fn clear_database(state: State<AppState>) -> AppResult<()> {
 }
 
 #[tauri::command]
-pub fn export_session(
-    state: State<AppState>,
-    id: String,
-    format: String,
-) -> AppResult<ExportData> {
+pub fn export_session(state: State<AppState>, id: String, format: String) -> AppResult<ExportData> {
     with_db(&state, |db| {
         let session = db
             .get_session(&id)?

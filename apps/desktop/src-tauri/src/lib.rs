@@ -64,10 +64,7 @@ where
 /// Run every connector (optionally filtered to sessions newer than
 /// `since_ts`) and upsert each resulting [`crate::models::Session`] into
 /// the database. Returns the number of sessions persisted.
-pub(crate) fn persist_scanned_sessions(
-    db: SharedDb,
-    since_ts: Option<String>,
-) -> AppResult<usize> {
+pub(crate) fn persist_scanned_sessions(db: SharedDb, since_ts: Option<String>) -> AppResult<usize> {
     let receiver = Indexer::collect_sessions(since_ts.as_deref());
     let mut total = 0usize;
 

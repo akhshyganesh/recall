@@ -166,8 +166,14 @@ impl CopilotCliConnector {
                 continue;
             };
 
-            let event_type = event.get("type").and_then(|value| value.as_str()).unwrap_or("");
-            let data = event.get("data").cloned().unwrap_or(serde_json::Value::Null);
+            let event_type = event
+                .get("type")
+                .and_then(|value| value.as_str())
+                .unwrap_or("");
+            let data = event
+                .get("data")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
             let timestamp = event
                 .get("timestamp")
                 .and_then(|value| value.as_str())
@@ -184,7 +190,8 @@ impl CopilotCliConnector {
                     }
 
                     if started_at.is_none() {
-                        started_at = Self::message_text(data.get("startTime")).or(timestamp.clone());
+                        started_at =
+                            Self::message_text(data.get("startTime")).or(timestamp.clone());
                     }
 
                     if let Some(context) = data.get("context") {
@@ -200,16 +207,15 @@ impl CopilotCliConnector {
                         host_type = Self::message_text(context.get("hostType")).or(host_type);
                     }
 
-                    copilot_version = Self::message_text(data.get("copilotVersion"))
-                        .or(copilot_version);
-                    remote_steerable = data.get("remoteSteerable").and_then(|value| value.as_bool());
+                    copilot_version =
+                        Self::message_text(data.get("copilotVersion")).or(copilot_version);
+                    remote_steerable = data
+                        .get("remoteSteerable")
+                        .and_then(|value| value.as_bool());
                 }
                 "session.model_change" => {
-                    model = Self::first_non_empty_text(&[
-                        data.get("newModel"),
-                        data.get("model"),
-                    ])
-                    .or(model);
+                    model = Self::first_non_empty_text(&[data.get("newModel"), data.get("model")])
+                        .or(model);
                 }
                 "system.message" => {
                     if model.is_none() {
@@ -240,7 +246,8 @@ impl CopilotCliConnector {
                 }
                 "assistant.message" => {
                     let content = Self::message_text(data.get("content")).unwrap_or_default();
-                    let reasoning = Self::message_text(data.get("reasoningText")).unwrap_or_default();
+                    let reasoning =
+                        Self::message_text(data.get("reasoningText")).unwrap_or_default();
                     let mut structured_parts = Vec::new();
 
                     if !content.is_empty() {
@@ -258,7 +265,9 @@ impl CopilotCliConnector {
                         }));
                     }
 
-                    if let Some(tool_requests) = data.get("toolRequests").and_then(|value| value.as_array()) {
+                    if let Some(tool_requests) =
+                        data.get("toolRequests").and_then(|value| value.as_array())
+                    {
                         for tool_request in tool_requests {
                             if let Some(tool_part) = Self::tool_call_part(tool_request) {
                                 structured_parts.push(tool_part);
@@ -572,9 +581,12 @@ impl Connector for CopilotCliConnector {
                 }
 
                 let events_path = session_dir.join("events.jsonl");
-                let workspace_metadata = self.parse_workspace_yaml(&session_dir.join("workspace.yaml"));
+                let workspace_metadata =
+                    self.parse_workspace_yaml(&session_dir.join("workspace.yaml"));
 
-                if let Some(conversation) = self.parse_events_file(&events_path, &workspace_metadata) {
+                if let Some(conversation) =
+                    self.parse_events_file(&events_path, &workspace_metadata)
+                {
                     conversations.push(conversation);
                 }
             }
@@ -606,10 +618,8 @@ mod tests {
 
     #[test]
     fn parses_copilot_cli_session_files() {
-        let session_root = std::env::temp_dir().join(format!(
-            "recall-copilot-cli-test-{}",
-            uuid::Uuid::new_v4()
-        ));
+        let session_root =
+            std::env::temp_dir().join(format!("recall-copilot-cli-test-{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&session_root).unwrap();
 
         let workspace_yaml = session_root.join("workspace.yaml");
@@ -656,8 +666,14 @@ mod tests {
             .and_then(|value| value.as_array())
             .unwrap();
         assert_eq!(parts.len(), 3);
-        assert_eq!(parts[1].get("type").and_then(|value| value.as_str()), Some("thinking"));
-        assert_eq!(parts[2].get("tool").and_then(|value| value.as_str()), Some("view"));
+        assert_eq!(
+            parts[1].get("type").and_then(|value| value.as_str()),
+            Some("thinking")
+        );
+        assert_eq!(
+            parts[2].get("tool").and_then(|value| value.as_str()),
+            Some("view")
+        );
 
         fs::remove_dir_all(&session_root).unwrap();
     }

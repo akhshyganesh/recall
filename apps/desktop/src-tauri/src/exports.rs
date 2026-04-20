@@ -27,7 +27,11 @@ pub fn build_export(session: &Session, format: &str) -> AppResult<ExportData> {
     Ok(ExportData {
         format: format.to_string(),
         content,
-        filename: format!("{}.{}", sanitize_filename(session.title.as_deref()), extension),
+        filename: format!(
+            "{}.{}",
+            sanitize_filename(session.title.as_deref()),
+            extension
+        ),
     })
 }
 
