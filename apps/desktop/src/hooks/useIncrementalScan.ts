@@ -5,7 +5,7 @@
  * The consumer is responsible for what to do on a new-session tick
  * (typically: reload metadata and refresh the current view).
  */
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import * as api from '../api';
 
@@ -19,6 +19,13 @@ export function useIncrementalScan(
   const intervalMs = options.intervalMs ?? DEFAULT_INTERVAL_MS;
   const lookbackMs = options.lookbackMs ?? DEFAULT_LOOKBACK_MS;
 
+  // Keep a stable ref so the effect doesn't restart when the caller
+  // passes a non-memoized inline function.
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
   useEffect(() => {
     const run = async () => {
       try {
@@ -27,7 +34,7 @@ export function useIncrementalScan(
         );
 
         if (count > 0) {
-          await onChange();
+          await onChangeRef.current();
         }
       } catch (error) {
         console.error('[recall] Incremental scan failed:', error);
@@ -39,5 +46,5 @@ export function useIncrementalScan(
     }, intervalMs);
 
     return () => window.clearInterval(interval);
-  }, [intervalMs, lookbackMs, onChange]);
+  }, [intervalMs, lookbackMs]);
 }

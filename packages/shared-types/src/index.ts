@@ -17,29 +17,13 @@ export type { SearchResult } from './generated/SearchResult';
 export type { ActivityPoint } from './generated/ActivityPoint';
 export type { ExportData } from './generated/ExportData';
 export type { DetectionResult } from './generated/DetectionResult';
+export type { Stats } from './generated/Stats';
 
-/** Detected connector source reported by `detect_sources`. */
-export interface DetectedSource {
-  name: string;
-  agent_slug: string;
-  detected: boolean;
-  root_paths: string[];
-  evidence: string;
-}
+/** Detected connector source reported by `detect_sources`. Re-exported from the generated type. */
+export type { DetectedSourcePayload as DetectedSource } from './generated/DetectedSourcePayload';
 
-/** Aggregate database stats (returned by `get_stats`). */
-export interface Stats {
-  total_sessions: number;
-  total_messages: number;
-  total_tools: number;
-}
-
-/** Info about the running app instance (returned by `get_app_info`). */
-export interface AppInfo {
-  current_version: string;
-  repository_url: string;
-  releases_url: string;
-}
+/** Info about the running app instance (returned by `get_app_info`). Re-exported from the generated type. */
+export type { AppInfoPayload as AppInfo } from './generated/AppInfoPayload';
 
 /** UI-only: update check state machine. */
 export type UpdateState = 'idle' | 'checking' | 'available' | 'up-to-date' | 'error';

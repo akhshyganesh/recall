@@ -3,7 +3,7 @@ use rusqlite::{params, Connection};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use crate::models::{ActivityPoint, FileChange, Message, SearchResult, Session, SessionSummary};
+use crate::models::{ActivityPoint, FileChange, Message, SearchResult, Session, SessionSummary, Stats};
 
 const SESSION_PATH_EXPR: &str = "COALESCE(NULLIF(repo_path, ''), NULLIF(workspace, ''))";
 const SESSION_PATH_EXPR_WITH_ALIAS: &str = "COALESCE(NULLIF(s.repo_path, ''), NULLIF(s.workspace, ''))";
@@ -538,7 +538,7 @@ impl Database {
         Ok(paths)
     }
 
-    pub fn get_stats(&self) -> Result<serde_json::Value, String> {
+    pub fn get_stats(&self) -> Result<Stats, String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         let total_sessions: i64 = conn
             .query_row("SELECT COUNT(*) FROM sessions", [], |r| r.get(0))
@@ -552,11 +552,11 @@ impl Database {
             })
             .map_err(|e| e.to_string())?;
 
-        Ok(serde_json::json!({
-            "total_sessions": total_sessions,
-            "total_messages": total_messages,
-            "total_tools": total_tools,
-        }))
+        Ok(Stats {
+            total_sessions,
+            total_messages,
+            total_tools,
+        })
     }
 
     pub fn get_activity_heatmap(&self, days: usize) -> Result<Vec<ActivityPoint>, String> {

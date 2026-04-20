@@ -15,8 +15,6 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-const TS_OUT: &str = "../../../../packages/shared-types/src/generated/";
-
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../../../packages/shared-types/src/generated/")]
 pub struct Session {
@@ -133,6 +131,17 @@ pub struct ExportData {
     pub filename: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../../../packages/shared-types/src/generated/")]
+pub struct Stats {
+    #[ts(type = "number")]
+    pub total_sessions: i64,
+    #[ts(type = "number")]
+    pub total_messages: i64,
+    #[ts(type = "number")]
+    pub total_tools: i64,
+}
+
 // ---------------------------------------------------------------------------
 // Internal (not exported): intermediate values produced by connectors and
 // consumed by the indexer before being persisted.
@@ -164,8 +173,3 @@ pub struct NormalizedMessage {
     pub content: String,
     pub extra: serde_json::Value,
 }
-
-// Silence the unused constant warning while still documenting where
-// generated files land.
-#[allow(dead_code)]
-const _: &str = TS_OUT;

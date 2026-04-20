@@ -13,7 +13,7 @@ use ts_rs::TS;
 
 use crate::exports::build_export;
 use crate::indexer::Indexer;
-use crate::models::{ActivityPoint, ExportData, SearchResult, Session, SessionSummary};
+use crate::models::{ActivityPoint, ExportData, SearchResult, Session, SessionSummary, Stats};
 use crate::{persist_scanned_sessions, with_db, AppState};
 
 pub const REPOSITORY_URL: &str = "https://github.com/akhshyganesh/recall";
@@ -163,7 +163,7 @@ pub fn get_search_paths(state: State<AppState>) -> AppResult<Vec<String>> {
 }
 
 #[tauri::command]
-pub fn get_stats(state: State<AppState>) -> AppResult<serde_json::Value> {
+pub fn get_stats(state: State<AppState>) -> AppResult<Stats> {
     with_db(&state, |db| db.get_stats())
 }
 
