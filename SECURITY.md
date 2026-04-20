@@ -17,7 +17,7 @@ There is no telemetry, no analytics, no authentication, no account.
 
 If you discover a vulnerability — memory safety, path traversal in connector parsing, data exfiltration vector, etc. — please **do not** open a public issue.
 
-Email: **security@akhshyganesh.dev** (or open a [private security advisory](https://github.com/akhshyganesh/recall/security/advisories/new) on GitHub).
+Email: **akhshy@akhshy.dev** (or open a [private security advisory](https://github.com/akhshyganesh/recall/security/advisories/new) on GitHub).
 
 Include:
 
