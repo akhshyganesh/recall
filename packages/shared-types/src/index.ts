@@ -25,6 +25,9 @@ export type { DetectedSourcePayload as DetectedSource } from './generated/Detect
 /** Info about the running app instance (returned by `get_app_info`). Re-exported from the generated type. */
 export type { AppInfoPayload as AppInfo } from './generated/AppInfoPayload';
 
+/** MCP server status (returned by `get_mcp_status`). Re-exported from the generated type. */
+export type { McpStatusPayload as McpStatus } from './generated/McpStatusPayload';
+
 /** UI-only: update check state machine. */
 export type UpdateState = 'idle' | 'checking' | 'available' | 'downloading' | 'installing' | 'up-to-date' | 'error';
 

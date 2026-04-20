@@ -21,6 +21,7 @@ import type {
   AppInfo,
   DateFilter,
   DetectedSource,
+  McpStatus,
   OpenTab,
   SearchResult,
   Session,
@@ -72,6 +73,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>(INITIAL_UPDATE_STATUS);
+  const [mcpStatus, setMcpStatus] = useState<McpStatus>({ running: false, port: null, url: null, active_connections: 0 });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobileSidebar, setIsMobileSidebar] = useState(() => {
     if (typeof window === 'undefined') {
@@ -357,6 +359,15 @@ export default function App() {
       if (!cancelled && info) {
         await checkForUpdates(info);
       }
+
+      if (!cancelled) {
+        try {
+          const status = await api.getMcpStatus();
+          setMcpStatus(status);
+        } catch {
+          // MCP status not critical
+        }
+      }
     };
 
     void initialize();
@@ -612,6 +623,38 @@ export default function App() {
       console.error('Failed to clear database:', error);
     }
   }, [clearSearch, loadMeta, loadSources, loadTimelineSessions]);
+
+  const handleToggleMcp = useCallback(async (enabled: boolean) => {
+    try {
+      if (enabled) {
+        await api.startMcpServer();
+      } else {
+        await api.stopMcpServer();
+      }
+      const status = await api.getMcpStatus();
+      setMcpStatus(status);
+    } catch (error) {
+      console.error('Failed to toggle MCP server:', error);
+    }
+  }, []);
+
+  // Poll MCP status while on settings view and server is running
+  useEffect(() => {
+    if (view !== 'settings' || !mcpStatus.running) {
+      return undefined;
+    }
+
+    const interval = setInterval(async () => {
+      try {
+        const status = await api.getMcpStatus();
+        setMcpStatus(status);
+      } catch {
+        // ignore polling errors
+      }
+    }, 3_000);
+
+    return () => clearInterval(interval);
+  }, [view, mcpStatus.running]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -875,6 +918,7 @@ export default function App() {
           {view === 'settings' && (
             <SettingsPanel
               appInfo={appInfo}
+              mcpStatus={mcpStatus}
               onCheckForUpdates={() => {
                 void checkForUpdates();
               }}
@@ -882,6 +926,7 @@ export default function App() {
               onDownloadAndInstall={() => {
                 void handleDownloadAndInstall();
               }}
+              onToggleMcp={handleToggleMcp}
               sources={sources}
               updateStatus={updateStatus}
             />

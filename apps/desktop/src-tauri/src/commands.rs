@@ -13,6 +13,7 @@ use ts_rs::TS;
 
 use crate::exports::build_export;
 use crate::indexer::Indexer;
+use crate::mcp::{self, McpServer};
 use crate::models::{ActivityPoint, ExportData, SearchResult, Session, SessionSummary, Stats};
 use crate::{persist_scanned_sessions, with_db, AppState};
 
@@ -190,4 +191,66 @@ pub fn export_session(state: State<AppState>, id: String, format: String) -> App
             .ok_or_else(|| "Session not found".to_string())?;
         build_export(&session, format.as_str())
     })
+}
+
+// --- MCP server ------------------------------------------------------------
+
+#[tauri::command]
+pub async fn start_mcp_server(state: State<'_, AppState>, port: Option<u16>) -> AppResult<u16> {
+    let port = port.unwrap_or(mcp::DEFAULT_PORT);
+    let mut guard = state.mcp.lock().await;
+
+    // Stop existing server if running
+    if let Some(mut existing) = guard.take() {
+        existing.stop();
+    }
+
+    let server = McpServer::start(Arc::clone(&state.db), port)
+        .await
+        .map_err(|e| e.to_string())?;
+    let actual_port = server.port();
+    *guard = Some(server);
+    Ok(actual_port)
+}
+
+#[tauri::command]
+pub async fn stop_mcp_server(state: State<'_, AppState>) -> AppResult<()> {
+    let mut guard = state.mcp.lock().await;
+    if let Some(mut server) = guard.take() {
+        server.stop();
+    }
+    Ok(())
+}
+
+#[derive(Serialize, TS)]
+#[ts(export, export_to = "../../../../packages/shared-types/src/generated/")]
+pub struct McpStatusPayload {
+    pub running: bool,
+    pub port: Option<u16>,
+    pub url: Option<String>,
+    #[ts(type = "number")]
+    pub active_connections: usize,
+}
+
+#[tauri::command]
+pub async fn get_mcp_status(state: State<'_, AppState>) -> AppResult<McpStatusPayload> {
+    let guard = state.mcp.lock().await;
+    match guard.as_ref() {
+        Some(server) => {
+            let port = server.port();
+            let active = server.active_connections().await;
+            Ok(McpStatusPayload {
+                running: true,
+                port: Some(port),
+                url: Some(format!("http://127.0.0.1:{port}/sse")),
+                active_connections: active,
+            })
+        }
+        None => Ok(McpStatusPayload {
+            running: false,
+            port: None,
+            url: None,
+            active_connections: 0,
+        }),
+    }
 }

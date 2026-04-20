@@ -20,21 +20,25 @@ mod connectors;
 mod db;
 mod exports;
 mod indexer;
+pub(crate) mod mcp;
 mod models;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use tauri::{Manager, State};
+use tokio::sync::Mutex as TokioMutex;
 
 use db::Database;
 use indexer::Indexer;
+use mcp::McpServer;
 
 pub(crate) type AppResult<T> = Result<T, String>;
 pub(crate) type SharedDb = Arc<Mutex<Option<Database>>>;
 
 pub struct AppState {
     pub(crate) db: SharedDb,
+    pub(crate) mcp: Arc<TokioMutex<Option<McpServer>>>,
 }
 
 /// Resolve the SQLite database path under the per-user app data directory.
@@ -99,6 +103,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .manage(AppState {
             db: Arc::new(Mutex::new(Some(db))),
+            mcp: Arc::new(TokioMutex::new(None)),
         })
         .setup(|app| {
             spawn_initial_scan(Arc::clone(&app.state::<AppState>().db));
@@ -120,6 +125,9 @@ pub fn run() {
             commands::get_activity_heatmap,
             commands::clear_database,
             commands::export_session,
+            commands::start_mcp_server,
+            commands::stop_mcp_server,
+            commands::get_mcp_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { AppInfo, DetectedSource, UpdateStatus } from '../types';
+import type { AppInfo, DetectedSource, McpStatus, UpdateStatus } from '../types';
 import { formatUpdateDate, trimReleaseNotes } from '../lib/update-format';
 import { DownloadIcon, RefreshIcon, TrashIcon } from './AppIcons';
 
@@ -7,9 +7,11 @@ interface SettingsPanelProps {
   appInfo: AppInfo | null;
   sources: DetectedSource[];
   updateStatus: UpdateStatus;
+  mcpStatus: McpStatus;
   onCheckForUpdates: () => void;
   onDownloadAndInstall: () => void;
   onClearDatabase: () => Promise<void>;
+  onToggleMcp: (enabled: boolean) => Promise<void>;
 }
 
 function formatCheckTime(value: string | null): string | null {
@@ -101,15 +103,18 @@ export default function SettingsPanel({
   appInfo,
   sources,
   updateStatus,
+  mcpStatus,
   onCheckForUpdates,
   onDownloadAndInstall,
   onClearDatabase,
+  onToggleMcp,
 }: SettingsPanelProps) {
   const checkDisabled = updateStatus.state === 'checking' || updateStatus.state === 'downloading' || updateStatus.state === 'installing';
   const releaseNotes = trimReleaseNotes(updateStatus.release_notes, 360);
   const updateMeta = getUpdateMeta(appInfo, updateStatus);
   const [clearing, setClearing] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [mcpToggling, setMcpToggling] = useState(false);
 
   return (
     <div className="settings enter">
@@ -118,8 +123,78 @@ export default function SettingsPanel({
         {appInfo && <span className="settings-version">Recall {appInfo.current_version}</span>}
       </div>
 
-      <div className="settings-layout">
-        <section className="settings-section settings-section-sources">
+      <div className="settings-grid">
+        {/* ── Row 1: MCP Server (full width) ── */}
+        <section className="settings-section settings-cell-full">
+          <div className="settings-heading">MCP Server</div>
+
+          <div className={`mcp-card ${mcpStatus.running ? 'active' : ''}`}>
+            <div className="mcp-card-top">
+              <div className={`mcp-dot ${mcpStatus.running ? 'on' : ''}`} />
+              <div className="mcp-card-copy">
+                <div className="mcp-card-title">
+                  {mcpStatus.running ? 'MCP Server Running' : 'MCP Server Stopped'}
+                </div>
+                <div className="mcp-card-meta">
+                  {mcpStatus.running
+                    ? `Listening on port ${mcpStatus.port}`
+                    : 'Enable to let AI agents query your session history'}
+                </div>
+              </div>
+              <label className="mcp-toggle">
+                <input
+                  checked={mcpStatus.running}
+                  disabled={mcpToggling}
+                  onChange={async (e) => {
+                    setMcpToggling(true);
+                    try {
+                      await onToggleMcp(e.target.checked);
+                    } finally {
+                      setMcpToggling(false);
+                    }
+                  }}
+                  type="checkbox"
+                />
+                <span className="mcp-toggle-track" />
+              </label>
+            </div>
+
+            {mcpStatus.running && (
+              <div className="mcp-details-row">
+                <div className="mcp-connection-info">
+                  <div className="mcp-info-label">SSE Endpoint</div>
+                  <code className="mcp-info-url">{mcpStatus.url}</code>
+                  <div className="mcp-info-label" style={{ marginTop: 12 }}>Agent Configuration</div>
+                  <pre className="mcp-info-config">{`{
+  "mcpServers": {
+    "recall": {
+      "url": "${mcpStatus.url}"
+    }
+  }
+}`}</pre>
+                  <div className="mcp-info-hint">
+                    Add the config above to your AI agent's MCP settings to connect.
+                  </div>
+                </div>
+
+                <div className="mcp-connections-panel">
+                  <div className="mcp-connections-count">{mcpStatus.active_connections}</div>
+                  <div className="mcp-connections-label">
+                    {mcpStatus.active_connections === 1 ? 'Active Connection' : 'Active Connections'}
+                  </div>
+                  <div className="mcp-connections-hint">
+                    {mcpStatus.active_connections > 0
+                      ? 'AI agents are currently connected and can query your sessions.'
+                      : 'No agents connected. Configure your AI agent with the endpoint to start.'}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* ── Row 2 Left: Detected Sources ── */}
+        <section className="settings-section settings-cell-left">
           <div className="settings-heading">Detected Sources</div>
 
           <div className="source-list">
@@ -144,8 +219,9 @@ export default function SettingsPanel({
           </div>
         </section>
 
-        <div className="settings-side-stack">
-          <section className="settings-section settings-section-updates">
+        {/* ── Row 2 Right: Updates + Database + Shortcuts + About stacked ── */}
+        <div className="settings-cell-right">
+          <section className="settings-section">
             <div className="settings-heading">Updates</div>
 
             <div className={`update-card ${updateStatus.state}`}>
@@ -192,7 +268,7 @@ export default function SettingsPanel({
             </div>
           </section>
 
-          <section className="settings-section settings-section-database">
+          <section className="settings-section">
             <div className="settings-heading">Database</div>
 
             <div className="danger-box">
@@ -253,7 +329,7 @@ export default function SettingsPanel({
             </div>
           </section>
 
-          <section className="settings-section settings-section-shortcuts">
+          <section className="settings-section">
             <div className="settings-heading">Keyboard Shortcuts</div>
 
             <div className="shortcut-list">
@@ -268,28 +344,20 @@ export default function SettingsPanel({
             </div>
           </section>
 
-          <section className="settings-section settings-section-about">
-            <div className="settings-heading">About</div>
-
-            <div className="about-card">
-              <div className="about-row">
-                <span className="about-label">Source</span>
-                <a
-                  className="about-link"
-                  href={appInfo?.repository_url ?? 'https://github.com/akhshyganesh/recall'}
-                  rel="noopener noreferrer"
-                  target="_blank"
-                >
-                  github.com/akhshyganesh/recall
-                </a>
-              </div>
-            </div>
-          </section>
         </div>
       </div>
 
       <div className="settings-footer">
-        <p>All session data stays on your machine. Nothing is sent to any server.</p>
+        <span className="settings-footer-privacy">All session data stays on your machine.</span>
+        <span className="settings-footer-sep">·</span>
+        <a
+          className="settings-footer-link"
+          href={appInfo?.repository_url ?? 'https://github.com/akhshyganesh/recall'}
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          GitHub
+        </a>
       </div>
     </div>
   );

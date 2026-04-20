@@ -13,6 +13,7 @@ export type {
   DetectedSource,
   ExportData,
   FileChange,
+  McpStatus,
   Message,
   OpenTab,
   SearchResult,
