@@ -39,7 +39,7 @@ function getUpdateTitle(updateStatus: UpdateStatus): string {
         ? `Version ${updateStatus.latest_version} is available.`
         : 'A newer release is available.';
     case 'up-to-date':
-      return 'This build already matches the latest published release.';
+      return 'You are at the latest build.';
     case 'error':
       return 'The last update check did not complete.';
     default:
@@ -63,7 +63,7 @@ function getUpdateMeta(appInfo: AppInfo | null, updateStatus: UpdateStatus): str
     case 'installing':
       return 'Installing update — the app will restart shortly.';
     case 'up-to-date':
-      return checkedAt ? `Last checked ${checkedAt}.` : 'No newer release was found.';
+      return checkedAt ? `Last checked ${checkedAt}.` : 'You are already at the latest build.';
     case 'error':
       return checkedAt ? `Last attempted ${checkedAt}.` : 'The release check could not complete.';
     default:
@@ -109,6 +109,7 @@ export default function SettingsPanel({
   const releaseNotes = trimReleaseNotes(updateStatus.release_notes, 360);
   const updateMeta = getUpdateMeta(appInfo, updateStatus);
   const [clearing, setClearing] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   return (
     <div className="settings enter">
@@ -196,30 +197,59 @@ export default function SettingsPanel({
 
             <div className="danger-box">
               <p>Permanently clear all indexed sessions and messages. This will not delete your actual harness session data.</p>
-              <button
-                disabled={clearing}
-                onClick={async () => {
-                  setClearing(true);
-                  try {
-                    await onClearDatabase();
-                  } finally {
-                    setClearing(false);
-                  }
-                }}
-                type="button"
-              >
-                {clearing ? (
-                  <>
-                    <RefreshIcon className="spin-icon" />
-                    Clearing…
-                  </>
-                ) : (
-                  <>
+              {confirmClear && !clearing && (
+                <p className="danger-box-confirm">Are you sure? This cannot be undone.</p>
+              )}
+              <div className="danger-box-actions">
+                {!confirmClear ? (
+                  <button
+                    disabled={clearing}
+                    onClick={() => setConfirmClear(true)}
+                    type="button"
+                  >
                     <TrashIcon />
                     Clear Database
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      className="danger-box-confirm-btn"
+                      disabled={clearing}
+                      onClick={async () => {
+                        setClearing(true);
+                        try {
+                          await onClearDatabase();
+                        } finally {
+                          setClearing(false);
+                          setConfirmClear(false);
+                        }
+                      }}
+                      type="button"
+                    >
+                      {clearing ? (
+                        <>
+                          <RefreshIcon className="spin-icon" />
+                          Clearing…
+                        </>
+                      ) : (
+                        <>
+                          <TrashIcon />
+                          Yes, clear everything
+                        </>
+                      )}
+                    </button>
+                    {!clearing && (
+                      <button
+                        className="danger-box-cancel-btn"
+                        onClick={() => setConfirmClear(false)}
+                        type="button"
+                      >
+                        Cancel
+                      </button>
+                    )}
                   </>
                 )}
-              </button>
+              </div>
             </div>
           </section>
 
