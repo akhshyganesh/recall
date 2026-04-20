@@ -73,7 +73,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>(INITIAL_UPDATE_STATUS);
-  const [mcpStatus, setMcpStatus] = useState<McpStatus>({ running: false, port: null, url: null });
+  const [mcpStatus, setMcpStatus] = useState<McpStatus>({ running: false, port: null, url: null, active_connections: 0 });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobileSidebar, setIsMobileSidebar] = useState(() => {
     if (typeof window === 'undefined') {
@@ -637,6 +637,24 @@ export default function App() {
       console.error('Failed to toggle MCP server:', error);
     }
   }, []);
+
+  // Poll MCP status while on settings view and server is running
+  useEffect(() => {
+    if (view !== 'settings' || !mcpStatus.running) {
+      return undefined;
+    }
+
+    const interval = setInterval(async () => {
+      try {
+        const status = await api.getMcpStatus();
+        setMcpStatus(status);
+      } catch {
+        // ignore polling errors
+      }
+    }, 3_000);
+
+    return () => clearInterval(interval);
+  }, [view, mcpStatus.running]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {

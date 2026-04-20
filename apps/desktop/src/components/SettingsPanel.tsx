@@ -123,8 +123,78 @@ export default function SettingsPanel({
         {appInfo && <span className="settings-version">Recall {appInfo.current_version}</span>}
       </div>
 
-      <div className="settings-layout">
-        <section className="settings-section settings-section-sources">
+      <div className="settings-grid">
+        {/* ── Row 1: MCP Server (full width) ── */}
+        <section className="settings-section settings-cell-full">
+          <div className="settings-heading">MCP Server</div>
+
+          <div className={`mcp-card ${mcpStatus.running ? 'active' : ''}`}>
+            <div className="mcp-card-top">
+              <div className={`mcp-dot ${mcpStatus.running ? 'on' : ''}`} />
+              <div className="mcp-card-copy">
+                <div className="mcp-card-title">
+                  {mcpStatus.running ? 'MCP Server Running' : 'MCP Server Stopped'}
+                </div>
+                <div className="mcp-card-meta">
+                  {mcpStatus.running
+                    ? `Listening on port ${mcpStatus.port}`
+                    : 'Enable to let AI agents query your session history'}
+                </div>
+              </div>
+              <label className="mcp-toggle">
+                <input
+                  checked={mcpStatus.running}
+                  disabled={mcpToggling}
+                  onChange={async (e) => {
+                    setMcpToggling(true);
+                    try {
+                      await onToggleMcp(e.target.checked);
+                    } finally {
+                      setMcpToggling(false);
+                    }
+                  }}
+                  type="checkbox"
+                />
+                <span className="mcp-toggle-track" />
+              </label>
+            </div>
+
+            {mcpStatus.running && (
+              <div className="mcp-details-row">
+                <div className="mcp-connection-info">
+                  <div className="mcp-info-label">SSE Endpoint</div>
+                  <code className="mcp-info-url">{mcpStatus.url}</code>
+                  <div className="mcp-info-label" style={{ marginTop: 12 }}>Agent Configuration</div>
+                  <pre className="mcp-info-config">{`{
+  "mcpServers": {
+    "recall": {
+      "url": "${mcpStatus.url}"
+    }
+  }
+}`}</pre>
+                  <div className="mcp-info-hint">
+                    Add the config above to your AI agent's MCP settings to connect.
+                  </div>
+                </div>
+
+                <div className="mcp-connections-panel">
+                  <div className="mcp-connections-count">{mcpStatus.active_connections}</div>
+                  <div className="mcp-connections-label">
+                    {mcpStatus.active_connections === 1 ? 'Active Connection' : 'Active Connections'}
+                  </div>
+                  <div className="mcp-connections-hint">
+                    {mcpStatus.active_connections > 0
+                      ? 'AI agents are currently connected and can query your sessions.'
+                      : 'No agents connected. Configure your AI agent with the endpoint to start.'}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* ── Row 2 Left: Detected Sources ── */}
+        <section className="settings-section settings-cell-left">
           <div className="settings-heading">Detected Sources</div>
 
           <div className="source-list">
@@ -149,8 +219,9 @@ export default function SettingsPanel({
           </div>
         </section>
 
-        <div className="settings-side-stack">
-          <section className="settings-section settings-section-updates">
+        {/* ── Row 2 Right: Updates + Database + Shortcuts + About stacked ── */}
+        <div className="settings-cell-right">
+          <section className="settings-section">
             <div className="settings-heading">Updates</div>
 
             <div className={`update-card ${updateStatus.state}`}>
@@ -197,7 +268,7 @@ export default function SettingsPanel({
             </div>
           </section>
 
-          <section className="settings-section settings-section-database">
+          <section className="settings-section">
             <div className="settings-heading">Database</div>
 
             <div className="danger-box">
@@ -258,61 +329,7 @@ export default function SettingsPanel({
             </div>
           </section>
 
-          <section className="settings-section settings-section-mcp">
-            <div className="settings-heading">MCP Server</div>
-
-            <div className={`mcp-card ${mcpStatus.running ? 'active' : ''}`}>
-              <div className="mcp-card-top">
-                <div className={`mcp-dot ${mcpStatus.running ? 'on' : ''}`} />
-                <div className="mcp-card-copy">
-                  <div className="mcp-card-title">
-                    {mcpStatus.running ? 'MCP Server Running' : 'MCP Server Stopped'}
-                  </div>
-                  <div className="mcp-card-meta">
-                    {mcpStatus.running
-                      ? `Listening on port ${mcpStatus.port}`
-                      : 'Enable to let AI agents query your session history'}
-                  </div>
-                </div>
-                <label className="mcp-toggle">
-                  <input
-                    checked={mcpStatus.running}
-                    disabled={mcpToggling}
-                    onChange={async (e) => {
-                      setMcpToggling(true);
-                      try {
-                        await onToggleMcp(e.target.checked);
-                      } finally {
-                        setMcpToggling(false);
-                      }
-                    }}
-                    type="checkbox"
-                  />
-                  <span className="mcp-toggle-track" />
-                </label>
-              </div>
-
-              {mcpStatus.running && mcpStatus.url && (
-                <div className="mcp-connection-info">
-                  <div className="mcp-info-label">SSE Endpoint</div>
-                  <code className="mcp-info-url">{mcpStatus.url}</code>
-                  <div className="mcp-info-label" style={{ marginTop: 12 }}>Agent Configuration</div>
-                  <pre className="mcp-info-config">{`{
-  "mcpServers": {
-    "recall": {
-      "url": "${mcpStatus.url}"
-    }
-  }
-}`}</pre>
-                  <div className="mcp-info-hint">
-                    Add the config above to your AI agent's MCP settings to connect.
-                  </div>
-                </div>
-              )}
-            </div>
-          </section>
-
-          <section className="settings-section settings-section-shortcuts">
+          <section className="settings-section">
             <div className="settings-heading">Keyboard Shortcuts</div>
 
             <div className="shortcut-list">
@@ -327,7 +344,7 @@ export default function SettingsPanel({
             </div>
           </section>
 
-          <section className="settings-section settings-section-about">
+          <section className="settings-section">
             <div className="settings-heading">About</div>
 
             <div className="about-card">

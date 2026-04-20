@@ -228,6 +228,8 @@ pub struct McpStatusPayload {
     pub running: bool,
     pub port: Option<u16>,
     pub url: Option<String>,
+    #[ts(type = "number")]
+    pub active_connections: usize,
 }
 
 #[tauri::command]
@@ -236,16 +238,19 @@ pub async fn get_mcp_status(state: State<'_, AppState>) -> AppResult<McpStatusPa
     match guard.as_ref() {
         Some(server) => {
             let port = server.port();
+            let active = server.active_connections().await;
             Ok(McpStatusPayload {
                 running: true,
                 port: Some(port),
                 url: Some(format!("http://127.0.0.1:{port}/sse")),
+                active_connections: active,
             })
         }
         None => Ok(McpStatusPayload {
             running: false,
             port: None,
             url: None,
+            active_connections: 0,
         }),
     }
 }

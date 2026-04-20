@@ -1870,18 +1870,23 @@ body {
   border-radius: 10px;
 }
 
-.settings-layout {
+.settings-layout,
+.settings-grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(360px, 1.15fr);
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 1fr);
   gap: 24px;
   align-items: start;
 }
 
-.settings-section-sources {
+.settings-cell-full {
+  grid-column: 1 / -1;
+}
+
+.settings-cell-left {
   grid-column: 1;
 }
 
-.settings-side-stack {
+.settings-cell-right {
   grid-column: 2;
   display: flex;
   flex-direction: column;
@@ -2253,6 +2258,11 @@ body {
 .mcp-dot.on {
   background: var(--green);
   box-shadow: 0 0 8px rgba(106,153,85,0.5);
+  animation: mcp-pulse 2s ease-in-out infinite;
+}
+@keyframes mcp-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(106,153,85,0.5); }
+  50% { box-shadow: 0 0 14px rgba(106,153,85,0.8); }
 }
 .mcp-card-copy {
   flex: 1;
@@ -2314,12 +2324,21 @@ body {
   opacity: 0.5;
   cursor: default;
 }
-.mcp-connection-info {
+
+.mcp-details-row {
   margin-top: 16px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: start;
+}
+
+.mcp-connection-info {
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: rgba(0,0,0,0.14);
+  min-width: 0;
 }
 .mcp-info-label {
   font-size: 11px;
@@ -2349,6 +2368,37 @@ body {
   margin: 0;
 }
 .mcp-info-hint {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-3);
+  line-height: 1.5;
+}
+
+.mcp-connections-panel {
+  width: 160px;
+  padding: 18px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-raised);
+  text-align: center;
+  flex-shrink: 0;
+}
+.mcp-connections-count {
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+.mcp-connections-label {
+  margin-top: 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-4);
+  font-weight: 600;
+}
+.mcp-connections-hint {
   margin-top: 10px;
   font-size: 11px;
   color: var(--text-3);
@@ -3034,11 +3084,14 @@ body {
     padding: 18px 16px 48px;
   }
 
-  .settings-layout {
+  .settings-layout,
+  .settings-grid {
     grid-template-columns: 1fr;
   }
 
-  .settings-side-stack {
+  .settings-cell-full,
+  .settings-cell-left,
+  .settings-cell-right {
     grid-column: 1;
   }
 
@@ -3046,6 +3099,14 @@ body {
   .settings-section-database,
   .settings-section-sources {
     grid-column: 1;
+  }
+
+  .mcp-details-row {
+    grid-template-columns: 1fr;
+  }
+
+  .mcp-connections-panel {
+    width: 100%;
   }
 
   .settings-metric-grid {

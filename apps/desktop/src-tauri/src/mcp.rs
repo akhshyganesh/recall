@@ -56,6 +56,7 @@ struct McpInner {
 pub struct McpServer {
     shutdown_tx: Option<tokio::sync::oneshot::Sender<()>>,
     port: u16,
+    inner: Arc<McpInner>,
 }
 
 impl McpServer {
@@ -74,7 +75,7 @@ impl McpServer {
         let app = Router::new()
             .route("/sse", get(handle_sse))
             .route("/message", post(handle_message))
-            .with_state(state)
+            .with_state(Arc::clone(&state))
             .layer(cors);
 
         let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{port}"))
@@ -83,6 +84,7 @@ impl McpServer {
 
         let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
 
+        let serve_state = Arc::clone(&state);
         tokio::spawn(async move {
             axum::serve(listener, app)
                 .with_graceful_shutdown(async {
@@ -90,6 +92,8 @@ impl McpServer {
                 })
                 .await
                 .ok();
+            // Clear all sessions when server shuts down
+            serve_state.sessions.lock().await.clear();
         });
 
         eprintln!("[recall] MCP server listening on 127.0.0.1:{port}");
@@ -97,6 +101,7 @@ impl McpServer {
         Ok(McpServer {
             shutdown_tx: Some(shutdown_tx),
             port,
+            inner: state,
         })
     }
 
@@ -109,6 +114,14 @@ impl McpServer {
 
     pub fn port(&self) -> u16 {
         self.port
+    }
+
+    /// Returns the number of active SSE connections after pruning dead ones.
+    pub async fn active_connections(&self) -> usize {
+        let mut sessions = self.inner.sessions.lock().await;
+        // Prune closed connections (sender is closed when receiver dropped)
+        sessions.retain(|_, tx| !tx.is_closed());
+        sessions.len()
     }
 }
 
@@ -166,6 +179,8 @@ async fn handle_message(
             .data(serde_json::to_string(&resp).unwrap_or_default());
 
         if tx.send(event).await.is_err() {
+            // Client disconnected — remove the dead session
+            state.sessions.lock().await.remove(session_id);
             return StatusCode::GONE.into_response();
         }
     }
