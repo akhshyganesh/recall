@@ -1,7 +1,7 @@
 {
   "name": "recall-workspace",
   "private": true,
-  "version": "0.4.6",
+  "version": "0.4.7",
   "description": "Local AI coding session history — workspace root",
   "license": "MIT",
   "repository": {
