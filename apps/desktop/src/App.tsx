@@ -599,10 +599,6 @@ export default function App() {
   }, [selectedSession]);
 
   const handleClearDatabase = useCallback(async () => {
-    if (!window.confirm('Delete all indexed data?')) {
-      return;
-    }
-
     try {
       await api.clearDatabase();
       setSelectedSession(null);
