@@ -344,28 +344,20 @@ export default function SettingsPanel({
             </div>
           </section>
 
-          <section className="settings-section">
-            <div className="settings-heading">About</div>
-
-            <div className="about-card">
-              <div className="about-row">
-                <span className="about-label">Source</span>
-                <a
-                  className="about-link"
-                  href={appInfo?.repository_url ?? 'https://github.com/akhshyganesh/recall'}
-                  rel="noopener noreferrer"
-                  target="_blank"
-                >
-                  github.com/akhshyganesh/recall
-                </a>
-              </div>
-            </div>
-          </section>
         </div>
       </div>
 
       <div className="settings-footer">
-        <p>All session data stays on your machine. Nothing is sent to any server.</p>
+        <span className="settings-footer-privacy">All session data stays on your machine.</span>
+        <span className="settings-footer-sep">·</span>
+        <a
+          className="settings-footer-link"
+          href={appInfo?.repository_url ?? 'https://github.com/akhshyganesh/recall'}
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          GitHub
+        </a>
       </div>
     </div>
   );
