@@ -1,12 +1,12 @@
 /**
  * `useUpdateCheck` — encapsulates the GitHub-releases update probe and
- * the `AppInfo` fetch that feeds it.
- *
- * Keeps an `appInfoRef` so consumers can trigger a re-check without
- * threading the latest `AppInfo` through component state.
+ * the `AppInfo` fetch that feeds it. Supports in-app download & install
+ * via the Tauri updater plugin.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { check } from '@tauri-apps/plugin-updater';
+import { relaunch } from '@tauri-apps/plugin-process';
 import type { AppInfo, UpdateStatus } from '@recall/shared-types';
 
 import * as api from '../api';
@@ -21,12 +21,14 @@ const INITIAL_UPDATE_STATUS: UpdateStatus = {
   release_notes: null,
   checked_at: null,
   error: null,
+  download_progress: null,
 };
 
 export interface UseUpdateCheckResult {
   appInfo: AppInfo | null;
   updateStatus: UpdateStatus;
   checkForUpdates: (info?: AppInfo | null) => Promise<void>;
+  downloadAndInstall: () => Promise<void>;
 }
 
 export function useUpdateCheck(): UseUpdateCheckResult {
@@ -56,6 +58,7 @@ export function useUpdateCheck(): UseUpdateCheckResult {
       state: 'checking',
       current_version: currentVersion,
       error: null,
+      download_progress: null,
     }));
 
     try {
@@ -74,6 +77,7 @@ export function useUpdateCheck(): UseUpdateCheckResult {
         release_notes: release.release_notes,
         checked_at: checkedAt,
         error: null,
+        download_progress: null,
       });
     } catch (error) {
       console.error('Failed to check for updates:', error);
@@ -82,6 +86,68 @@ export function useUpdateCheck(): UseUpdateCheckResult {
         state: 'error',
         checked_at: new Date().toISOString(),
         error: error instanceof Error ? error.message : 'Failed to check for updates.',
+      }));
+    }
+  }, []);
+
+  const downloadAndInstall = useCallback(async () => {
+    setUpdateStatus((current) => ({
+      ...current,
+      state: 'downloading',
+      download_progress: 0,
+      error: null,
+    }));
+
+    try {
+      const update = await check();
+
+      if (!update) {
+        setUpdateStatus((current) => ({
+          ...current,
+          state: 'up-to-date',
+          error: null,
+          download_progress: null,
+        }));
+        return;
+      }
+
+      let downloaded = 0;
+      let contentLength = 0;
+
+      await update.downloadAndInstall((event) => {
+        switch (event.event) {
+          case 'Started':
+            contentLength = event.data.contentLength ?? 0;
+            break;
+          case 'Progress':
+            downloaded += event.data.chunkLength;
+            if (contentLength > 0) {
+              const progress = Math.min(Math.round((downloaded / contentLength) * 100), 100);
+              setUpdateStatus((current) => ({
+                ...current,
+                state: 'downloading',
+                download_progress: progress,
+              }));
+            }
+            break;
+          case 'Finished':
+            setUpdateStatus((current) => ({
+              ...current,
+              state: 'installing',
+              download_progress: 100,
+            }));
+            break;
+        }
+      });
+
+      await relaunch();
+    } catch (error) {
+      console.error('Failed to download and install update:', error);
+      setUpdateStatus((current) => ({
+        ...current,
+        state: 'error',
+        download_progress: null,
+        error: error instanceof Error ? error.message : 'Failed to install update.',
       }));
     }
   }, []);
@@ -101,5 +167,5 @@ export function useUpdateCheck(): UseUpdateCheckResult {
     };
   }, [checkForUpdates, loadAppInfo]);
 
-  return { appInfo, updateStatus, checkForUpdates };
+  return { appInfo, updateStatus, checkForUpdates, downloadAndInstall };
 }

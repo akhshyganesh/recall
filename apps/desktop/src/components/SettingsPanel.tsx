@@ -8,7 +8,7 @@ interface SettingsPanelProps {
   sources: DetectedSource[];
   updateStatus: UpdateStatus;
   onCheckForUpdates: () => void;
-  onOpenReleasePage: () => void;
+  onDownloadAndInstall: () => void;
   onClearDatabase: () => Promise<void>;
 }
 
@@ -55,7 +55,13 @@ function getUpdateMeta(appInfo: AppInfo | null, updateStatus: UpdateStatus): str
     case 'checking':
       return 'Querying the latest release from GitHub.';
     case 'available':
-      return releaseDate ? `Published ${releaseDate}.` : 'Open the release page to download the new build.';
+      return releaseDate ? `Published ${releaseDate}.` : 'Ready to download and install.';
+    case 'downloading':
+      return updateStatus.download_progress != null
+        ? `Downloading update… ${updateStatus.download_progress}%`
+        : 'Downloading update…';
+    case 'installing':
+      return 'Installing update — the app will restart shortly.';
     case 'up-to-date':
       return checkedAt ? `Last checked ${checkedAt}.` : 'No newer release was found.';
     case 'error':
@@ -96,10 +102,10 @@ export default function SettingsPanel({
   sources,
   updateStatus,
   onCheckForUpdates,
-  onOpenReleasePage,
+  onDownloadAndInstall,
   onClearDatabase,
 }: SettingsPanelProps) {
-  const checkDisabled = updateStatus.state === 'checking';
+  const checkDisabled = updateStatus.state === 'checking' || updateStatus.state === 'downloading' || updateStatus.state === 'installing';
   const releaseNotes = trimReleaseNotes(updateStatus.release_notes, 360);
   const updateMeta = getUpdateMeta(appInfo, updateStatus);
   const [clearing, setClearing] = useState(false);
@@ -166,9 +172,19 @@ export default function SettingsPanel({
                   <span>{updateStatus.state === 'checking' ? 'Checking...' : 'Check now'}</span>
                 </button>
                 {updateStatus.state === 'available' && (
-                  <button className="update-primary-btn" onClick={onOpenReleasePage} type="button">
+                  <button className="update-primary-btn" onClick={onDownloadAndInstall} type="button">
                     <DownloadIcon />
-                    <span>View release</span>
+                    <span>Update now</span>
+                  </button>
+                )}
+                {(updateStatus.state === 'downloading' || updateStatus.state === 'installing') && (
+                  <button className="update-primary-btn" disabled type="button">
+                    <RefreshIcon className="spin-icon" />
+                    <span>
+                      {updateStatus.state === 'installing'
+                        ? 'Installing…'
+                        : `Downloading… ${updateStatus.download_progress ?? 0}%`}
+                    </span>
                   </button>
                 )}
               </div>

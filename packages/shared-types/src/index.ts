@@ -26,7 +26,7 @@ export type { DetectedSourcePayload as DetectedSource } from './generated/Detect
 export type { AppInfoPayload as AppInfo } from './generated/AppInfoPayload';
 
 /** UI-only: update check state machine. */
-export type UpdateState = 'idle' | 'checking' | 'available' | 'up-to-date' | 'error';
+export type UpdateState = 'idle' | 'checking' | 'available' | 'downloading' | 'installing' | 'up-to-date' | 'error';
 
 export interface UpdateStatus {
   state: UpdateState;
@@ -37,6 +37,8 @@ export interface UpdateStatus {
   release_notes: string | null;
   checked_at: string | null;
   error: string | null;
+  /** Download progress: 0–100, only meaningful when state is 'downloading'. */
+  download_progress: number | null;
 }
 
 /** UI-only: tab model for the session pinning bar. */

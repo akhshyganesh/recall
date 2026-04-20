@@ -34,5 +34,12 @@
       "icons/icon.png"
     ]
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/akhshyganesh/recall/releases/latest/download/latest.json"
+      ],
+      "pubkey": ""
+    }
+  }
 }
