@@ -33,7 +33,10 @@ impl CopilotConnector {
     }
 
     /// VS Code stores full Copilot chat sessions in per-workspace storage:
-    /// ~/Library/Application Support/Code/User/workspaceStorage/<hash>/chatSessions/<session-uuid>.jsonl
+    /// - macOS: ~/Library/Application Support/Code/User/workspaceStorage/<hash>/chatSessions/<session-uuid>.jsonl
+    /// - Linux: ~/.config/Code/User/workspaceStorage/<hash>/chatSessions/<session-uuid>.jsonl
+    /// - Windows: %APPDATA%\Code\User\workspaceStorage\<hash>\chatSessions\<session-uuid>.jsonl
+    ///
     /// These JSONL files use an incremental state format:
     ///   kind=0: initial snapshot (header with sessionId, creationDate, etc.)
     ///   kind=1: set a value at a key path (e.g. ["customTitle"] or ["requests", 0, "response", 5, "value"])
@@ -47,6 +50,11 @@ impl CopilotConnector {
                 dirs::home_dir().map(|h| {
                     h.join("Library/Application Support/Code - Insiders/User/workspaceStorage")
                 }),
+            ]
+        } else if cfg!(target_os = "windows") {
+            vec![
+                dirs::config_dir().map(|d| d.join("Code/User/workspaceStorage")),
+                dirs::config_dir().map(|d| d.join("Code - Insiders/User/workspaceStorage")),
             ]
         } else {
             vec![
@@ -85,11 +93,26 @@ impl CopilotConnector {
         let val: serde_json::Value = serde_json::from_str(&content).ok()?;
         let folder = val.get("folder")?.as_str()?;
         let path = if let Some(stripped) = folder.strip_prefix("file://") {
-            urlencoding::decode(stripped).ok()?.to_string()
+            Self::normalize_file_uri_path(&urlencoding::decode(stripped).ok()?)
         } else {
             folder.to_string()
         };
         Some(path)
+    }
+
+    /// Normalize a decoded file:// path for the current OS. On Windows, VS Code
+    /// emits URIs like `file:///C:/...` which decode to `/C:/...`; we strip the
+    /// leading slash so we end up with `C:/...`. No-op elsewhere.
+    fn normalize_file_uri_path(path: &str) -> String {
+        let bytes = path.as_bytes();
+        if bytes.len() >= 3
+            && bytes[0] == b'/'
+            && bytes[2] == b':'
+            && bytes[1].is_ascii_alphabetic()
+        {
+            return path[1..].to_string();
+        }
+        path.to_string()
     }
 
     /// Convert epoch millis to RFC 3339 string
@@ -118,9 +141,10 @@ impl CopilotConnector {
         }
         // Fallback: try as file:// URL
         if let Some(stripped) = uri_str.strip_prefix("file://") {
-            return urlencoding::decode(stripped)
+            let decoded = urlencoding::decode(stripped)
                 .unwrap_or_default()
                 .to_string();
+            return Self::normalize_file_uri_path(&decoded);
         }
         uri_str.to_string()
     }
@@ -1061,5 +1085,34 @@ impl Connector for CopilotConnector {
         }
 
         conversations
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalize_posix_file_uri_path_is_unchanged() {
+        assert_eq!(
+            CopilotConnector::normalize_file_uri_path("/home/user/project"),
+            "/home/user/project"
+        );
+    }
+
+    #[test]
+    fn normalize_windows_file_uri_strips_leading_slash() {
+        assert_eq!(
+            CopilotConnector::normalize_file_uri_path("/C:/Users/alice/project"),
+            "C:/Users/alice/project"
+        );
+    }
+
+    #[test]
+    fn normalize_windows_file_uri_handles_lowercase_drive() {
+        assert_eq!(
+            CopilotConnector::normalize_file_uri_path("/d:/work"),
+            "d:/work"
+        );
     }
 }

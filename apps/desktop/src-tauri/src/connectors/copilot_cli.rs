@@ -23,6 +23,9 @@ impl CopilotCliConnector {
         Self
     }
 
+    /// Copilot CLI stores session state under the user's home directory on
+    /// every supported OS: ~/.copilot/session-state on macOS, Linux, and
+    /// Windows (resolved via `%USERPROFILE%`).
     fn session_state_root(&self) -> Option<PathBuf> {
         dirs::home_dir()
             .map(|home| home.join(".copilot/session-state"))

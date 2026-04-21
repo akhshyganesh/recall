@@ -12,14 +12,19 @@ impl CodexConnector {
     }
 
     fn default_roots(&self) -> Vec<PathBuf> {
+        // Codex CLI honours $CODEX_HOME and otherwise stores rollouts in the
+        // user's home directory on every supported OS:
+        // - macOS / Linux / Windows: ~/.codex
+        // - Linux XDG fallback:     ~/.config/codex
         let mut roots = Vec::new();
+        if let Ok(codex_home) = std::env::var("CODEX_HOME") {
+            roots.push(PathBuf::from(codex_home));
+        }
         if let Some(home) = dirs::home_dir() {
-            // CODEX_HOME default
-            if let Ok(codex_home) = std::env::var("CODEX_HOME") {
-                roots.push(PathBuf::from(codex_home));
-            }
             roots.push(home.join(".codex"));
-            roots.push(home.join(".config/codex"));
+            if !cfg!(target_os = "windows") {
+                roots.push(home.join(".config/codex"));
+            }
         }
         roots
     }

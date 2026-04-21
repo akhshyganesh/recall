@@ -87,6 +87,21 @@ Recall reads from and writes to:
 
 The **Clear database** button in Settings wipes this file. You can also delete it manually and restart the app to force a full rescan.
 
+## Session source roots by OS
+
+Session folders are tool-specific and are not the same path across macOS, Linux, and Windows.
+
+- Copilot Chat (VS Code workspace storage): macOS `$HOME/Library/Application Support/Code/User/workspaceStorage/.../chatSessions/`; Linux `$HOME/.config/Code/User/workspaceStorage/.../chatSessions/`; Windows `%APPDATA%\Code\User\workspaceStorage\...\chatSessions\`
+- Cline extension storage (VS Code globalStorage): macOS `$HOME/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/` (or `.../cline.cline/`); Linux `$HOME/.config/Code/User/globalStorage/saoudrizwan.claude-dev/` (or `.../cline.cline/`); Windows `%APPDATA%\Code\User\globalStorage\saoudrizwan.claude-dev\` (or `...\cline.cline\`)
+- Cursor storage: macOS `$HOME/Library/Application Support/Cursor/User/globalStorage/` and `.../workspaceStorage/`; Linux `$HOME/.config/Cursor/User/globalStorage/` and `.../workspaceStorage/`; Windows `%APPDATA%\Cursor\User\globalStorage\` and `%APPDATA%\Cursor\User\workspaceStorage\`
+- Claude Code CLI: `~/.claude/` on all OSes (Windows resolves via `%USERPROFILE%`)
+- Codex CLI: `$CODEX_HOME` if set, otherwise `~/.codex/` on all OSes
+- Gemini CLI: `~/.gemini/` on all OSes
+- GitHub Copilot CLI: `~/.copilot/session-state/` on all OSes
+- Aider: scans project roots under `$HOME` for `.aider.chat.history.md`
+
+These paths follow each app's standard user-data location conventions. Recall's own database path is derived from `dirs::data_local_dir()`, which maps to `%LOCALAPPDATA%` on Windows, `~/Library/Application Support` on macOS, and `$XDG_DATA_HOME` (or `~/.local/share`) on Linux.
+
 ## Common tasks
 
 ### Adding a dependency

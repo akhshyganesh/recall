@@ -15,6 +15,22 @@ Before writing any Rust, confirm:
 
 Grab a real sample session. Treat it as a test fixture later.
 
+### OS path note (important)
+
+Session roots are not identical across operating systems.
+
+- macOS often uses `~/Library/Application Support/...`
+- Linux often uses `~/.config/...`
+- Windows usually uses `%APPDATA%\\...` for VS Code-style user data
+
+For VS Code-family tools (Copilot Chat, Cline extension data), the platform-specific user settings paths documented by VS Code map to:
+
+- macOS: `$HOME/Library/Application Support/Code/User/...`
+- Linux: `$HOME/.config/Code/User/...`
+- Windows: `%APPDATA%\\Code\\User\\...`
+
+Reference: VS Code settings file locations in the official docs.
+
 ## 2. Declare the module
 
 [`apps/desktop/src-tauri/src/connectors/mod.rs`](../apps/desktop/src-tauri/src/connectors/mod.rs):
