@@ -12,12 +12,18 @@ impl ClaudeCodeConnector {
     }
 
     fn default_roots(&self) -> Vec<PathBuf> {
+        // Claude Code stores sessions under the user's home directory on
+        // every supported OS:
+        // - macOS / Linux / Windows: ~/.claude (CLI default)
+        // - Linux XDG fallback:     ~/.config/claude
         let mut roots = Vec::new();
         if let Some(home) = dirs::home_dir() {
-            // macOS
             roots.push(home.join(".claude"));
-            // Linux
-            roots.push(home.join(".config/claude"));
+        }
+        if !cfg!(target_os = "windows") {
+            if let Some(home) = dirs::home_dir() {
+                roots.push(home.join(".config/claude"));
+            }
         }
         roots
     }

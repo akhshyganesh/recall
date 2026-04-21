@@ -12,10 +12,16 @@ impl GeminiConnector {
     }
 
     fn default_roots(&self) -> Vec<PathBuf> {
+        // Gemini CLI stores sessions under the user's home directory on every
+        // supported OS:
+        // - macOS / Linux / Windows: ~/.gemini
+        // - Linux XDG fallback:     ~/.config/gemini
         let mut roots = Vec::new();
         if let Some(home) = dirs::home_dir() {
             roots.push(home.join(".gemini"));
-            roots.push(home.join(".config/gemini"));
+            if !cfg!(target_os = "windows") {
+                roots.push(home.join(".config/gemini"));
+            }
         }
         roots
     }
