@@ -12,16 +12,22 @@ impl ClineConnector {
 
     fn default_roots(&self) -> Vec<PathBuf> {
         let mut roots = Vec::new();
-        if let Some(home) = dirs::home_dir() {
-            // macOS
-            roots.push(home.join(
-                "Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev",
-            ));
-            // Linux
+        if cfg!(target_os = "macos") {
+            if let Some(home) = dirs::home_dir() {
+                roots.push(home.join(
+                    "Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev",
+                ));
+                roots.push(
+                    home.join("Library/Application Support/Code/User/globalStorage/cline.cline"),
+                );
+            }
+        } else if cfg!(target_os = "windows") {
+            if let Some(config) = dirs::config_dir() {
+                roots.push(config.join("Code/User/globalStorage/saoudrizwan.claude-dev"));
+                roots.push(config.join("Code/User/globalStorage/cline.cline"));
+            }
+        } else if let Some(home) = dirs::home_dir() {
             roots.push(home.join(".config/Code/User/globalStorage/saoudrizwan.claude-dev"));
-            // Also check Cline-specific paths
-            roots
-                .push(home.join("Library/Application Support/Code/User/globalStorage/cline.cline"));
             roots.push(home.join(".config/Code/User/globalStorage/cline.cline"));
         }
         roots

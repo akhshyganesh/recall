@@ -33,7 +33,10 @@ impl CopilotConnector {
     }
 
     /// VS Code stores full Copilot chat sessions in per-workspace storage:
-    /// ~/Library/Application Support/Code/User/workspaceStorage/<hash>/chatSessions/<session-uuid>.jsonl
+    /// - macOS: ~/Library/Application Support/Code/User/workspaceStorage/<hash>/chatSessions/<session-uuid>.jsonl
+    /// - Linux: ~/.config/Code/User/workspaceStorage/<hash>/chatSessions/<session-uuid>.jsonl
+    /// - Windows: %APPDATA%\Code\User\workspaceStorage\<hash>\chatSessions\<session-uuid>.jsonl
+    ///
     /// These JSONL files use an incremental state format:
     ///   kind=0: initial snapshot (header with sessionId, creationDate, etc.)
     ///   kind=1: set a value at a key path (e.g. ["customTitle"] or ["requests", 0, "response", 5, "value"])
@@ -47,6 +50,11 @@ impl CopilotConnector {
                 dirs::home_dir().map(|h| {
                     h.join("Library/Application Support/Code - Insiders/User/workspaceStorage")
                 }),
+            ]
+        } else if cfg!(target_os = "windows") {
+            vec![
+                dirs::config_dir().map(|d| d.join("Code/User/workspaceStorage")),
+                dirs::config_dir().map(|d| d.join("Code - Insiders/User/workspaceStorage")),
             ]
         } else {
             vec![

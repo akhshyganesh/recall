@@ -87,6 +87,25 @@ Recall reads from and writes to:
 
 The **Clear database** button in Settings wipes this file. You can also delete it manually and restart the app to force a full rescan.
 
+## Session source roots by OS
+
+Session folders are tool-specific and are not the same path across macOS, Linux, and Windows.
+
+- Copilot Chat (VS Code workspace storage)
+	- macOS: `$HOME/Library/Application Support/Code/User/workspaceStorage/.../chatSessions/`
+	- Linux: `$HOME/.config/Code/User/workspaceStorage/.../chatSessions/`
+	- Windows: `%APPDATA%\\Code\\User\\workspaceStorage\\...\\chatSessions\\`
+- Cline extension storage (VS Code globalStorage)
+	- macOS: `$HOME/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/` or `.../cline.cline/`
+	- Linux: `$HOME/.config/Code/User/globalStorage/saoudrizwan.claude-dev/` or `.../cline.cline/`
+	- Windows: `%APPDATA%\\Code\\User\\globalStorage\\saoudrizwan.claude-dev\\` or `...\\cline.cline\\`
+- Cursor storage
+	- macOS: `$HOME/Library/Application Support/Cursor/User/globalStorage/` and `.../workspaceStorage/`
+	- Linux: `$HOME/.config/Cursor/User/globalStorage/` and `.../workspaceStorage/`
+	- Windows: `%APPDATA%\\Cursor\\User\\globalStorage\\` and `%APPDATA%\\Cursor\\User\\workspaceStorage\\`
+
+These paths follow each app's standard user-data location conventions.
+
 ## Common tasks
 
 ### Adding a dependency

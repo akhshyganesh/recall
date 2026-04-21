@@ -13,11 +13,17 @@ impl CursorConnector {
 
     fn default_roots(&self) -> Vec<PathBuf> {
         let mut roots = Vec::new();
-        if let Some(home) = dirs::home_dir() {
-            // macOS
-            roots.push(home.join("Library/Application Support/Cursor/User/globalStorage"));
-            roots.push(home.join("Library/Application Support/Cursor/User/workspaceStorage"));
-            // Linux
+        if cfg!(target_os = "macos") {
+            if let Some(home) = dirs::home_dir() {
+                roots.push(home.join("Library/Application Support/Cursor/User/globalStorage"));
+                roots.push(home.join("Library/Application Support/Cursor/User/workspaceStorage"));
+            }
+        } else if cfg!(target_os = "windows") {
+            if let Some(config) = dirs::config_dir() {
+                roots.push(config.join("Cursor/User/globalStorage"));
+                roots.push(config.join("Cursor/User/workspaceStorage"));
+            }
+        } else if let Some(home) = dirs::home_dir() {
             roots.push(home.join(".config/Cursor/User/globalStorage"));
             roots.push(home.join(".config/Cursor/User/workspaceStorage"));
         }
