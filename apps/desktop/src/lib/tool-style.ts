@@ -1,4 +1,5 @@
 const TOOL_CLASS_BY_MATCH = [
+  ['antigravity', 'antigravity'],
   ['copilot', 'copilot'],
   ['claude', 'claude_code'],
   ['cursor', 'cursor'],
@@ -9,6 +10,7 @@ const TOOL_CLASS_BY_MATCH = [
 ] as const;
 
 const TOOL_THEME_BY_KEY = {
+  antigravity: { key: 'antigravity', label: 'Antigravity', rgb: '78,201,176' },
   copilot: { key: 'copilot', label: 'Copilot', rgb: '86,156,214' },
   claude_code: { key: 'claude_code', label: 'Claude Code', rgb: '206,145,120' },
   cursor: { key: 'cursor', label: 'Cursor', rgb: '156,220,254' },

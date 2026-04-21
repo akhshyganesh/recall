@@ -1040,10 +1040,16 @@ impl Connector for CopilotConnector {
         }
     }
 
-    fn scan(&self, _roots: &[String], since_ts: Option<&str>) -> Vec<NormalizedConversation> {
+    fn scan(&self, roots: &[String], since_ts: Option<&str>) -> Vec<NormalizedConversation> {
         let mut conversations = Vec::new();
 
-        for ws_root in self.workspace_storage_roots() {
+        let scan_roots: Vec<PathBuf> = if roots.is_empty() {
+            self.workspace_storage_roots()
+        } else {
+            roots.iter().map(PathBuf::from).collect()
+        };
+
+        for ws_root in scan_roots {
             if let Ok(entries) = fs::read_dir(&ws_root) {
                 for entry in entries.flatten() {
                     let ws_hash_dir = entry.path();
@@ -1091,6 +1097,7 @@ impl Connector for CopilotConnector {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     #[test]
     fn normalize_posix_file_uri_path_is_unchanged() {
@@ -1114,5 +1121,52 @@ mod tests {
             CopilotConnector::normalize_file_uri_path("/d:/work"),
             "d:/work"
         );
+    }
+
+    #[test]
+    fn scan_respects_explicit_workspace_storage_roots() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("recall-copilot-scan-test-{}", uuid::Uuid::new_v4()));
+        let workspace_storage = temp_dir.join("workspaceStorage");
+        let workspace_dir = workspace_storage.join("workspace-1");
+        let chat_sessions_dir = workspace_dir.join("chatSessions");
+
+        fs::create_dir_all(&chat_sessions_dir).expect("create chat sessions dir");
+        fs::write(
+            workspace_dir.join("workspace.json"),
+            r#"{"folder":"file:///tmp/project"}"#,
+        )
+        .expect("write workspace json");
+        fs::write(
+            chat_sessions_dir.join("session-1.jsonl"),
+            concat!(
+                "{\"kind\":0,\"v\":{",
+                "\"sessionId\":\"session-1\",",
+                "\"creationDate\":1710000000000,",
+                "\"customTitle\":\"Fix Copilot scan roots\",",
+                "\"requests\":[{",
+                "\"message\":{\"text\":\"Inspect the workspace storage root\"},",
+                "\"timestamp\":1710000001000,",
+                "\"modelId\":\"copilot/gpt-5.4\",",
+                "\"response\":[{\"value\":\"Scanning explicit roots now.\"}]",
+                "}]}}\n"
+            ),
+        )
+        .expect("write chat session");
+
+        let conversations =
+            CopilotConnector::new().scan(&[workspace_storage.to_string_lossy().to_string()], None);
+
+        assert_eq!(conversations.len(), 1);
+        assert_eq!(conversations[0].agent_slug, "copilot");
+        assert_eq!(conversations[0].external_id, "session-1");
+        assert_eq!(conversations[0].workspace.as_deref(), Some("/tmp/project"));
+        assert_eq!(
+            conversations[0].title.as_deref(),
+            Some("Fix Copilot scan roots")
+        );
+        assert_eq!(conversations[0].model.as_deref(), Some("gpt-5.4"));
+
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 }

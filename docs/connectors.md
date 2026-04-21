@@ -29,6 +29,14 @@ For VS Code-family tools (Copilot Chat, Cline extension data), the platform-spec
 - Linux: `$HOME/.config/Code/User/...`
 - Windows: `%APPDATA%\\Code\\User\\...`
 
+For Antigravity, the primary session source is the Gemini-owned artifact tree:
+
+- macOS: `$HOME/.gemini/antigravity/brain/<session-id>/`
+- Linux: `$HOME/.gemini/antigravity/brain/<session-id>/`
+- Windows: `%USERPROFILE%\.gemini\antigravity\brain\<session-id>\`
+
+Each session directory contains markdown artifacts such as `task.md`, `implementation_plan.md`, and `walkthrough.md`, plus adjacent `*.metadata.json` timestamp metadata. Recall also keeps fallback support for legacy Antigravity app-data chat sessions under `User/workspaceStorage/.../chatSessions/*.json` and `User/globalStorage/emptyWindowChatSessions/*.json` for installs that still populate those stores.
+
 Reference: VS Code settings file locations in the official docs.
 
 ## 2. Declare the module
@@ -36,7 +44,7 @@ Reference: VS Code settings file locations in the official docs.
 [`apps/desktop/src-tauri/src/connectors/mod.rs`](../apps/desktop/src-tauri/src/connectors/mod.rs):
 
 ```rust
-mod acme;   // add this
+pub mod acme;   // add this
 
 pub fn all_connectors() -> Vec<Box<dyn Connector>> {
     vec![
@@ -78,8 +86,8 @@ impl Connector for AcmeConnector {
         }
     }
 
-    fn scan(&self, since: Option<&str>) -> Vec<NormalizedConversation> {
-        // Walk the sessions directory, skip files older than `since`,
+    fn scan(&self, roots: &[String], since_ts: Option<&str>) -> Vec<NormalizedConversation> {
+        // Walk the sessions directory, skip files older than `since_ts`,
         // parse each into one `NormalizedConversation`.
         vec![]
     }
@@ -93,7 +101,7 @@ impl Connector for AcmeConnector {
   - the `sessions.tool` column,
   - the frontend's `tool-pill` CSS class (see [`apps/desktop/src/lib/tool-style.ts`](../apps/desktop/src/lib/tool-style.ts)).
   Keep it short, lowercase, no spaces, and don't change it after release.
-- `scan(since)` must be pure w.r.t. the filesystem — no writes, no network. If `since` is `Some`, skip files whose mtime is older than that timestamp.
+- `scan(roots, since_ts)` must be pure w.r.t. the filesystem — no writes, no network. If `roots` is empty, fall back to the connector's default on-disk locations. If `since_ts` is `Some`, skip files whose mtime is older than that timestamp.
 - `scan` runs on a blocking thread. Don't block shorter than necessary, but don't bother with async either.
 
 ## 4. Style it
