@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Antigravity connector for built-in chat sessions on macOS, Linux, and Windows.
+- Antigravity connector for Gemini-owned Antigravity session artifacts on macOS, Linux, and Windows, with fallback support for legacy app-data chat sessions.
 - `@recall/shared-types` workspace package.
 - Unit tests for `exports` and the export filename sanitizer.
 - CI workflow (`.github/workflows/ci.yml`): typecheck, build, `cargo check`, `cargo test`, `cargo clippy`, `cargo fmt --check`.

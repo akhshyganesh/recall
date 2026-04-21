@@ -29,13 +29,13 @@ For VS Code-family tools (Copilot Chat, Cline extension data), the platform-spec
 - Linux: `$HOME/.config/Code/User/...`
 - Windows: `%APPDATA%\\Code\\User\\...`
 
-For Antigravity's built-in chat session store, the app-specific user data root maps to:
+For Antigravity, the primary session source is the Gemini-owned artifact tree:
 
-- macOS: `$HOME/Library/Application Support/Antigravity/User/workspaceStorage/.../chatSessions/*.json`
-- Linux: `$HOME/.config/Antigravity/User/workspaceStorage/.../chatSessions/*.json`
-- Windows: `%APPDATA%\Antigravity\User\workspaceStorage\...\chatSessions\*.json`
+- macOS: `$HOME/.gemini/antigravity/brain/<session-id>/`
+- Linux: `$HOME/.gemini/antigravity/brain/<session-id>/`
+- Windows: `%USERPROFILE%\.gemini\antigravity\brain\<session-id>\`
 
-Empty-window Antigravity sessions live under the same root at `User/globalStorage/emptyWindowChatSessions/*.json`.
+Each session directory contains markdown artifacts such as `task.md`, `implementation_plan.md`, and `walkthrough.md`, plus adjacent `*.metadata.json` timestamp metadata. Recall also keeps fallback support for legacy Antigravity app-data chat sessions under `User/workspaceStorage/.../chatSessions/*.json` and `User/globalStorage/emptyWindowChatSessions/*.json` for installs that still populate those stores.
 
 Reference: VS Code settings file locations in the official docs.
 

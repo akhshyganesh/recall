@@ -14,6 +14,10 @@ impl AntigravityConnector {
     fn default_roots(&self) -> Vec<PathBuf> {
         let mut roots = Vec::new();
 
+        if let Some(home) = dirs::home_dir() {
+            roots.push(home.join(".gemini/antigravity"));
+        }
+
         if cfg!(target_os = "macos") {
             if let Some(home) = dirs::home_dir() {
                 roots.push(home.join("Library/Application Support/Antigravity"));
@@ -29,7 +33,7 @@ impl AntigravityConnector {
         roots
     }
 
-    fn normalize_scan_root(root: &Path) -> PathBuf {
+    fn normalize_legacy_scan_root(root: &Path) -> PathBuf {
         if root.file_name().and_then(|name| name.to_str()) == Some("User") {
             return root.to_path_buf();
         }
@@ -59,8 +63,31 @@ impl AntigravityConnector {
         root.to_path_buf()
     }
 
-    fn collect_session_dirs(&self, root: &Path) -> Vec<(PathBuf, Option<String>)> {
-        let user_root = Self::normalize_scan_root(root);
+    fn has_brain_storage(root: &Path) -> bool {
+        Self::brain_root(root).is_some()
+    }
+
+    fn has_legacy_storage(root: &Path) -> bool {
+        let user_root = Self::normalize_legacy_scan_root(root);
+        user_root.join("workspaceStorage").is_dir()
+            || user_root.join("globalStorage/state.vscdb").is_file()
+    }
+
+    fn brain_root(root: &Path) -> Option<PathBuf> {
+        if root.file_name().and_then(|name| name.to_str()) == Some("brain") && root.is_dir() {
+            return Some(root.to_path_buf());
+        }
+
+        let brain_root = root.join("brain");
+        if brain_root.is_dir() {
+            return Some(brain_root);
+        }
+
+        None
+    }
+
+    fn collect_legacy_session_dirs(&self, root: &Path) -> Vec<(PathBuf, Option<String>)> {
+        let user_root = Self::normalize_legacy_scan_root(root);
         let mut session_dirs = Vec::new();
 
         let empty_window_dir = user_root.join("globalStorage/emptyWindowChatSessions");
@@ -92,6 +119,90 @@ impl AntigravityConnector {
         }
 
         session_dirs
+    }
+
+    fn collect_brain_session_dirs(&self, root: &Path) -> Vec<PathBuf> {
+        let Some(brain_root) = Self::brain_root(root) else {
+            return Vec::new();
+        };
+
+        let mut session_dirs = Vec::new();
+
+        if let Ok(entries) = fs::read_dir(brain_root) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    session_dirs.push(path);
+                }
+            }
+        }
+
+        session_dirs
+    }
+
+    fn path_mtime_rfc3339(path: &Path) -> Option<String> {
+        fs::metadata(path)
+            .ok()
+            .and_then(|metadata| metadata.modified().ok())
+            .map(|modified| chrono::DateTime::<chrono::Utc>::from(modified).to_rfc3339())
+    }
+
+    fn collect_brain_artifact_paths(session_dir: &Path) -> Vec<PathBuf> {
+        let mut artifact_paths = Vec::new();
+
+        if let Ok(entries) = fs::read_dir(session_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if !path.is_file() {
+                    continue;
+                }
+
+                let file_name = path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or("");
+                let is_markdown = path.extension().and_then(|ext| ext.to_str()) == Some("md");
+                let is_markdown_metadata = file_name.ends_with(".md.metadata.json");
+
+                if is_markdown || is_markdown_metadata {
+                    artifact_paths.push(path);
+                }
+            }
+        }
+
+        artifact_paths
+    }
+
+    fn read_artifact_metadata(path: &Path) -> Option<Value> {
+        let metadata_path = PathBuf::from(format!("{}.metadata.json", path.to_string_lossy()));
+        let content = fs::read_to_string(metadata_path).ok()?;
+        serde_json::from_str(&content).ok()
+    }
+
+    fn read_markdown_artifact(path: &Path) -> Option<String> {
+        let content = fs::read_to_string(path).ok()?;
+        let trimmed = content.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    }
+
+    fn artifact_timestamp(path: &Path) -> Option<String> {
+        let metadata = Self::read_artifact_metadata(path);
+        Self::timestamp_to_rfc3339(
+            metadata
+                .as_ref()
+                .and_then(|value| value.get("updatedAt").or_else(|| value.get("createdAt"))),
+        )
+        .or_else(|| Self::path_mtime_rfc3339(path))
+    }
+
+    fn artifact_summary(path: &Path) -> Option<String> {
+        Self::read_artifact_metadata(path)?
+            .get("summary")
+            .and_then(Self::extract_text)
     }
 
     fn read_workspace_folder(workspace_dir: &Path) -> Option<String> {
@@ -392,6 +503,151 @@ impl AntigravityConnector {
         let session: Value = serde_json::from_str(&content).ok()?;
         self.parse_session_value(path, &session, workspace)
     }
+
+    fn parse_brain_session_dir(&self, session_dir: &Path) -> Option<NormalizedConversation> {
+        let session_id = session_dir
+            .file_name()
+            .and_then(|name| name.to_str())?
+            .to_string();
+        let task_path = session_dir.join("task.md");
+        let task_summary = Self::artifact_summary(&task_path);
+
+        let mut messages = Vec::new();
+        let mut artifact_names = Vec::new();
+        let mut artifact_paths = Self::collect_brain_artifact_paths(session_dir);
+
+        if let Some(content) = Self::read_markdown_artifact(&task_path) {
+            artifact_names.push("task.md".to_string());
+            messages.push(NormalizedMessage {
+                idx: 0,
+                role: "user".to_string(),
+                author: None,
+                created_at: Self::artifact_timestamp(&task_path),
+                content,
+                extra: serde_json::json!({ "artifact": "task.md" }),
+            });
+        }
+
+        let mut assistant_artifacts = Vec::new();
+        if let Ok(entries) = fs::read_dir(session_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if !path.is_file() {
+                    continue;
+                }
+
+                if path.extension().and_then(|ext| ext.to_str()) != Some("md") {
+                    continue;
+                }
+
+                let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+                    continue;
+                };
+
+                if file_name == "task.md" {
+                    continue;
+                }
+
+                let created_at = Self::artifact_timestamp(&path);
+                assistant_artifacts.push((path, created_at));
+            }
+        }
+
+        assistant_artifacts.sort_by(|left, right| {
+            left.1
+                .as_deref()
+                .cmp(&right.1.as_deref())
+                .then_with(|| left.0.cmp(&right.0))
+        });
+
+        for (path, created_at) in assistant_artifacts {
+            let Some(content) = Self::read_markdown_artifact(&path) else {
+                continue;
+            };
+
+            let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+                continue;
+            };
+
+            artifact_names.push(file_name.to_string());
+            messages.push(NormalizedMessage {
+                idx: 0,
+                role: "assistant".to_string(),
+                author: Some("Antigravity".to_string()),
+                created_at,
+                content,
+                extra: serde_json::json!({ "artifact": file_name }),
+            });
+        }
+
+        if messages.is_empty() {
+            return None;
+        }
+
+        for (index, message) in messages.iter_mut().enumerate() {
+            message.idx = index;
+        }
+
+        if artifact_paths.is_empty() {
+            artifact_paths.push(task_path.clone());
+        }
+
+        let source_mtime = artifact_paths
+            .iter()
+            .filter_map(|path| Self::path_mtime_rfc3339(path))
+            .max()
+            .or_else(|| Self::path_mtime_rfc3339(session_dir));
+
+        let title = messages
+            .iter()
+            .find(|message| message.role == "user")
+            .map(|message| first_line(&message.content, 100))
+            .or(task_summary)
+            .or_else(|| {
+                messages
+                    .first()
+                    .map(|message| first_line(&message.content, 100))
+            });
+
+        let started_at = messages
+            .iter()
+            .find(|message| message.role == "user")
+            .and_then(|message| message.created_at.clone())
+            .or_else(|| {
+                messages
+                    .first()
+                    .and_then(|message| message.created_at.clone())
+            })
+            .or_else(|| source_mtime.clone());
+        let ended_at = messages
+            .iter()
+            .rev()
+            .find_map(|message| message.created_at.clone())
+            .or_else(|| source_mtime.clone());
+
+        let mut metadata = serde_json::json!({
+            "storage": "brain",
+            "artifacts": artifact_names,
+        });
+        if let Some(summary) = Self::artifact_summary(&task_path) {
+            metadata["taskSummary"] = serde_json::json!(summary);
+        }
+
+        Some(NormalizedConversation {
+            agent_slug: "antigravity".to_string(),
+            external_id: session_id,
+            title,
+            workspace: None,
+            source_path: session_dir.to_string_lossy().to_string(),
+            started_at,
+            ended_at,
+            metadata,
+            messages,
+            model: None,
+            branch: None,
+            source_mtime,
+        })
+    }
 }
 
 impl Connector for AntigravityConnector {
@@ -404,17 +660,39 @@ impl Connector for AntigravityConnector {
     }
 
     fn detect(&self) -> DetectionResult {
-        for root in self.default_roots() {
-            let workspace_storage = root.join("User/workspaceStorage");
-            let global_storage_db = root.join("User/globalStorage/state.vscdb");
+        let mut root_paths = Vec::new();
+        let mut evidence = Vec::new();
 
-            if workspace_storage.is_dir() || global_storage_db.is_file() {
-                return DetectionResult {
-                    detected: true,
-                    root_paths: vec![root.to_string_lossy().to_string()],
-                    evidence: format!("Found Antigravity user data at {}", root.display()),
-                };
+        for root in self.default_roots() {
+            let mut found = false;
+
+            if Self::has_brain_storage(&root) {
+                evidence.push(format!(
+                    "Found Antigravity Gemini artifacts at {}",
+                    root.display()
+                ));
+                found = true;
             }
+
+            if Self::has_legacy_storage(&root) {
+                evidence.push(format!(
+                    "Found Antigravity legacy user data at {}",
+                    root.display()
+                ));
+                found = true;
+            }
+
+            if found {
+                root_paths.push(root.to_string_lossy().to_string());
+            }
+        }
+
+        if !root_paths.is_empty() {
+            return DetectionResult {
+                detected: true,
+                root_paths,
+                evidence: evidence.join("; "),
+            };
         }
 
         DetectionResult {
@@ -434,7 +712,25 @@ impl Connector for AntigravityConnector {
         let mut conversations = Vec::new();
 
         for root in scan_roots {
-            for (session_dir, workspace) in self.collect_session_dirs(&root) {
+            for session_dir in self.collect_brain_session_dirs(&root) {
+                let source_mtime = Self::collect_brain_artifact_paths(&session_dir)
+                    .iter()
+                    .filter_map(|path| Self::path_mtime_rfc3339(path))
+                    .max()
+                    .or_else(|| Self::path_mtime_rfc3339(&session_dir));
+
+                if let (Some(since), Some(modified)) = (since_ts, source_mtime.as_deref()) {
+                    if modified < since {
+                        continue;
+                    }
+                }
+
+                if let Some(conversation) = self.parse_brain_session_dir(&session_dir) {
+                    conversations.push(conversation);
+                }
+            }
+
+            for (session_dir, workspace) in self.collect_legacy_session_dirs(&root) {
                 if let Ok(entries) = fs::read_dir(&session_dir) {
                     for entry in entries.flatten() {
                         let path = entry.path();
@@ -551,6 +847,77 @@ mod tests {
         assert_eq!(workspace.as_deref(), Some("/home/alice/project"));
 
         let _ = fs::remove_file(temp_dir.join("workspace.json"));
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn parses_antigravity_brain_session_directory() {
+        let connector = AntigravityConnector::new();
+        let temp_dir = std::env::temp_dir().join(format!(
+            "recall-antigravity-brain-test-{}",
+            std::process::id()
+        ));
+        let session_dir = temp_dir.join("brain/session-123");
+
+        fs::create_dir_all(&session_dir).expect("create temp brain session dir");
+        fs::write(
+            session_dir.join("task.md"),
+            "# Investigate missing Antigravity sessions\n\nFigure out why Recall is empty.",
+        )
+        .expect("write task artifact");
+        fs::write(
+            session_dir.join("task.md.metadata.json"),
+            r#"{"summary":"Investigate missing Antigravity sessions","updatedAt":"2026-04-21T17:40:00Z"}"#,
+        )
+        .expect("write task metadata");
+        fs::write(
+            session_dir.join("implementation_plan.md"),
+            "Collect the real storage root and compare it with the connector assumptions.",
+        )
+        .expect("write plan artifact");
+        fs::write(
+            session_dir.join("implementation_plan.md.metadata.json"),
+            r#"{"updatedAt":"2026-04-21T17:41:00Z"}"#,
+        )
+        .expect("write plan metadata");
+        fs::write(
+            session_dir.join("walkthrough.md"),
+            "Recall now scans the Gemini Antigravity brain directory and surfaces these sessions.",
+        )
+        .expect("write walkthrough artifact");
+        fs::write(
+            session_dir.join("walkthrough.md.metadata.json"),
+            r#"{"updatedAt":"2026-04-21T17:42:00Z"}"#,
+        )
+        .expect("write walkthrough metadata");
+
+        let conversation = connector
+            .parse_brain_session_dir(&session_dir)
+            .expect("expected a parsed brain conversation");
+
+        assert_eq!(conversation.agent_slug, "antigravity");
+        assert_eq!(conversation.external_id, "session-123");
+        assert_eq!(
+            conversation.title.as_deref(),
+            Some("# Investigate missing Antigravity sessions")
+        );
+        assert_eq!(conversation.messages.len(), 3);
+        assert_eq!(conversation.messages[0].role, "user");
+        assert_eq!(conversation.messages[1].role, "assistant");
+        assert_eq!(
+            conversation.messages[1].author.as_deref(),
+            Some("Antigravity")
+        );
+        assert_eq!(
+            conversation.started_at.as_deref(),
+            Some("2026-04-21T17:40:00+00:00")
+        );
+        assert_eq!(
+            conversation.ended_at.as_deref(),
+            Some("2026-04-21T17:42:00+00:00")
+        );
+        assert_eq!(conversation.metadata["storage"], "brain");
+
         let _ = fs::remove_dir_all(&temp_dir);
     }
 }
