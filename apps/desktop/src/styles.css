@@ -42,6 +42,7 @@
   --comment: #6a9955;
 
   /* Tool colors — coded like syntax tokens */
+  --tool-antigravity: #4ec9b0;
   --tool-copilot: #569cd6;
   --tool-claude: #ce9178;
   --tool-cursor: #9cdcfe;
@@ -317,6 +318,7 @@ body {
   border-radius: 50%;
   flex-shrink: 0;
 }
+.tool-dot.antigravity { background: var(--tool-antigravity); }
 .tool-dot.copilot { background: var(--tool-copilot); }
 .tool-dot.claude_code { background: var(--tool-claude); }
 .tool-dot.cursor { background: var(--tool-cursor); }
@@ -1476,6 +1478,7 @@ body {
   white-space: nowrap;
   line-height: 1.5;
 }
+.tool-pill.antigravity { background: rgba(78,201,176,0.12); color: var(--tool-antigravity); }
 .tool-pill.copilot { background: rgba(86,156,214,0.12); color: var(--tool-copilot); }
 .tool-pill.claude_code { background: rgba(206,145,120,0.12); color: var(--tool-claude); }
 .tool-pill.cursor { background: rgba(156,220,254,0.12); color: var(--tool-cursor); }

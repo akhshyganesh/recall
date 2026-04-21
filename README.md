@@ -1,6 +1,6 @@
 # Recall
 
-> Local, private search across your AI coding session history — Copilot, Claude Code, Cursor, Aider, Codex, Cline, Gemini, and more.
+> Local, private search across your AI coding session history — Copilot, Claude Code, Cursor, Antigravity, Aider, Codex, Cline, Gemini, and more.
 
 Recall scans the session files that AI coding assistants already write to your disk, normalizes them into a single SQLite database with full-text search, and gives you a fast desktop UI to browse, search, favorite, and export them. **Everything stays local.** No network calls, no telemetry, no account.
 
@@ -22,7 +22,7 @@ Modern AI tools produce enormous amounts of useful context — edits, reasoning,
 
 ## Features
 
-- **8 connectors** out of the box: GitHub Copilot (VS Code & CLI), Claude Code, Cursor, Aider, OpenAI Codex, Cline, Gemini.
+- **9 connectors** out of the box: GitHub Copilot (VS Code & CLI), Claude Code, Cursor, Antigravity, Aider, OpenAI Codex, Cline, Gemini.
 - **Unified view**: every session rendered with the same message/diff/tool-call pipeline, regardless of vendor.
 - **Full-text search** via SQLite FTS5 with snippet highlighting.
 - **Activity heatmap**, per-tool breakdown, per-repo filtering.
@@ -34,7 +34,7 @@ Modern AI tools produce enormous amounts of useful context — edits, reasoning,
 
 ## Install
 
-Prebuilt binaries for macOS (arm64) and Linux (x86_64) are published on the [Releases page](https://github.com/akhshyganesh/recall/releases). Windows builds can be produced locally — see [`docs/development.md`](docs/development.md).
+Prebuilt binaries for macOS (arm64), Linux (x86_64), and Windows (x64) are published on the [Releases page](https://github.com/akhshyganesh/recall/releases).
 
 ### macOS — "damaged and can't be opened"
 

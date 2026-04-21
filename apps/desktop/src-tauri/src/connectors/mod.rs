@@ -1,4 +1,5 @@
 pub mod aider;
+pub mod antigravity;
 pub mod claude_code;
 pub mod cline;
 pub mod codex;
@@ -18,6 +19,7 @@ pub trait Connector: Send + Sync {
 
 pub fn all_connectors() -> Vec<Box<dyn Connector>> {
     vec![
+        Box::new(antigravity::AntigravityConnector::new()),
         Box::new(claude_code::ClaudeCodeConnector::new()),
         Box::new(copilot::CopilotConnector::new()),
         Box::new(copilot_cli::CopilotCliConnector::new()),
