@@ -1,6 +1,6 @@
 [package]
 name = "recall"
-version = "0.5.2"
+version = "0.5.3"
 description = "Local AI coding session history search"
 authors = ["Akhshy Ganesh <akhshyganesh@users.noreply.github.com>"]
 license = "MIT"
