@@ -86,6 +86,25 @@ impl CopilotConnector {
         ws_dirs
     }
 
+    /// Collect workspace hash directories from a scan root. The root can be
+    /// either the workspaceStorage directory or a single workspace hash path.
+    fn workspace_dirs_from_scan_root(scan_root: &Path) -> Vec<PathBuf> {
+        if scan_root.join("chatSessions").is_dir() {
+            return vec![scan_root.to_path_buf()];
+        }
+
+        let mut ws_dirs = Vec::new();
+        if let Ok(entries) = fs::read_dir(scan_root) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.join("chatSessions").is_dir() {
+                    ws_dirs.push(path);
+                }
+            }
+        }
+        ws_dirs
+    }
+
     /// Read the workspace.json to get the folder path for context
     fn read_workspace_folder(ws_hash_dir: &Path) -> Option<String> {
         let wj = ws_hash_dir.join("workspace.json");
@@ -1050,40 +1069,32 @@ impl Connector for CopilotConnector {
         };
 
         for ws_root in scan_roots {
-            if let Ok(entries) = fs::read_dir(&ws_root) {
-                for entry in entries.flatten() {
-                    let ws_hash_dir = entry.path();
-                    let chat_sessions_dir = ws_hash_dir.join("chatSessions");
-                    if !chat_sessions_dir.is_dir() {
-                        continue;
-                    }
+            for ws_hash_dir in Self::workspace_dirs_from_scan_root(&ws_root) {
+                let chat_sessions_dir = ws_hash_dir.join("chatSessions");
+                let workspace_folder = Self::read_workspace_folder(&ws_hash_dir);
 
-                    let workspace_folder = Self::read_workspace_folder(&ws_hash_dir);
+                if let Ok(files) = fs::read_dir(&chat_sessions_dir) {
+                    for file_entry in files.flatten() {
+                        let path = file_entry.path();
+                        if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+                            continue;
+                        }
+                        if !path.is_file() {
+                            continue;
+                        }
 
-                    if let Ok(files) = fs::read_dir(&chat_sessions_dir) {
-                        for file_entry in files.flatten() {
-                            let path = file_entry.path();
-                            if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
-                                continue;
-                            }
-                            if !path.is_file() {
-                                continue;
-                            }
-
-                            // Filter by mtime
-                            if let Some(since) = since_ts {
-                                if let Some(mtime_str) = Self::latest_session_source_mtime(&path) {
-                                    if mtime_str.as_str() < since {
-                                        continue;
-                                    }
+                        // Filter by mtime
+                        if let Some(since) = since_ts {
+                            if let Some(mtime_str) = Self::latest_session_source_mtime(&path) {
+                                if mtime_str.as_str() < since {
+                                    continue;
                                 }
                             }
+                        }
 
-                            if let Some(conv) =
-                                self.parse_chat_session(&path, workspace_folder.clone())
-                            {
-                                conversations.push(conv);
-                            }
+                        if let Some(conv) = self.parse_chat_session(&path, workspace_folder.clone())
+                        {
+                            conversations.push(conv);
                         }
                     }
                 }
@@ -1166,6 +1177,48 @@ mod tests {
             Some("Fix Copilot scan roots")
         );
         assert_eq!(conversations[0].model.as_deref(), Some("gpt-5.4"));
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn scan_respects_explicit_workspace_hash_roots() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "recall-copilot-scan-ws-test-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let workspace_dir = temp_dir.join("workspaceStorage").join("workspace-1");
+        let chat_sessions_dir = workspace_dir.join("chatSessions");
+
+        fs::create_dir_all(&chat_sessions_dir).expect("create chat sessions dir");
+        fs::write(
+            workspace_dir.join("workspace.json"),
+            r#"{"folder":"file:///tmp/project"}"#,
+        )
+        .expect("write workspace json");
+        fs::write(
+            chat_sessions_dir.join("session-1.jsonl"),
+            concat!(
+                "{\"kind\":0,\"v\":{",
+                "\"sessionId\":\"session-1\",",
+                "\"creationDate\":1710000000000,",
+                "\"customTitle\":\"Fix Copilot scan roots\",",
+                "\"requests\":[{",
+                "\"message\":{\"text\":\"Inspect the workspace hash root\"},",
+                "\"timestamp\":1710000001000,",
+                "\"modelId\":\"copilot/gpt-5.4\",",
+                "\"response\":[{\"value\":\"Scanning explicit workspace hash root now.\"}]",
+                "}]}}\n"
+            ),
+        )
+        .expect("write chat session");
+
+        let conversations =
+            CopilotConnector::new().scan(&[workspace_dir.to_string_lossy().to_string()], None);
+
+        assert_eq!(conversations.len(), 1);
+        assert_eq!(conversations[0].external_id, "session-1");
+        assert_eq!(conversations[0].workspace.as_deref(), Some("/tmp/project"));
 
         let _ = fs::remove_dir_all(&temp_dir);
     }
