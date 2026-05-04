@@ -173,6 +173,72 @@ impl AntigravityConnector {
         artifact_paths
     }
 
+    fn overview_log_path(session_dir: &Path) -> PathBuf {
+        session_dir
+            .join(".system_generated")
+            .join("logs")
+            .join("overview.txt")
+    }
+
+    fn parse_overview_log_messages(session_dir: &Path) -> Vec<NormalizedMessage> {
+        let mut messages = Vec::new();
+        let overview_path = Self::overview_log_path(session_dir);
+        let Ok(content) = fs::read_to_string(overview_path) else {
+            return messages;
+        };
+
+        for line in content.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+
+            let Ok(value) = serde_json::from_str::<Value>(trimmed) else {
+                continue;
+            };
+
+            let source = value
+                .get("source")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default();
+            let role = match source {
+                "USER_EXPLICIT" | "USER" => "user",
+                "MODEL" => "assistant",
+                _ => continue,
+            };
+
+            let Some(content) = value
+                .get("content")
+                .and_then(|v| v.as_str())
+                .map(str::trim)
+                .filter(|v| !v.is_empty())
+                .map(str::to_string)
+            else {
+                continue;
+            };
+
+            let created_at = value
+                .get("created_at")
+                .and_then(|v| v.as_str())
+                .map(|v| v.to_string());
+
+            messages.push(NormalizedMessage {
+                idx: 0,
+                role: role.to_string(),
+                author: if role == "assistant" {
+                    Some("Antigravity".to_string())
+                } else {
+                    None
+                },
+                created_at,
+                content,
+                extra: serde_json::json!({ "artifact": "overview.txt" }),
+            });
+        }
+
+        messages
+    }
+
     fn read_artifact_metadata(path: &Path) -> Option<Value> {
         let metadata_path = PathBuf::from(format!("{}.metadata.json", path.to_string_lossy()));
         let content = fs::read_to_string(metadata_path).ok()?;
@@ -581,6 +647,10 @@ impl AntigravityConnector {
         }
 
         if messages.is_empty() {
+            messages = Self::parse_overview_log_messages(session_dir);
+        }
+
+        if messages.is_empty() {
             return None;
         }
 
@@ -596,6 +666,7 @@ impl AntigravityConnector {
             .iter()
             .filter_map(|path| Self::path_mtime_rfc3339(path))
             .max()
+            .or_else(|| Self::path_mtime_rfc3339(&Self::overview_log_path(session_dir)))
             .or_else(|| Self::path_mtime_rfc3339(session_dir));
 
         let title = messages
@@ -717,6 +788,7 @@ impl Connector for AntigravityConnector {
                     .iter()
                     .filter_map(|path| Self::path_mtime_rfc3339(path))
                     .max()
+                    .or_else(|| Self::path_mtime_rfc3339(&Self::overview_log_path(&session_dir)))
                     .or_else(|| Self::path_mtime_rfc3339(&session_dir));
 
                 if let (Some(since), Some(modified)) = (since_ts, source_mtime.as_deref()) {
@@ -917,6 +989,40 @@ mod tests {
             Some("2026-04-21T17:42:00+00:00")
         );
         assert_eq!(conversation.metadata["storage"], "brain");
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn parses_antigravity_brain_session_from_overview_log() {
+        let connector = AntigravityConnector::new();
+        let temp_dir = std::env::temp_dir().join(format!(
+            "recall-antigravity-overview-test-{}",
+            std::process::id()
+        ));
+        let session_dir = temp_dir.join("brain/session-overview");
+        let logs_dir = session_dir.join(".system_generated/logs");
+
+        fs::create_dir_all(&logs_dir).expect("create overview logs dir");
+        fs::write(
+            logs_dir.join("overview.txt"),
+            concat!(
+                "{\"source\":\"USER_EXPLICIT\",\"created_at\":\"2026-05-04T10:31:56Z\",\"content\":\"<USER_REQUEST>\\nhi\\n</USER_REQUEST>\"}\n",
+                "{\"source\":\"MODEL\",\"created_at\":\"2026-05-04T10:31:57Z\",\"content\":\"Hello! How can I help you today?\"}\n"
+            ),
+        )
+        .expect("write overview log");
+
+        let conversation = connector
+            .parse_brain_session_dir(&session_dir)
+            .expect("expected parsed conversation from overview log");
+
+        assert_eq!(conversation.agent_slug, "antigravity");
+        assert_eq!(conversation.external_id, "session-overview");
+        assert_eq!(conversation.messages.len(), 2);
+        assert_eq!(conversation.messages[0].role, "user");
+        assert_eq!(conversation.messages[1].role, "assistant");
+        assert!(conversation.source_mtime.is_some());
 
         let _ = fs::remove_dir_all(&temp_dir);
     }
