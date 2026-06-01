@@ -24,7 +24,7 @@ pub const RELEASES_URL: &str = "https://github.com/akhshyganesh/recall/releases"
 type AppResult<T> = Result<T, String>;
 
 #[derive(Serialize, TS)]
-#[ts(export, export_to = "../../../../packages/shared-types/src/generated/")]
+#[ts(export, export_to = "../gen/bindings/")]
 pub struct DetectedSourcePayload {
     pub name: String,
     pub agent_slug: String,
@@ -34,7 +34,7 @@ pub struct DetectedSourcePayload {
 }
 
 #[derive(Serialize, TS)]
-#[ts(export, export_to = "../../../../packages/shared-types/src/generated/")]
+#[ts(export, export_to = "../gen/bindings/")]
 pub struct AppInfoPayload {
     pub current_version: String,
     pub repository_url: String,

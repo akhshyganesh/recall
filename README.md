@@ -15,6 +15,23 @@
 
 Recall is a fast, lightweight terminal workspace built on Tauri 2 + Rust and React 19. It pairs a native PTY backend with a modern UI — multi-tab terminals, an integrated code editor, contextual session history, and git-aware development context. Under 10 MB on disk and no telemetry.
 
+## Known macOS notice
+
+If macOS shows:
+
+- `“Recall” is damaged and can’t be opened. You should move it to the Bin.`
+- `Apple could not verify “Recall” is free of malware...`
+
+that means the downloaded app build was not notarized by Apple yet.
+
+Known workaround from Terminal after moving the app into `/Applications`:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Recall.app
+```
+
+This is a known distribution issue for non-notarized macOS builds. The release workflow now supports Apple signing and notarization when the required Apple secrets are configured.
+
 ## Features
 
 **Terminal**
