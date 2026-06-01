@@ -2,7 +2,7 @@
 //!
 //! Every struct that crosses the Tauri IPC boundary is annotated with
 //! `#[derive(TS)]` so the matching TypeScript declarations can be
-//! regenerated into `packages/shared-types/src/generated/` via:
+//! regenerated into `src-tauri/gen/bindings/` via a Rust test run.
 //!
 //! ```sh
 //! pnpm types:generate
@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../../../packages/shared-types/src/generated/")]
+#[ts(export, export_to = "../gen/bindings/")]
 pub struct Session {
     pub id: String,
     pub tool: String,
@@ -43,7 +43,7 @@ pub struct Session {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../../../packages/shared-types/src/generated/")]
+#[ts(export, export_to = "../gen/bindings/")]
 pub struct Message {
     pub id: String,
     pub session_id: String,
@@ -57,7 +57,7 @@ pub struct Message {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../../../packages/shared-types/src/generated/")]
+#[ts(export, export_to = "../gen/bindings/")]
 pub struct FileChange {
     pub id: String,
     pub session_id: String,
@@ -70,7 +70,7 @@ pub struct FileChange {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../../../packages/shared-types/src/generated/")]
+#[ts(export, export_to = "../gen/bindings/")]
 pub struct SessionSummary {
     pub id: String,
     pub tool: String,
@@ -90,7 +90,7 @@ pub struct SessionSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../../../packages/shared-types/src/generated/")]
+#[ts(export, export_to = "../gen/bindings/")]
 pub struct SearchResult {
     pub id: String,
     pub tool: String,
@@ -107,7 +107,7 @@ pub struct SearchResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../../../packages/shared-types/src/generated/")]
+#[ts(export, export_to = "../gen/bindings/")]
 pub struct ActivityPoint {
     pub date: String,
     pub tool: String,
@@ -116,7 +116,7 @@ pub struct ActivityPoint {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../../../packages/shared-types/src/generated/")]
+#[ts(export, export_to = "../gen/bindings/")]
 pub struct DetectionResult {
     pub detected: bool,
     pub root_paths: Vec<String>,
@@ -124,7 +124,7 @@ pub struct DetectionResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../../../packages/shared-types/src/generated/")]
+#[ts(export, export_to = "../gen/bindings/")]
 pub struct ExportData {
     pub format: String,
     pub content: String,
@@ -132,14 +132,14 @@ pub struct ExportData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../../../packages/shared-types/src/generated/")]
+#[ts(export, export_to = "../gen/bindings/")]
 pub struct McpStatus {
     pub running: bool,
     pub endpoint: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../../../packages/shared-types/src/generated/")]
+#[ts(export, export_to = "../gen/bindings/")]
 pub struct Stats {
     #[ts(type = "number")]
     pub total_sessions: i64,

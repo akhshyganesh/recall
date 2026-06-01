@@ -8,21 +8,25 @@ on:
 
 jobs:
   release:
-    name: Build ${{ matrix.platform }}
+    name: Build ${{ matrix.name }}
     permissions:
       contents: write
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-latest
-            args: --target aarch64-apple-darwin
-          - platform: macos-latest
-            args: --target x86_64-apple-darwin
+          - name: macOS Apple Silicon
+            platform: macos-latest
+            rustTargets: aarch64-apple-darwin
+            args: --target aarch64-apple-darwin --bundles dmg
           - platform: ubuntu-22.04
-            args: ""
+            name: Ubuntu 22.04
+            rustTargets: ""
+            args: --bundles deb
           - platform: windows-latest
-            args: ""
+            name: Windows
+            rustTargets: ""
+            args: --bundles nsis
 
     runs-on: ${{ matrix.platform }}
 
@@ -51,7 +55,23 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.rustTargets }}
+
+      - name: Prepare Apple notarization key
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          # Raw App Store Connect API private key contents (.p8), stored as a secret.
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+        run: |
+          if [[ -z "$APPLE_API_KEY_CONTENT" ]]; then
+            exit 0
+          fi
+
+          key_path="$RUNNER_TEMP/AuthKey.p8"
+          printf '%s' "$APPLE_API_KEY_CONTENT" > "$key_path"
+          chmod 600 "$key_path"
+          echo "APPLE_API_KEY_PATH=$key_path" >> "$GITHUB_ENV"
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -73,6 +93,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # macOS signing certificate exported as base64-encoded .p12.
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          # Password for the exported APPLE_CERTIFICATE .p12 archive.
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # Signing identity name from Keychain Access / `security find-identity`.
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          # App Store Connect issuer ID for notarization.
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          # App Store Connect key ID paired with APPLE_API_KEY_CONTENT.
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: Recall ${{ github.ref_name }}

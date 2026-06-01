@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -11,6 +12,11 @@ function run(command, commandArgs, env = process.env) {
     stdio: 'inherit',
     env,
   });
+}
+
+function resolveTauriCliEntry() {
+  const localEntry = path.join(process.cwd(), 'node_modules', '@tauri-apps', 'cli', 'tauri.js');
+  return existsSync(localEntry) ? localEntry : null;
 }
 
 function shouldStripLinuxPathSegment(value, homeDirectory) {
@@ -81,8 +87,10 @@ if (changedKeys.length > 0) {
   );
 }
 
-const tauriCommand = process.platform === 'win32' ? 'tauri.cmd' : 'tauri';
-const tauriResult = run(tauriCommand, args, env);
+const tauriCliEntry = resolveTauriCliEntry();
+const tauriResult = tauriCliEntry
+  ? run(process.execPath, [tauriCliEntry, ...args], env)
+  : run(process.platform === 'win32' ? 'tauri.cmd' : 'tauri', args, env);
 
 if (tauriResult.error) {
   console.error(tauriResult.error.message);

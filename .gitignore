@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
+src-tauri/bindings/
+src-tauri/gen/bindings/
 
 # Editor directories and files
 .vscode/*
