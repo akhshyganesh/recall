@@ -718,8 +718,7 @@ impl Database {
                  ",
             supported_agent_filter("s.agent_slug")
         );
-        let mut param_values: Vec<Box<dyn rusqlite::types::ToSql>> =
-            vec![Box::new(since_date)];
+        let mut param_values: Vec<Box<dyn rusqlite::types::ToSql>> = vec![Box::new(since_date)];
         append_path_scope_filter(
             &mut sql,
             SESSION_PATH_EXPR_WITH_ALIAS,
@@ -731,9 +730,7 @@ impl Database {
         let params_ref: Vec<&dyn rusqlite::types::ToSql> =
             param_values.iter().map(|p| p.as_ref()).collect();
 
-        let mut stmt = conn
-            .prepare(&sql)
-            .map_err(|e| e.to_string())?;
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
 
         let rows = stmt
             .query_map(params_ref.as_slice(), |row| {

@@ -2,9 +2,9 @@ use tauri::{AppHandle, Manager};
 
 use crate::modules::git::operations;
 use crate::modules::git::types::{
-    DiscardEntry, GitBranchMutationResult, GitBranchSnapshot, GitCommitFileChange,
-    GitCommitResult, GitDiffContentResult, GitDiffResult, GitLogEntry, GitPanelSnapshot,
-    GitPushResult, GitRepoInfo, GitStatusSnapshot,
+    DiscardEntry, GitBranchMutationResult, GitBranchSnapshot, GitCommitFileChange, GitCommitResult,
+    GitDiffContentResult, GitDiffResult, GitLogEntry, GitPanelSnapshot, GitPushResult, GitRepoInfo,
+    GitStatusSnapshot,
 };
 use crate::modules::workspace::{WorkspaceEnv, WorkspaceRegistry};
 
@@ -96,8 +96,7 @@ pub async fn git_switch_remote_branch(
 ) -> Result<GitBranchMutationResult, String> {
     let workspace = WorkspaceEnv::from_option(workspace);
     blocking(app, move |r| {
-        operations::switch_remote_branch(r, &repo_root, &name, &workspace)
-            .map_err(Into::into)
+        operations::switch_remote_branch(r, &repo_root, &name, &workspace).map_err(Into::into)
     })
     .await
 }

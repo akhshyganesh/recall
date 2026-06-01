@@ -1,5 +1,7 @@
 use crate::modules::sessions::connectors::Connector;
-use crate::modules::sessions::models::{DetectionResult, NormalizedConversation, NormalizedMessage};
+use crate::modules::sessions::models::{
+    DetectionResult, NormalizedConversation, NormalizedMessage,
+};
 use similar::TextDiff;
 use std::collections::HashMap;
 use std::fs;

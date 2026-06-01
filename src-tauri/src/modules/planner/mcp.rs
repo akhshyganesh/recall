@@ -4,11 +4,11 @@ use axum::Router;
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
     model::{ServerCapabilities, ServerInfo},
-    schemars,
+    schemars, tool, tool_handler, tool_router,
     transport::streamable_http_server::{
         session::local::LocalSessionManager, StreamableHttpServerConfig, StreamableHttpService,
     },
-    tool, tool_handler, tool_router, ServerHandler,
+    ServerHandler,
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
@@ -83,7 +83,9 @@ impl PlannerMcpServerState {
             );
         let listener = tokio::net::TcpListener::bind(MCP_BIND_ADDRESS)
             .await
-            .map_err(|error| format!("Failed to bind planner MCP endpoint on {MCP_BIND_ADDRESS}: {error}"))?;
+            .map_err(|error| {
+                format!("Failed to bind planner MCP endpoint on {MCP_BIND_ADDRESS}: {error}")
+            })?;
         let router = Router::new().nest_service("/mcp", service);
 
         let task = tokio::spawn({
@@ -134,7 +136,9 @@ impl RecallPlannerMcpServer {
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct ListPlannerItemsRequest {
-    #[schemars(description = "Optional status/stage id filter. Uses the user's custom planner stages.")]
+    #[schemars(
+        description = "Optional status/stage id filter. Uses the user's custom planner stages."
+    )]
     status: Option<String>,
     #[schemars(description = "Include completed items when allowed by the planner access policy.")]
     include_completed: Option<bool>,
@@ -223,7 +227,12 @@ impl RecallPlannerMcpServer {
             visible_items(&document, true, None)
                 .into_iter()
                 .find(|item| item.id == args.item_id)
-                .ok_or_else(|| format!("Planner item '{}' was not found or is hidden by policy", args.item_id))
+                .ok_or_else(|| {
+                    format!(
+                        "Planner item '{}' was not found or is hidden by policy",
+                        args.item_id
+                    )
+                })
         }))
     }
 
@@ -232,7 +241,10 @@ impl RecallPlannerMcpServer {
         description = "Get the full planner snapshot allowed by the user's access policy, including sketch names, tags, and linked planner items only when sketch access is enabled."
     )]
     fn get_planner_snapshot(&self) -> String {
-        self.render_json(self.load_document().map(|document| visible_snapshot(&document)))
+        self.render_json(
+            self.load_document()
+                .map(|document| visible_snapshot(&document)),
+        )
     }
 }
 

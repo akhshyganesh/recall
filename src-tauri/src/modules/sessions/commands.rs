@@ -211,4 +211,3 @@ pub fn export_session(state: State<AppState>, id: String, format: String) -> App
         build_export(&session, format.as_str())
     })
 }
-

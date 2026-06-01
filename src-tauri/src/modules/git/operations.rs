@@ -8,10 +8,10 @@ use crate::modules::git::process::{
     read_text_file, run_git,
 };
 use crate::modules::git::types::{
-    DiscardEntry, GitBranchMutationResult, GitBranchSnapshot, GitCommitFileChange,
-    GitCommitResult, GitDiffContentResult, GitDiffResult, GitLocalBranch, GitLogEntry,
-    GitOutput, GitPanelSnapshot, GitPushResult, GitRemoteBranch, GitRepoInfo,
-    GitStatusSnapshot, TextSource, DEFAULT_TIMEOUT_SECS, NETWORK_TIMEOUT_SECS,
+    DiscardEntry, GitBranchMutationResult, GitBranchSnapshot, GitCommitFileChange, GitCommitResult,
+    GitDiffContentResult, GitDiffResult, GitLocalBranch, GitLogEntry, GitOutput, GitPanelSnapshot,
+    GitPushResult, GitRemoteBranch, GitRepoInfo, GitStatusSnapshot, TextSource,
+    DEFAULT_TIMEOUT_SECS, NETWORK_TIMEOUT_SECS,
 };
 use crate::modules::git::utils::{
     authorized_repo_root, canonical_dir, resolve_within_repo, split_upstream, ResolvedGitDirectory,
@@ -171,11 +171,7 @@ fn list_branches_inner(repo_root: &ResolvedGitDirectory) -> Result<GitBranchSnap
         .into_iter()
         .filter_map(parse_local_branch_line)
         .collect();
-    local_branches.sort_by(|a, b| {
-        b.current
-            .cmp(&a.current)
-            .then_with(|| a.name.cmp(&b.name))
-    });
+    local_branches.sort_by(|a, b| b.current.cmp(&a.current).then_with(|| a.name.cmp(&b.name)));
 
     let remote_lines = git_stdout_lines(
         &repo_root.workspace,
@@ -314,11 +310,7 @@ pub fn create_branch(
     let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
     ensure_git_available(&repo_root.workspace)?;
     let branch = validate_branch_name(&repo_root, name, "git branch creation failed")?;
-    let mut args: Vec<&OsStr> = vec![
-        OsStr::new("switch"),
-        OsStr::new("-c"),
-        OsStr::new(&branch),
-    ];
+    let mut args: Vec<&OsStr> = vec![OsStr::new("switch"), OsStr::new("-c"), OsStr::new(&branch)];
     if let Some(start) = start_point.filter(|value| !value.trim().is_empty()) {
         let validated = validate_start_point(&repo_root, start)?;
         args.push(OsStr::new(validated.as_str()));
@@ -367,7 +359,10 @@ fn validate_branch_name(
 fn validate_remote_branch_name(repo_root: &ResolvedGitDirectory, name: &str) -> Result<String> {
     let trimmed = name.trim();
     if trimmed.is_empty() {
-        return Err(GitError::command("git switch failed", "remote branch cannot be empty"));
+        return Err(GitError::command(
+            "git switch failed",
+            "remote branch cannot be empty",
+        ));
     }
     let (remote, short_name) = trimmed.split_once('/').ok_or_else(|| {
         GitError::command(
@@ -376,7 +371,10 @@ fn validate_remote_branch_name(repo_root: &ResolvedGitDirectory, name: &str) -> 
         )
     })?;
     if remote.is_empty() {
-        return Err(GitError::command("git switch failed", "missing remote name"));
+        return Err(GitError::command(
+            "git switch failed",
+            "missing remote name",
+        ));
     }
     validate_branch_name(repo_root, short_name, "git switch failed")?;
     let full_ref = format!("refs/remotes/{trimmed}");
@@ -592,12 +590,7 @@ pub fn unstage(
     if !looks_like_no_head(&output) {
         return ensure_success(&output, "git reset failed");
     }
-    let mut rm_args: Vec<OsString> = vec![
-        "rm".into(),
-        "--cached".into(),
-        "-r".into(),
-        "--".into(),
-    ];
+    let mut rm_args: Vec<OsString> = vec!["rm".into(), "--cached".into(), "-r".into(), "--".into()];
     for p in &resolved {
         rm_args.push(p.clone().into());
     }

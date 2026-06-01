@@ -2,14 +2,14 @@ use std::sync::Arc;
 
 use axum::Router;
 use rmcp::{
-    ServerHandler, tool, tool_handler, tool_router,
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
     model::{ServerCapabilities, ServerInfo},
-    schemars,
+    schemars, tool, tool_handler, tool_router,
     transport::streamable_http_server::{
-        StreamableHttpServerConfig, session::local::LocalSessionManager,
-        tower::StreamableHttpService,
+        session::local::LocalSessionManager, tower::StreamableHttpService,
+        StreamableHttpServerConfig,
     },
+    ServerHandler,
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
@@ -83,7 +83,9 @@ impl McpServerState {
             );
         let listener = tokio::net::TcpListener::bind(MCP_BIND_ADDRESS)
             .await
-            .map_err(|error| format!("Failed to bind sessions MCP endpoint on {MCP_BIND_ADDRESS}: {error}"))?;
+            .map_err(|error| {
+                format!("Failed to bind sessions MCP endpoint on {MCP_BIND_ADDRESS}: {error}")
+            })?;
         let router = Router::new().nest_service("/mcp", service);
 
         let task = tokio::spawn({
@@ -145,7 +147,9 @@ impl RecallSessionsMcpServer {
 struct ListSessionsRequest {
     #[schemars(description = "Maximum number of sessions to return. Defaults to 20.")]
     limit: Option<u32>,
-    #[schemars(description = "Filter to a single tool name, for example 'copilot' or 'claude-code'.")]
+    #[schemars(
+        description = "Filter to a single tool name, for example 'copilot' or 'claude-code'."
+    )]
     tool: Option<String>,
     #[schemars(description = "Filter to a repository or workspace path.")]
     path: Option<String>,
@@ -181,7 +185,9 @@ struct SessionLookupRequest {
 struct RelatedSessionsRequest {
     #[schemars(description = "Recall session id to use as the anchor.")]
     session_id: String,
-    #[schemars(description = "Maximum number of sessions to return per related bucket. Defaults to 10.")]
+    #[schemars(
+        description = "Maximum number of sessions to return per related bucket. Defaults to 10."
+    )]
     limit: Option<u32>,
 }
 
@@ -267,7 +273,10 @@ impl RecallSessionsMcpServer {
         name = "find_related_sessions",
         description = "Find related Recall sessions for an anchor session, grouped by same agent, same project, other agents in the same project, and same tool."
     )]
-    fn find_related_sessions(&self, Parameters(args): Parameters<RelatedSessionsRequest>) -> String {
+    fn find_related_sessions(
+        &self,
+        Parameters(args): Parameters<RelatedSessionsRequest>,
+    ) -> String {
         self.render_json(self.with_db(|db| {
             let anchor = db
                 .get_session(&args.session_id)?
@@ -301,7 +310,9 @@ impl RecallSessionsMcpServer {
                 .collect::<Vec<_>>();
             let other_agents_same_project = same_project_seed
                 .into_iter()
-                .filter(|session| session.id != anchor.id && session.agent_slug != anchor.agent_slug)
+                .filter(|session| {
+                    session.id != anchor.id && session.agent_slug != anchor.agent_slug
+                })
                 .take(limit)
                 .collect::<Vec<_>>();
             let same_tool = db

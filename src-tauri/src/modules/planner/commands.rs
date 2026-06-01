@@ -14,9 +14,7 @@ pub fn save_planner_document(document: PlannerDocument) -> AppResult<PlannerDocu
 }
 
 #[tauri::command]
-pub async fn get_planner_mcp_status(
-    state: State<'_, PlannerState>,
-) -> AppResult<PlannerMcpStatus> {
+pub async fn get_planner_mcp_status(state: State<'_, PlannerState>) -> AppResult<PlannerMcpStatus> {
     Ok(state.mcp.status().await)
 }
 

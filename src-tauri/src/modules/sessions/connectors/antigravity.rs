@@ -1,5 +1,7 @@
 use crate::modules::sessions::connectors::Connector;
-use crate::modules::sessions::models::{DetectionResult, NormalizedConversation, NormalizedMessage};
+use crate::modules::sessions::models::{
+    DetectionResult, NormalizedConversation, NormalizedMessage,
+};
 use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
