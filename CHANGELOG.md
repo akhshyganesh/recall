@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.0.3]
+
+- Fixed the macOS release workflow to choose ad-hoc signing via step outputs, so Apple certificate secrets are not accidentally forwarded into ad-hoc builds.
+- Shipped the recovery release after the `v1.0.2` macOS GitHub Actions run failed during certificate import.
+
 ## [1.0.2]
 
 - Allowed the macOS release workflow to fall back to ad-hoc signing when Apple certificate secrets are not configured.
