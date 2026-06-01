@@ -155,6 +155,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [focusedRowKey, setFocusedRowKey] = useState<string | null>(null);
+  const [branchPanelOpen, setBranchPanelOpen] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -205,11 +206,11 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   const canFetch = !scm.actionBusy && !sourceControl.busyAction;
   const branchBusy = !!scm.actionBusy?.startsWith("branch:");
   const branchQuery = scm.branchQuery.trim();
-  const visibleLocalBranches = scm.branchLocalMatches.slice(0, branchQuery ? 6 : 4);
-  const visibleRemoteBranches = scm.branchRemoteMatches.slice(
-    0,
-    branchQuery ? 6 : 4,
-  );
+  const visibleLocalBranches = scm.branchLocalMatches.slice(0, branchQuery ? 8 : 6);
+  const visibleRemoteBranches = scm.branchRemoteMatches.slice(0, branchQuery ? 8 : 6);
+  const totalBranchCount = scm.branchSnapshot
+    ? scm.branchSnapshot.localBranches.length + scm.branchSnapshot.remoteBranches.length
+    : null;
 
   const footerFeedback = useMemo(() => {
     if (scm.actionError)
@@ -543,29 +544,63 @@ export const SourceControlPanel = memo(function SourceControlPanel({
           </div>
         </header>
 
-        {onOpenGitGraph ? (
-          <button
-            type="button"
-            onClick={() => onOpenGitGraph()}
-            className="group flex shrink-0 cursor-pointer items-center gap-2 border-b border-border/40 px-3 py-2 text-left text-muted-foreground transition-colors hover:bg-foreground/4 hover:text-foreground"
-          >
-            <HugeiconsIcon
-              icon={GitBranchIcon}
-              size={13}
-              strokeWidth={1.85}
-              className="shrink-0"
-            />
-            <span className="flex-1 text-[12px] font-medium">Commit Graph</span>
-            <HugeiconsIcon
-              icon={ArrowRight01Icon}
-              size={12}
-              strokeWidth={2}
-              className="shrink-0 opacity-50 transition-transform group-hover:translate-x-0.5"
-            />
-          </button>
-        ) : null}
+        <div className="flex shrink-0 items-stretch border-b border-border/40">
+          {onOpenGitGraph ? (
+            <button
+              type="button"
+              onClick={() => onOpenGitGraph()}
+              className="group flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-3 py-2 text-left text-muted-foreground transition-colors hover:bg-foreground/4 hover:text-foreground"
+            >
+              <HugeiconsIcon
+                icon={GitBranchIcon}
+                size={13}
+                strokeWidth={1.85}
+                className="shrink-0"
+              />
+              <span className="min-w-0 flex-1 truncate text-[12px] font-medium">
+                Commit Graph
+              </span>
+              <HugeiconsIcon
+                icon={ArrowRight01Icon}
+                size={12}
+                strokeWidth={2}
+                className="shrink-0 opacity-50 transition-transform group-hover:translate-x-0.5"
+              />
+            </button>
+          ) : (
+            <div className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2">
+              <HugeiconsIcon
+                icon={GitBranchIcon}
+                size={13}
+                strokeWidth={1.85}
+                className="shrink-0 text-muted-foreground"
+              />
+              <span className="text-[12px] font-medium text-muted-foreground">
+                Branches
+              </span>
+            </div>
+          )}
+          {scm.panelState === "ready" && scm.status ? (
+            <button
+              type="button"
+              onClick={() => setBranchPanelOpen((v) => !v)}
+              aria-label="Toggle branch list"
+              className={cn(
+                "flex shrink-0 cursor-pointer items-center gap-1.5 border-l border-border/40 px-3 py-2 text-muted-foreground transition-colors hover:bg-foreground/4 hover:text-foreground",
+                branchPanelOpen && "bg-foreground/5 text-foreground",
+              )}
+            >
+              <HugeiconsIcon icon={GitBranchIcon} size={12} strokeWidth={1.9} />
+              {totalBranchCount !== null ? (
+                <span className="text-[11px] font-medium tabular-nums">
+                  {totalBranchCount}
+                </span>
+              ) : null}
+            </button>
+          ) : null}
+        </div>
 
-        {scm.panelState === "ready" && scm.status ? (
+        {scm.panelState === "ready" && scm.status && branchPanelOpen ? (
           <BranchManager
             branchQuery={scm.branchQuery}
             branchSnapshotLoaded={scm.branchSnapshot !== null}
@@ -573,17 +608,19 @@ export const SourceControlPanel = memo(function SourceControlPanel({
             fetchBusy={fetchBusy}
             actionBusy={!!scm.actionBusy || !!sourceControl.busyAction}
             canCreateBranch={scm.canCreateBranch}
-            currentBranch={scm.branchSnapshot?.current ?? scm.status.branch}
             exactLocalBranch={scm.exactLocalBranch}
             exactRemoteBranch={scm.exactRemoteBranch}
             localBranches={visibleLocalBranches}
             remoteBranches={visibleRemoteBranches}
+            statusAhead={scm.status.ahead}
+            statusBehind={scm.status.behind}
             onBranchQueryChange={scm.setBranchQuery}
             onFetchBranches={() => void scm.fetchBranches()}
             onRefreshBranches={() => void scm.refreshBranches()}
             onSwitchLocalBranch={(name) => void scm.switchLocalBranch(name)}
             onSwitchRemoteBranch={(name) => void scm.switchRemoteBranch(name)}
             onCreateBranch={(name) => void scm.createBranch(name)}
+            onPublishBranch={() => void scm.publishBranch()}
           />
         ) : null}
 
@@ -816,17 +853,19 @@ function BranchManager({
   fetchBusy,
   actionBusy,
   canCreateBranch,
-  currentBranch,
   exactLocalBranch,
   exactRemoteBranch,
   localBranches,
   remoteBranches,
+  statusAhead,
+  statusBehind,
   onBranchQueryChange,
   onFetchBranches,
   onRefreshBranches,
   onSwitchLocalBranch,
   onSwitchRemoteBranch,
   onCreateBranch,
+  onPublishBranch,
 }: {
   branchQuery: string;
   branchSnapshotLoaded: boolean;
@@ -834,205 +873,231 @@ function BranchManager({
   fetchBusy: boolean;
   actionBusy: boolean;
   canCreateBranch: boolean;
-  currentBranch: string | null;
   exactLocalBranch: GitLocalBranch | null;
   exactRemoteBranch: GitRemoteBranch | null;
   localBranches: GitLocalBranch[];
   remoteBranches: GitRemoteBranch[];
+  statusAhead: number;
+  statusBehind: number;
   onBranchQueryChange: (value: string) => void;
   onFetchBranches: () => void;
   onRefreshBranches: () => void;
   onSwitchLocalBranch: (name: string) => void;
   onSwitchRemoteBranch: (name: string) => void;
   onCreateBranch: (name: string) => void;
+  onPublishBranch: () => void;
 }) {
   const query = branchQuery.trim();
   const busy = actionBusy || branchBusy || fetchBusy;
-  const showSearchState = query.length > 0;
+
+  const unifiedItems = useMemo(() => {
+    const items: Array<{
+      key: string;
+      name: string;
+      type: "local" | "remote";
+      remoteName: string | null;
+      isCurrent: boolean;
+      hasUpstream: boolean;
+      actionLabel: string;
+      onAction: () => void;
+      disabled: boolean;
+    }> = [];
+
+    const sortedLocal = [...localBranches].sort((a, b) =>
+      a.current ? -1 : b.current ? 1 : 0,
+    );
+    for (const b of sortedLocal) {
+      items.push({
+        key: `local:${b.name}`,
+        name: b.name,
+        type: "local",
+        remoteName: null,
+        isCurrent: b.current,
+        hasUpstream: b.upstream !== null,
+        actionLabel: "Switch",
+        onAction: () => onSwitchLocalBranch(b.name),
+        disabled: busy,
+      });
+    }
+    for (const b of remoteBranches) {
+      items.push({
+        key: `remote:${b.name}`,
+        name: b.shortName,
+        type: "remote",
+        remoteName: b.remote,
+        isCurrent: false,
+        hasUpstream: true,
+        actionLabel: "Track",
+        onAction: () => onSwitchRemoteBranch(b.name),
+        disabled: busy,
+      });
+    }
+    return items;
+  }, [localBranches, remoteBranches, busy, onSwitchLocalBranch, onSwitchRemoteBranch]);
 
   return (
-    <div className="shrink-0 border-b border-border/40 bg-card/55 px-2.5 py-2">
-      <div className="rounded-sm border border-border/55 bg-background/95 p-2 shadow-sm">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/85">
-              Branches
-            </div>
-            <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
-              {currentBranch ? (
-                <>
-                  Current:{" "}
-                  <span className="font-mono text-foreground/85">{currentBranch}</span>
-                </>
-              ) : (
-                "Loading branch metadata"
-              )}
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <Button
-              size="xs"
-              variant="ghost"
-              className="h-7 px-2 text-[11px]"
-              disabled={busy}
-              onClick={onRefreshBranches}
-            >
-              Refresh
-            </Button>
-            <Button
-              size="xs"
-              variant="secondary"
-              className="h-7 px-2 text-[11px]"
-              disabled={busy}
-              onClick={onFetchBranches}
-            >
-              {fetchBusy ? "Fetching…" : "Fetch"}
-            </Button>
-          </div>
-        </div>
-
+    <div className="shrink-0 border-b border-border/40 bg-card/55">
+      {/* Search row */}
+      <div className="flex items-center gap-1 px-2 pb-1.5 pt-2">
         <Input
           value={branchQuery}
           onChange={(event) => onBranchQueryChange(event.target.value)}
-          placeholder="Search local or remote branches"
-          className="h-8 text-[12px]"
+          placeholder="Search branches…"
+          className="h-7 min-w-0 flex-1 text-[11.5px]"
           disabled={busy}
         />
-
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {query ? (
-            exactLocalBranch ? (
-              <Button
-                size="xs"
-                variant={exactLocalBranch.current ? "ghost" : "default"}
-                className="h-7 px-2 text-[11px]"
-                disabled={busy || exactLocalBranch.current}
-                onClick={() => onSwitchLocalBranch(exactLocalBranch.name)}
-              >
-                {exactLocalBranch.current ? "Current branch" : "Switch local"}
-              </Button>
-            ) : exactRemoteBranch ? (
-              <Button
-                size="xs"
-                className="h-7 px-2 text-[11px]"
-                disabled={busy}
-                onClick={() => onSwitchRemoteBranch(exactRemoteBranch.name)}
-              >
-                Track remote
-              </Button>
-            ) : (
-              <Button
-                size="xs"
-                className="h-7 px-2 text-[11px]"
-                disabled={busy || !canCreateBranch}
-                onClick={() => onCreateBranch(query)}
-              >
-                Create branch
-              </Button>
-            )
-          ) : null}
-        </div>
-
-        {!branchSnapshotLoaded ? (
-          <div className="mt-2 text-[10.5px] text-muted-foreground">
-            Loading branch list…
-          </div>
-        ) : (
-          <div className="mt-2 grid gap-2 md:grid-cols-2">
-            <BranchList
-              title="Local"
-              emptyLabel={
-                showSearchState ? "No matching local branches" : "No local branches"
-              }
-              items={localBranches.map((branch) => ({
-                key: branch.name,
-                name: branch.name,
-                meta: branch.upstream ?? (branch.current ? "current" : null),
-                active: branch.current,
-                disabled: busy || branch.current,
-                actionLabel: branch.current ? "Current" : "Switch",
-                onAction: () => onSwitchLocalBranch(branch.name),
-              }))}
-            />
-            <BranchList
-              title="Remote"
-              emptyLabel={
-                showSearchState ? "No matching remote branches" : "No remote branches"
-              }
-              items={remoteBranches.map((branch) => ({
-                key: branch.name,
-                name: branch.shortName,
-                meta: branch.remote,
-                disabled: busy,
-                actionLabel: "Track",
-                onAction: () => onSwitchRemoteBranch(branch.name),
-              }))}
-            />
-          </div>
-        )}
+        <IconActionButton
+          label="Refresh branches"
+          disabled={busy}
+          side="bottom"
+          onClick={onRefreshBranches}
+        >
+          <HugeiconsIcon icon={Refresh01Icon} size={13} strokeWidth={1.85} />
+        </IconActionButton>
+        <IconActionButton
+          label={fetchBusy ? "Fetching…" : "Fetch from remote"}
+          disabled={busy}
+          side="bottom"
+          onClick={onFetchBranches}
+        >
+          {fetchBusy ? (
+            <Spinner className="size-3" />
+          ) : (
+            <HugeiconsIcon icon={FolderCloudIcon} size={13} strokeWidth={1.85} />
+          )}
+        </IconActionButton>
       </div>
-    </div>
-  );
-}
 
-function BranchList({
-  title,
-  emptyLabel,
-  items,
-}: {
-  title: string;
-  emptyLabel: string;
-  items: {
-    key: string;
-    name: string;
-    meta: string | null;
-    active?: boolean;
-    disabled: boolean;
-    actionLabel: string;
-    onAction: () => void;
-  }[];
-}) {
-  return (
-    <div className="space-y-1.5">
-      <div className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/75">
-        {title}
-      </div>
-      {items.length === 0 ? (
-        <div className="rounded-sm border border-dashed border-border/55 px-2 py-2 text-[10.5px] text-muted-foreground/70">
-          {emptyLabel}
-        </div>
-      ) : (
-        items.map((item) => (
-          <div
-            key={item.key}
-            className="flex items-center gap-2 rounded-sm border border-border/45 bg-background/70 px-2 py-1.5"
-          >
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[11.5px] font-medium text-foreground/90">
-                {item.name}
-              </div>
-              {item.meta ? (
-                <div className="truncate text-[10px] text-muted-foreground">
-                  {item.meta}
-                </div>
-              ) : null}
-            </div>
-            {item.active ? (
-              <span className="shrink-0 rounded border border-border/60 px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                Current
-              </span>
-            ) : null}
+      {/* Quick action for exact search match */}
+      {query ? (
+        <div className="px-2 pb-1.5">
+          {exactLocalBranch ? (
             <Button
               size="xs"
-              variant="ghost"
-              className="h-6 shrink-0 px-2 text-[10.5px]"
-              disabled={item.disabled}
-              onClick={item.onAction}
+              variant={exactLocalBranch.current ? "ghost" : "default"}
+              className="h-6 px-2 text-[10.5px]"
+              disabled={busy || exactLocalBranch.current}
+              onClick={() => onSwitchLocalBranch(exactLocalBranch.name)}
             >
-              {item.actionLabel}
+              {exactLocalBranch.current ? "Current branch" : "Switch local"}
             </Button>
-          </div>
-        ))
+          ) : exactRemoteBranch ? (
+            <Button
+              size="xs"
+              className="h-6 px-2 text-[10.5px]"
+              disabled={busy}
+              onClick={() => onSwitchRemoteBranch(exactRemoteBranch.name)}
+            >
+              Track remote
+            </Button>
+          ) : canCreateBranch ? (
+            <Button
+              size="xs"
+              className="h-6 px-2 text-[10.5px]"
+              disabled={busy}
+              onClick={() => onCreateBranch(query)}
+            >
+              Create &ldquo;{query}&rdquo;
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Unified branch list */}
+      {!branchSnapshotLoaded ? (
+        <div className="px-3 pb-2.5 text-[10.5px] text-muted-foreground">
+          Loading branches…
+        </div>
+      ) : (
+        <div className="max-h-52 overflow-y-auto px-1.5 pb-2">
+          {unifiedItems.length === 0 ? (
+            <div className="px-2 py-2 text-[10.5px] text-muted-foreground/70">
+              No branches found
+            </div>
+          ) : (
+            unifiedItems.map((item) => (
+              <div
+                key={item.key}
+                className={cn(
+                  "group flex items-center gap-2 rounded-sm px-2 py-1.5",
+                  item.isCurrent
+                    ? "bg-foreground/5"
+                    : "hover:bg-foreground/4",
+                )}
+              >
+                {/* Branch name */}
+                <span className="min-w-0 flex-1 truncate font-mono text-[11.5px] font-medium text-foreground/90">
+                  {item.name}
+                </span>
+
+                {/* Type chip */}
+                <span
+                  className={cn(
+                    "shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em]",
+                    item.type === "local"
+                      ? "border-border/50 text-muted-foreground"
+                      : "border-border/40 text-muted-foreground/70",
+                  )}
+                >
+                  {item.type === "local" ? "local" : (item.remoteName ?? "remote")}
+                </span>
+
+                {/* Ahead/behind — current branch only */}
+                {item.isCurrent && (statusAhead > 0 || statusBehind > 0) ? (
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    {statusAhead > 0 ? (
+                      <span className="inline-flex items-center gap-0.5 rounded border border-border/50 px-1 py-0.5 text-[9.5px] tabular-nums text-muted-foreground">
+                        <HugeiconsIcon
+                          icon={ArrowUp01Icon}
+                          size={8}
+                          strokeWidth={2.5}
+                        />
+                        {statusAhead}
+                      </span>
+                    ) : null}
+                    {statusBehind > 0 ? (
+                      <span className="inline-flex items-center gap-0.5 rounded border border-border/50 px-1 py-0.5 text-[9.5px] tabular-nums text-muted-foreground">
+                        <HugeiconsIcon
+                          icon={ArrowDown01Icon}
+                          size={8}
+                          strokeWidth={2.5}
+                        />
+                        {statusBehind}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {/* Action */}
+                {item.isCurrent && item.hasUpstream ? (
+                  <span className="shrink-0 text-[9.5px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/60">
+                    current
+                  </span>
+                ) : item.isCurrent && !item.hasUpstream ? (
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    className="h-6 shrink-0 px-2 text-[10px] opacity-0 transition-opacity group-hover:opacity-100"
+                    disabled={busy}
+                    onClick={onPublishBranch}
+                  >
+                    Publish
+                  </Button>
+                ) : (
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    className="h-6 shrink-0 px-2 text-[10px] opacity-0 transition-opacity group-hover:opacity-100"
+                    disabled={item.disabled}
+                    onClick={item.onAction}
+                  >
+                    {item.actionLabel}
+                  </Button>
+                )}
+              </div>
+            ))
+          )}
+        </div>
       )}
     </div>
   );

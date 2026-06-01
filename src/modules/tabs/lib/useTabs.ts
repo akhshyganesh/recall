@@ -866,6 +866,19 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     for (const lid of toDispose) disposeSession(lid);
   }, []);
 
+  const reorderTab = useCallback((fromIndex: number, dropPosition: number) => {
+    setTabs((prev) => {
+      if (fromIndex < 0 || fromIndex >= prev.length) return prev;
+      const clampedDrop = Math.min(dropPosition, prev.length);
+      if (fromIndex === clampedDrop || fromIndex + 1 === clampedDrop) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      const insertAt = fromIndex < clampedDrop ? clampedDrop - 1 : clampedDrop;
+      next.splice(insertAt, 0, moved);
+      return next;
+    });
+  }, []);
+
   return {
     tabs,
     activeId,
@@ -892,5 +905,6 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     closeActivePane,
     closePaneByLeaf,
     resetWorkspace,
+    reorderTab,
   };
 }

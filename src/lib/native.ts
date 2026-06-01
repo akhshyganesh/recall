@@ -243,6 +243,11 @@ export const native = {
 			repoRoot,
 			workspace: currentWorkspaceEnv(),
 		}),
+	gitPublishBranch: (repoRoot: string) =>
+		invoke<GitPushResult>("git_publish_branch", {
+			repoRoot,
+			workspace: currentWorkspaceEnv(),
+		}),
 	gitLog: (repoRoot: string, options?: { limit?: number; beforeSha?: string }) =>
 		invoke<GitLogEntry[]>("git_log", {
 			repoRoot,

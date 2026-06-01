@@ -217,6 +217,7 @@ export default function App() {
     closeActivePane,
     closePaneByLeaf,
     resetWorkspace,
+    reorderTab,
   } = useTabs(getLaunchDir() ? { cwd: getLaunchDir() } : undefined);
 
   // Mirror `tabs` into a ref so callbacks scheduled with `setTimeout`
@@ -877,6 +878,9 @@ export default function App() {
       "search.focus": () => searchInlineRef.current?.focus(),
       "shortcuts.open": () => openSettingsTab("shortcuts"),
       "settings.open": () => openSettingsTab("general"),
+      "terminal.clear": () => {
+        if (activeLeafId !== null) terminalRefs.current.get(activeLeafId)?.clear();
+      },
       "sidebar.toggle": toggleSidebar,
       "explorer.focus": toggleExplorerFocus,
       "view.zoomIn": zoomIn,
@@ -891,6 +895,7 @@ export default function App() {
     }),
     [
       activeId,
+      activeLeafId,
       cycleTab,
       handleCloseTabOrPane,
       openNewTab,
@@ -914,6 +919,9 @@ export default function App() {
     (id: ShortcutId) => {
       if (id === "editor.undo" || id === "editor.redo") {
         return activeTab?.kind !== "editor";
+      }
+      if (id === "terminal.clear") {
+        return activeTab?.kind !== "terminal";
       }
       return false;
     },
@@ -1164,6 +1172,7 @@ export default function App() {
             onClose={handleClose}
             onRenameTab={handleRenameTab}
             onPin={pinTab}
+            onReorderTab={reorderTab}
             onToggleSidebar={toggleSidebar}
             onToggleSourceControl={toggleSourceControl}
             onSplit={splitActivePaneInActiveTab}
