@@ -1,0 +1,43 @@
+export const PLANNER_MCP_ENDPOINT = "http://127.0.0.1:45140/mcp";
+
+export const PLANNER_MCP_SETUP_STEPS = [
+  "Open Settings -> Planner MCP, review the Planner Access Policy, and enable the local MCP endpoint.",
+  "Point an MCP-capable terminal agent at the streamable HTTP endpoint.",
+  "Copy this skills.md content when the agent needs explicit planner instructions.",
+];
+
+export const PLANNER_MCP_SKILL_MARKDOWN = [
+  "---",
+  "name: recall-planner-mcp",
+  'description: "Use when the user asks an agent to inspect active Recall planner tasks, notes, timers, deadlines, or sketches through the local policy-filtered planner MCP endpoint."',
+  "---",
+  "",
+  "# Recall Planner MCP",
+  "",
+  "Use this skill when the user wants an agent to read their Recall planner context without manually copying tasks or notes into the chat.",
+  "",
+  "## Connection",
+  "",
+  "- Assume Recall is already open on the user's machine.",
+  `- Use the local streamable HTTP MCP endpoint at \`${PLANNER_MCP_ENDPOINT}\`.`,
+  "- If the endpoint is unavailable, ask the user to open **Settings -> Planner MCP** and enable Planner Connect.",
+  "",
+  "## What This MCP Exposes",
+  "",
+  "- `get_planner_access_policy`: the user's current data-sharing policy.",
+  "- `list_planner_items`: visible active tasks with status, priority, start date, deadline, tags, and optionally notes or timer details.",
+  "- `get_planner_item`: one visible task by id.",
+  "- `get_planner_snapshot`: the policy-filtered task list and optional sketch names, tags, and linked planner items.",
+  "",
+  "## Policy Rules",
+  "",
+  "- Treat missing notes, timers, completed items, archived items, or sketch content as intentionally hidden.",
+  "- Do not infer hidden notes or diagram details from titles alone.",
+  "- Summarize which policy gates are enabled before using planner context in an answer.",
+  "",
+  "## Limits",
+  "",
+  "- This MCP is read-only.",
+  "- It is available only while Recall is running and Planner MCP is enabled.",
+  "- It exposes only the planner data allowed by the current access policy.",
+].join("\n");

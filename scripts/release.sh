@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Bumps the version across the monorepo, commits, tags, and pushes.
-# The GitHub Actions Release workflow builds the binaries on the tag push.
+# Bumps Recall versions, validates the app, commits, tags, and pushes.
+# The GitHub Actions release workflow builds desktop artifacts from the tag.
 
 set -euo pipefail
 
 usage() {
   echo "Usage: $0 <version>" >&2
-  echo "Example: $0 0.5.0" >&2
+  echo "Example: $0 1.0.1" >&2
   exit 1
 }
 
@@ -32,7 +32,7 @@ TAG="v${VERSION}"
 
 require_command git
 require_command node
-require_command npm
+require_command pnpm
 require_command cargo
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
@@ -78,55 +78,54 @@ if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; the
   exit 1
 fi
 
-echo "Bumping package.json versions to ${VERSION}..."
-npm version "$VERSION" --no-git-tag-version --workspaces --include-workspace-root >/dev/null
-
-echo "Bumping tauri.conf.json and Cargo.toml to ${VERSION}..."
+echo "Bumping Recall to ${VERSION}..."
 node - "$VERSION" <<'NODE'
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs");
+const path = require("path");
 
 const version = process.argv[2];
 const root = process.cwd();
 
 function rewriteJson(relPath, patch) {
-  const p = path.join(root, relPath);
-  const json = JSON.parse(fs.readFileSync(p, 'utf8'));
+  const filePath = path.join(root, relPath);
+  const json = JSON.parse(fs.readFileSync(filePath, "utf8"));
   patch(json);
-  fs.writeFileSync(p, `${JSON.stringify(json, null, 2)}\n`);
+  fs.writeFileSync(filePath, `${JSON.stringify(json, null, 2)}\n`);
 }
 
 function rewriteCargoVersion(relPath) {
-  const p = path.join(root, relPath);
-  const original = fs.readFileSync(p, 'utf8');
+  const filePath = path.join(root, relPath);
+  const original = fs.readFileSync(filePath, "utf8");
   const updated = original.replace(
     /(\[package\][\s\S]*?^version\s*=\s*")([^"]+)(")/m,
-    `$1${version}$3`
+    `$1${version}$3`,
   );
   if (updated === original) {
-    throw new Error(`Failed to update version in ${p}`);
+    throw new Error(`Failed to update version in ${relPath}`);
   }
-  fs.writeFileSync(p, updated);
+  fs.writeFileSync(filePath, updated);
 }
 
-rewriteJson('apps/desktop/src-tauri/tauri.conf.json', (c) => { c.version = version; });
-rewriteCargoVersion('apps/desktop/src-tauri/Cargo.toml');
+rewriteJson("package.json", (json) => {
+  json.version = version;
+});
+rewriteJson("src-tauri/tauri.conf.json", (json) => {
+  json.version = version;
+});
+rewriteCargoVersion("src-tauri/Cargo.toml");
 NODE
 
 echo "Refreshing Cargo.lock..."
-cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml >/dev/null
+cargo check --manifest-path src-tauri/Cargo.toml >/dev/null
 
 echo "Running checks..."
-npm run check
+pnpm run check
 
 git add \
   package.json \
-  package-lock.json \
-  apps/desktop/package.json \
-  packages/shared-types/package.json \
-  apps/desktop/src-tauri/Cargo.toml \
-  apps/desktop/src-tauri/Cargo.lock \
-  apps/desktop/src-tauri/tauri.conf.json
+  src-tauri/Cargo.toml \
+  src-tauri/Cargo.lock \
+  src-tauri/tauri.conf.json
 
 git commit -m "chore(release): ${TAG}"
 git tag -a "$TAG" -m "$TAG"
@@ -135,4 +134,4 @@ git push origin "$TAG"
 
 echo
 echo "Released ${TAG} from ${CURRENT_BRANCH}."
-echo "The GitHub Actions Release workflow is now building the binaries."
+echo "The GitHub Actions release workflow is now building the binaries."

@@ -1,0 +1,35 @@
+---
+name: recall-sessions-mcp
+description: "Use when the user asks about previous Recall sessions, prior work by the same agent or other agents, session history across a repo, or transcript context that should be read through Recall's local MCP endpoint."
+---
+
+# Recall Sessions MCP
+
+Use this skill when you need prior context from Recall's indexed session database instead of re-asking the user.
+
+## Connection
+
+- Assume Recall is already open on the user's machine.
+- Use the local streamable HTTP MCP endpoint at `http://127.0.0.1:45139/mcp`.
+- If the endpoint is unavailable, tell the user to enable **Settings -> Integrations -> Recall Sessions MCP** in Recall, then retry.
+
+## What This MCP Exposes
+
+- `list_sessions`: recent indexed session summaries, filterable by tool, path, and date range.
+- `search_sessions`: full-text search over indexed session transcripts.
+- `get_session_detail`: full transcript, metadata, and file changes for a session id.
+- `find_related_sessions`: related work grouped by same agent, same project, other agents in the same project, and same tool.
+- `get_session_stats`: aggregate counts for indexed session history.
+
+## Usage Guidance
+
+- Prefer `find_related_sessions` when the user asks whether this agent or another agent has already worked on the same repo or task.
+- Prefer `search_sessions` when the user mentions a concept, file, bug, or decision but not a session id.
+- Use `get_session_detail` only after you have identified a promising session id from `list_sessions`, `search_sessions`, or `find_related_sessions`.
+- Summarize what you learned from Recall session history before acting on it.
+
+## Limits
+
+- This MCP only exposes Recall's indexed session database.
+- It is read-only.
+- It is available only while Recall is running and the setting is enabled.
