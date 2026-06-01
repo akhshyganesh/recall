@@ -57,12 +57,47 @@ jobs:
         with:
           targets: ${{ matrix.rustTargets }}
 
+      - name: Configure macOS signing mode
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+        run: |
+          if [[ -z "$APPLE_CERTIFICATE" && -z "$APPLE_CERTIFICATE_PASSWORD" && -z "$APPLE_SIGNING_IDENTITY" ]]; then
+            echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+            echo "Using ad-hoc macOS signing because Apple certificate secrets are not configured."
+            exit 0
+          fi
+
+          if [[ -z "$APPLE_CERTIFICATE" || -z "$APPLE_CERTIFICATE_PASSWORD" || -z "$APPLE_SIGNING_IDENTITY" ]]; then
+            echo "Configure all Apple signing secrets (APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY) or none of them." >&2
+            exit 1
+          fi
+
+          {
+            echo "APPLE_CERTIFICATE<<EOF"
+            printf '%s\n' "$APPLE_CERTIFICATE"
+            echo "EOF"
+            echo "APPLE_CERTIFICATE_PASSWORD=$APPLE_CERTIFICATE_PASSWORD"
+            echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY"
+            echo "APPLE_API_ISSUER=$APPLE_API_ISSUER"
+            echo "APPLE_API_KEY=$APPLE_API_KEY"
+            echo "APPLE_API_KEY_CONTENT<<EOF"
+            printf '%s\n' "$APPLE_API_KEY_CONTENT"
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+
       - name: Prepare Apple notarization key
         if: runner.os == 'macOS'
         shell: bash
         env:
           # Raw App Store Connect API private key contents (.p8), stored as a secret.
-          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+          APPLE_API_KEY_CONTENT: ${{ env.APPLE_API_KEY_CONTENT }}
         run: |
           if [[ -z "$APPLE_API_KEY_CONTENT" ]]; then
             exit 0
@@ -72,6 +107,36 @@ jobs:
           printf '%s' "$APPLE_API_KEY_CONTENT" > "$key_path"
           chmod 600 "$key_path"
           echo "APPLE_API_KEY_PATH=$key_path" >> "$GITHUB_ENV"
+
+      - name: Validate Apple signing certificate
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ env.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ env.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          if [[ -z "$APPLE_CERTIFICATE" ]]; then
+            echo "APPLE_CERTIFICATE is not set; skipping macOS certificate validation."
+            exit 0
+          fi
+
+          if [[ -z "$APPLE_CERTIFICATE_PASSWORD" ]]; then
+            echo "APPLE_CERTIFICATE_PASSWORD must be set when APPLE_CERTIFICATE is provided." >&2
+            exit 1
+          fi
+
+          cert_path="$RUNNER_TEMP/apple-signing-cert.p12"
+
+          if ! printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$cert_path" 2>/dev/null; then
+            echo "APPLE_CERTIFICATE is not valid base64. Export the .p12 from Keychain Access and encode it with: openssl base64 -A -in /path/to/certificate.p12 -out certificate-base64.txt" >&2
+            exit 1
+          fi
+
+          if ! openssl pkcs12 -in "$cert_path" -passin "pass:$APPLE_CERTIFICATE_PASSWORD" -nokeys -info >/dev/null 2>&1; then
+            echo "APPLE_CERTIFICATE decoded successfully but is not a readable .p12 with the configured APPLE_CERTIFICATE_PASSWORD." >&2
+            echo "Re-export the certificate from Keychain Access as a .p12, choose a new export password, base64-encode it with openssl base64 -A, and update both repository secrets." >&2
+            exit 1
+          fi
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -94,15 +159,15 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # macOS signing certificate exported as base64-encoded .p12.
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE: ${{ env.APPLE_CERTIFICATE }}
           # Password for the exported APPLE_CERTIFICATE .p12 archive.
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ env.APPLE_CERTIFICATE_PASSWORD }}
           # Signing identity name from Keychain Access / `security find-identity`.
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
           # App Store Connect issuer ID for notarization.
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_ISSUER: ${{ env.APPLE_API_ISSUER }}
           # App Store Connect key ID paired with APPLE_API_KEY_CONTENT.
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY: ${{ env.APPLE_API_KEY }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: Recall ${{ github.ref_name }}

@@ -47,7 +47,7 @@ The Tauri updater artifact signer expects these repository secrets:
 - `TAURI_SIGNING_PRIVATE_KEY`
 - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
 
-To avoid Gatekeeper showing “Recall is damaged” / “Apple could not verify” on downloaded macOS builds, the release workflow also needs Apple signing and notarization secrets:
+To avoid Gatekeeper showing “Recall is damaged” / “Apple could not verify” on downloaded macOS builds, the release workflow can also use Apple signing and notarization secrets:
 
 - `APPLE_CERTIFICATE`
 - `APPLE_CERTIFICATE_PASSWORD`
@@ -55,6 +55,22 @@ To avoid Gatekeeper showing “Recall is damaged” / “Apple could not verify�
 - `APPLE_API_ISSUER`
 - `APPLE_API_KEY`
 - `APPLE_API_KEY_CONTENT`
+
+These Apple secrets are optional. If they are not configured, the macOS release job falls back to ad-hoc signing by setting `APPLE_SIGNING_IDENTITY=-`, which still allows the workflow to produce a `.dmg` but without Apple-backed code signing or notarization.
+
+`APPLE_CERTIFICATE` must be the base64 contents of an exported `.p12` signing certificate, not the raw `.cer` file and not a PEM block. The export flow that matches Tauri's CI expectations is:
+
+```sh
+openssl base64 -A -in /path/to/certificate.p12 -out certificate-base64.txt
+```
+
+Set the contents of `certificate-base64.txt` as the `APPLE_CERTIFICATE` repository secret, and set the password you chose while exporting the `.p12` as `APPLE_CERTIFICATE_PASSWORD`.
+
+If the macOS release job fails with `SecKeychainItemImport` / `failed to import keychain certificate`, the usual cause is one of:
+
+- `APPLE_CERTIFICATE` contains something other than a base64-encoded `.p12`
+- `APPLE_CERTIFICATE_PASSWORD` does not match the exported `.p12`
+- the exported certificate is not a valid `Developer ID Application` / Apple distribution identity
 
 `GITHUB_TOKEN` is provided automatically by GitHub Actions.
 
