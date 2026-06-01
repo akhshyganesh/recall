@@ -48,6 +48,7 @@ type Props = {
   onRenameTab: (id: number, title: string) => void;
   /** Promote a preview (transient) tab to persistent. */
   onPin: (id: number) => void;
+  onReorderTab: (fromIndex: number, dropPosition: number) => void;
   onToggleSidebar: () => void;
   onToggleSourceControl: () => void;
   onSplit: (dir: "row" | "col") => void;
@@ -81,6 +82,7 @@ export function Header({
   onClose,
   onRenameTab,
   onPin,
+  onReorderTab,
   onToggleSidebar,
   onToggleSourceControl,
   onSplit,
@@ -220,7 +222,7 @@ export function Header({
       {/* Tab row */}
       <div
         data-tauri-drag-region
-        className={`flex h-12 items-center gap-2 bg-card/65 ${
+        className={`flex h-10 items-center gap-2 bg-card/65 ${
           IS_MAC ? "pr-2 pl-20" : "pr-0 pl-2"
         }`}
       >
@@ -258,6 +260,7 @@ export function Header({
             onClose={onClose}
             onRename={onRenameTab}
             onPin={onPin}
+            onReorder={onReorderTab}
             compact={compact}
           />
           <div data-tauri-drag-region className="h-full min-w-2 flex-1" />

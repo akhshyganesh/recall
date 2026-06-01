@@ -7,6 +7,7 @@ export type TerminalPaneHandle = {
   focus: () => void;
   getBuffer: (maxLines?: number) => string | null;
   getSelection: () => string | null;
+  clear: () => void;
 };
 
 type Props = {
@@ -54,6 +55,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
         focus: () => session.focus(),
         getBuffer: (max?: number) => session.getBuffer(max),
         getSelection: () => session.getSelection(),
+        clear: () => session.clear(),
       }),
       [session],
     );

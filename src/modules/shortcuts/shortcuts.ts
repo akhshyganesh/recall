@@ -31,7 +31,8 @@ export type ShortcutId =
   | "settings.open"
   | "sidebar.toggle"
   | "editor.undo"
-  | "editor.redo";
+  | "editor.redo"
+  | "terminal.clear";
 
 export type ShortcutGroup =
   | "General"
@@ -68,6 +69,12 @@ export const SHORTCUTS: Shortcut[] = [
   {
     id: "shortcuts.open",
     label: "Show keyboard shortcuts",
+    group: "General",
+    defaultBindings: [{ [MOD_PROP]: true, key: "l" }],
+  },
+  {
+    id: "terminal.clear",
+    label: "Clear terminal",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, key: "k" }],
   },

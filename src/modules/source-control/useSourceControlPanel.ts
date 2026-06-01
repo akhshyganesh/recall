@@ -96,6 +96,7 @@ type SourceControlPanelState = {
   switchLocalBranch: (name: string) => Promise<void>;
   switchRemoteBranch: (name: string) => Promise<void>;
   createBranch: (name: string) => Promise<void>;
+  publishBranch: () => Promise<void>;
   selectEntry: (entry: SourceControlEntry) => Promise<void>;
   selectFile: (entry: SourceControlFileEntry) => Promise<void>;
   stageEntry: (entry: SourceControlEntry) => Promise<void>;
@@ -692,6 +693,18 @@ export function useSourceControlPanel(
     [branchResults.exactRemoteMatch, repo, runBranchAction],
   );
 
+  const publishBranch = useCallback(async () => {
+    if (!repo) return;
+    await runBranchAction(
+      "branch:publish",
+      () => "Branch published to remote",
+      async () => {
+        const result = await native.gitPublishBranch(repo.repoRoot);
+        return { branch: result.branch ?? "" };
+      },
+    );
+  }, [repo, runBranchAction]);
+
   const unstageEntry = useCallback(
     async (entry: SourceControlEntry) => {
       if (!repo) return;
@@ -928,6 +941,7 @@ export function useSourceControlPanel(
     switchLocalBranch,
     switchRemoteBranch,
     createBranch,
+    publishBranch,
     selectEntry,
     selectFile,
     stageEntry,

@@ -429,9 +429,14 @@ export function useTerminalSession({
     return sel.length > 0 ? sel : null;
   }, [leafId]);
 
+  const clear = useCallback(() => {
+    const slot = getSlotForLeaf(leafId);
+    if (slot) slot.term.clear();
+  }, [leafId]);
+
   return useMemo(
-    () => ({ write, focus, getBuffer, getSelection }),
-    [write, focus, getBuffer, getSelection],
+    () => ({ write, focus, getBuffer, getSelection, clear }),
+    [write, focus, getBuffer, getSelection, clear],
   );
 }
 

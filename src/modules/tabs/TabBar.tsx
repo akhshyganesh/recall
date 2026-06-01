@@ -30,7 +30,7 @@ import {
   Settings01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { EditorTab, MediaTab, Tab, TerminalTab } from "./lib/useTabs";
 
 type Props = {
@@ -46,6 +46,7 @@ type Props = {
   onRename: (id: number, title: string) => void;
   /** Pin (promote) a preview tab to persistent on double-click. */
   onPin: (id: number) => void;
+  onReorder?: (fromIndex: number, dropPosition: number) => void;
   compact?: boolean;
 };
 
@@ -61,6 +62,7 @@ export function TabBar({
   onClose,
   onRename,
   onPin,
+  onReorder,
   compact,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -68,6 +70,11 @@ export function TabBar({
   const skipRenameBlurRef = useRef(false);
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
+  const [dropIdx, setDropIdx] = useState<number | null>(null);
+  // Refs hold the latest drag state so pointer-event handlers never go stale.
+  const dragStartRef = useRef<{ x: number; idx: number } | null>(null);
+  const dragActiveRef = useRef<{ draggingIdx: number; dropIdx: number } | null>(null);
   const terminalLabels = useMemo(() => buildTerminalLabels(tabs), [tabs]);
 
   // Horizontal wheel scroll without holding shift.
@@ -127,11 +134,65 @@ export function TabBar({
     closeRename();
   };
 
+  const computeDropIdx = (clientX: number): number => {
+    const tabEls = Array.from(scrollRef.current?.querySelectorAll("[data-tab-id]") ?? []);
+    for (let j = 0; j < tabEls.length; j++) {
+      const rect = tabEls[j].getBoundingClientRect();
+      if (clientX < rect.left + rect.width / 2) return j;
+    }
+    return tabEls.length;
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!onReorder || e.button !== 0) return;
+    const tabEl = (e.target as Element).closest("[data-tab-id]");
+    if (!tabEl) return;
+    const tabId = Number(tabEl.getAttribute("data-tab-id"));
+    const idx = tabs.findIndex((t) => t.id === tabId);
+    if (idx < 0) return;
+    dragStartRef.current = { x: e.clientX, idx };
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const start = dragStartRef.current;
+    if (!start || !onReorder) return;
+    if (draggingIdx === null) {
+      if (Math.abs(e.clientX - start.x) <= 5) return;
+      // Threshold crossed — start drag
+      const newDrop = computeDropIdx(e.clientX);
+      dragActiveRef.current = { draggingIdx: start.idx, dropIdx: newDrop };
+      setDraggingIdx(start.idx);
+      setDropIdx(newDrop);
+      scrollRef.current?.setPointerCapture(e.pointerId);
+    } else {
+      const newDrop = computeDropIdx(e.clientX);
+      dragActiveRef.current = { draggingIdx, dropIdx: newDrop };
+      setDropIdx(newDrop);
+    }
+  };
+
+  const handlePointerUp = () => {
+    const active = dragActiveRef.current;
+    if (active !== null && onReorder) {
+      onReorder(active.draggingIdx, active.dropIdx);
+    }
+    dragStartRef.current = null;
+    dragActiveRef.current = null;
+    setDraggingIdx(null);
+    setDropIdx(null);
+  };
+
   return (
     <div
       ref={scrollRef}
-      data-tauri-drag-region
-      className="min-w-0 shrink overflow-x-auto rounded-full bg-background/65 p-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className={cn(
+        "min-w-0 shrink overflow-x-auto rounded-full bg-background/65 p-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        draggingIdx !== null && "cursor-grabbing select-none",
+      )}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
     >
       <div className="flex w-max items-center gap-1">
         <Tabs
@@ -139,107 +200,148 @@ export function TabBar({
           onValueChange={(v) => onSelect(Number(v))}
         >
           <TabsList className="h-7 w-max gap-1 rounded-full bg-transparent p-0">
-            {tabs.map((t) => {
-              const isPreview =
-                (t.kind === "editor" && (t as EditorTab).preview) ||
-                (t.kind === "media" && (t as MediaTab).preview);
-              const label = labelFor(t, terminalLabels);
-              return (
-                <ContextMenu key={t.id}>
-                  <ContextMenuTrigger asChild>
-                    <TabsTrigger
-                      value={String(t.id)}
-                      data-tab-id={t.id}
-                      title={tooltipFor(t, label)}
-                      onDoubleClick={() => isPreview && onPin(t.id)}
-                      className={cn(
-                        "group h-7 shrink-0 justify-between gap-1.5 rounded-full border-0 text-xs font-semibold text-muted-foreground transition-all data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-sm hover:bg-muted hover:text-foreground",
-                        compact
-                          ? "px-1.5!"
-                          : tabs.length === 1
-                            ? "px-2!"
-                            : "ps-2! pe-1!",
-                      )}
-                    >
-                      <span
+            {(() => {
+              const items: ReactNode[] = [];
+              tabs.forEach((t, i) => {
+                const isPreview =
+                  (t.kind === "editor" && (t as EditorTab).preview) ||
+                  (t.kind === "media" && (t as MediaTab).preview);
+                const label = labelFor(t, terminalLabels);
+                const isDragging = draggingIdx === i;
+                const showDropBefore =
+                  onReorder &&
+                  dropIdx === i &&
+                  draggingIdx !== null &&
+                  draggingIdx !== i &&
+                  draggingIdx !== i - 1;
+
+                if (showDropBefore) {
+                  items.push(
+                    <div
+                      key={`drop-${i}`}
+                      aria-hidden
+                      className="w-0.5 shrink-0 self-stretch rounded-full bg-primary/70 my-0.5"
+                    />,
+                  );
+                }
+
+                items.push(
+                  <ContextMenu key={t.id}>
+                    <ContextMenuTrigger asChild>
+                      <TabsTrigger
+                        value={String(t.id)}
+                        data-tab-id={t.id}
+                        title={tooltipFor(t, label)}
+                        onDoubleClick={() => isPreview && onPin(t.id)}
                         className={cn(
-                          "flex items-center gap-1.5 truncate",
-                          compact ? "max-w-48" : "max-w-80",
+                          "group h-7 shrink-0 justify-between gap-1.5 rounded-full border-0 text-xs font-semibold text-muted-foreground transition-all data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-sm hover:bg-muted hover:text-foreground",
+                          compact
+                            ? "px-1.5!"
+                            : tabs.length === 1
+                              ? "px-2!"
+                              : "ps-2! pe-1!",
+                          onReorder && "cursor-grab",
+                          isDragging && "opacity-40 cursor-grabbing",
                         )}
                       >
-                        <TabIcon tab={t} />
-                        {renamingId === t.id ? (
-                          <input
-                            ref={renameInputRef}
-                            value={renameValue}
-                            onChange={(e) => setRenameValue(e.target.value)}
-                            onClick={(e) => e.stopPropagation()}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onBlur={commitRename}
-                            onKeyDown={(e) => {
+                        <span
+                          className={cn(
+                            "flex items-center gap-1.5 truncate",
+                            compact ? "max-w-48" : "max-w-80",
+                          )}
+                        >
+                          <TabIcon tab={t} />
+                          {renamingId === t.id ? (
+                            <input
+                              ref={renameInputRef}
+                              value={renameValue}
+                              onChange={(e) => setRenameValue(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onBlur={commitRename}
+                              onKeyDown={(e) => {
+                                e.stopPropagation();
+                                if (e.key === "Enter") commitRename();
+                                if (e.key === "Escape") cancelRename();
+                              }}
+                              className="h-5 min-w-18 rounded-md border border-border/70 bg-background px-1.5 text-xs text-foreground outline-none"
+                            />
+                          ) : (
+                            <span className={cn("truncate", isPreview && "italic")}>
+                              {label}
+                            </span>
+                          )}
+                          {t.kind === "editor" && t.dirty ? (
+                            <span
+                              aria-label="Unsaved changes"
+                              className="size-1.5 shrink-0 rounded-full bg-foreground/70"
+                            />
+                          ) : null}
+                        </span>
+                        {tabs.length > 1 && (
+                          <span
+                            role="button"
+                            aria-label="Close tab"
+                            onClick={(e) => {
                               e.stopPropagation();
-                              if (e.key === "Enter") commitRename();
-                              if (e.key === "Escape") cancelRename();
+                              onClose(t.id);
                             }}
-                            className="h-5 min-w-18 rounded-md border border-border/70 bg-background px-1.5 text-xs text-foreground outline-none"
-                          />
-                        ) : (
-                          <span className={cn("truncate", isPreview && "italic")}>
-                            {label}
+                            className="rounded-full p-0.5 opacity-0 transition-opacity hover:bg-accent hover:opacity-100 group-hover:opacity-60"
+                          >
+                            <HugeiconsIcon
+                              icon={Cancel01Icon}
+                              size={11}
+                              strokeWidth={2}
+                            />
                           </span>
                         )}
-                        {t.kind === "editor" && t.dirty ? (
-                          <span
-                            aria-label="Unsaved changes"
-                            className="size-1.5 shrink-0 rounded-full bg-foreground/70"
-                          />
-                        ) : null}
-                      </span>
-                      {tabs.length > 1 && (
-                        <span
-                          role="button"
-                          aria-label="Close tab"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onClose(t.id);
-                          }}
-                          className="rounded-full p-0.5 opacity-0 transition-opacity hover:bg-accent hover:opacity-100 group-hover:opacity-60"
-                        >
-                          <HugeiconsIcon
-                            icon={Cancel01Icon}
-                            size={11}
-                            strokeWidth={2}
-                          />
-                        </span>
-                      )}
-                    </TabsTrigger>
-                  </ContextMenuTrigger>
-                  <ContextMenuContent className="min-w-40 rounded-md">
-                    <ContextMenuItem onSelect={() => beginRename(t)}>
-                      <HugeiconsIcon
-                        icon={PencilEdit02Icon}
-                        size={14}
-                        strokeWidth={1.75}
-                      />
-                      Rename tab
-                    </ContextMenuItem>
-                    {tabs.length > 1 ? (
-                      <>
-                        <ContextMenuSeparator />
-                        <ContextMenuItem onSelect={() => onClose(t.id)}>
-                          <HugeiconsIcon
-                            icon={Cancel01Icon}
-                            size={14}
-                            strokeWidth={1.75}
-                          />
-                          Close tab
-                        </ContextMenuItem>
-                      </>
-                    ) : null}
-                  </ContextMenuContent>
-                </ContextMenu>
-              );
-            })}
+                      </TabsTrigger>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent className="min-w-40 rounded-md">
+                      <ContextMenuItem onSelect={() => beginRename(t)}>
+                        <HugeiconsIcon
+                          icon={PencilEdit02Icon}
+                          size={14}
+                          strokeWidth={1.75}
+                        />
+                        Rename tab
+                      </ContextMenuItem>
+                      {tabs.length > 1 ? (
+                        <>
+                          <ContextMenuSeparator />
+                          <ContextMenuItem onSelect={() => onClose(t.id)}>
+                            <HugeiconsIcon
+                              icon={Cancel01Icon}
+                              size={14}
+                              strokeWidth={1.75}
+                            />
+                            Close tab
+                          </ContextMenuItem>
+                        </>
+                      ) : null}
+                    </ContextMenuContent>
+                  </ContextMenu>,
+                );
+              });
+
+              // Drop indicator after the last tab
+              if (
+                onReorder &&
+                dropIdx === tabs.length &&
+                draggingIdx !== null &&
+                draggingIdx !== tabs.length - 1
+              ) {
+                items.push(
+                  <div
+                    key="drop-end"
+                    aria-hidden
+                    className="w-0.5 shrink-0 self-stretch rounded-full bg-primary/70 my-0.5"
+                  />,
+                );
+              }
+
+              return items;
+            })()}
           </TabsList>
         </Tabs>
         <DropdownMenu>

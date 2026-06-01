@@ -706,6 +706,36 @@ pub fn commit(
     })
 }
 
+pub fn publish_branch(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<GitPushResult> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+
+    let branch = git_stdout_line_opt(
+        &repo_root.workspace,
+        &repo_root.git_path,
+        ["rev-parse", "--abbrev-ref", "HEAD"],
+    )?
+    .ok_or_else(|| GitError::command("git publish", "not on a branch (detached HEAD)"))?;
+
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["push", "--set-upstream", "origin", "HEAD"],
+        NETWORK_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git push --set-upstream failed")?;
+
+    Ok(GitPushResult {
+        remote: Some("origin".to_string()),
+        branch: Some(branch),
+        pushed: true,
+    })
+}
+
 pub fn push(
     registry: &WorkspaceRegistry,
     repo_root: &str,

@@ -252,6 +252,19 @@ pub async fn git_push(
 }
 
 #[tauri::command]
+pub async fn git_publish_branch(
+    repo_root: String,
+    workspace: Option<WorkspaceEnv>,
+    app: AppHandle,
+) -> Result<GitPushResult, String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    blocking(app, move |r| {
+        operations::publish_branch(r, &repo_root, &workspace).map_err(Into::into)
+    })
+    .await
+}
+
+#[tauri::command]
 pub async fn git_log(
     repo_root: String,
     limit: Option<u32>,
