@@ -1,128 +1,107 @@
-# Recall
+<div align="center">
+  <img src="public/logo.png" width="144" height="144" alt="Recall" />
+  <h1>Recall</h1>
 
-> Local, private search across your AI coding session history — Copilot, Claude Code, Cursor, Antigravity, Aider, Codex, Cline, Gemini, and more.
+  <p><strong>Open-source lightweight terminal workspace</strong></p>
 
-Recall scans the session files that AI coding assistants already write to your disk, normalizes them into a single SQLite database with full-text search, and gives you a fast desktop UI to browse, search, favorite, and export them. **Everything stays local.** No network calls, no telemetry, no account.
+  <p>
+    <img src="https://img.shields.io/github/v/release/akhshyganesh/recall?label=version&color=blue" alt="version" />
+    <img src="https://img.shields.io/badge/license-Apache--2.0-green" alt="license" />
+    <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey" alt="platform" />
+  </p>
+</div>
 
-<p align="center">
-  <img src="docs/screenshots/welcome.png" alt="Recall home screen" width="760" />
-  <br/>
-  <em>Welcome screen — every detected AI tool at a glance.</em>
-</p>
+---
 
-<p align="center">
-  <img src="docs/screenshots/session-chat.png" alt="A rendered session" width="760" />
-  <br/>
-  <em>A session rendered with messages, diffs, and tool calls.</em>
-</p>
-
-## Why
-
-Modern AI tools produce enormous amounts of useful context — edits, reasoning, tool calls, file diffs — and then bury it in tool-specific storage formats that disappear the moment you close the pane. Recall turns that history into something you own and can query.
+Recall is a fast, lightweight terminal workspace built on Tauri 2 + Rust and React 19. It pairs a native PTY backend with a modern UI — multi-tab terminals, an integrated code editor, contextual session history, and git-aware development context. Under 10 MB on disk and no telemetry.
 
 ## Features
 
-- **9 connectors** out of the box: GitHub Copilot (VS Code & CLI), Claude Code, Cursor, Antigravity, Aider, OpenAI Codex, Cline, Gemini.
-- **Unified view**: every session rendered with the same message/diff/tool-call pipeline, regardless of vendor.
-- **Full-text search** via SQLite FTS5 with snippet highlighting.
-- **Activity heatmap**, per-tool breakdown, per-repo filtering.
-- **Favorites and tabs** for sessions you keep coming back to.
-- **Exports**: Markdown, JSON, or plain text, any session, any time.
-- **Incremental rescan** every 30 s so new sessions show up automatically.
-- **Auto-update check** against GitHub Releases.
-- **Local-first, offline-first**: SQLite on-disk, no cloud, no telemetry.
+**Terminal**
+- xterm.js + WebGL renderer, multi-tab with background streaming
+- Native PTY backend via `portable-pty` (zsh, bash, pwsh, …)
+- Shell integration (cwd reporting, prompt markers) via injected init scripts
+- Inline search, link detection, true-color
 
-## Install
+**Editor**
+- CodeMirror 6 with language support for TS/JS, Rust, Python, HTML/CSS, JSON, Markdown
+- Vim mode
+- Prebuilt themes: Tokyo Night, Nord, GitHub, Atom One, Aura, Copilot, Xcode
 
-Prebuilt binaries for macOS (arm64), Linux (x86_64), and Windows (x64) are published on the [Releases page](https://github.com/akhshyganesh/recall/releases).
+**Session History**
+- Indexed local session history with search, activity heatmaps, and export to Markdown, JSON, or text
 
-### macOS — "damaged and can't be opened"
+**File Explorer**
+- Catppuccin icon theme (Material Icon Theme resolver)
+- Fuzzy search, keyboard navigation, inline rename, context actions
 
-macOS Gatekeeper quarantines unsigned apps downloaded from the internet. Because Recall is not notarized with an Apple Developer certificate, macOS will block it with a misleading "damaged" error. To fix this, open Terminal and run:
+**Web Preview**
+- Auto-detects local dev servers and opens them in a preview tab
 
-```sh
-xattr -cr /Applications/Recall.app
+**Quality**
+- Lightweight and fast (~7 MB bundle)
+- No telemetry, no account required
+
+## Windows notes
+
+- **SmartScreen warning**: Windows will show "Windows protected your PC" on first launch because we (temporarily) don't have a code-signing certificate yet. Click **More info** → **Run anyway**. This is normal for unsigned open-source apps.
+
+The default shell is detected in this order: `pwsh.exe` (PowerShell 7+) → `powershell.exe` (Windows PowerShell 5.1) → `cmd.exe`.
+
+## Linux notes
+
+- **Arch / AUR**: install via `yay -S recall-bin` (or `paru`, etc.). Tracks the latest release.
+- **AppImage**: needs FUSE. Without it: `./Recall_*.AppImage --appimage-extract-and-run`. On Wayland with rendering glitches, try `WEBKIT_DISABLE_DMABUF_RENDERER=1`; otherwise use the `.deb` / `.rpm` which link against the system's GTK stack.
+- **Snap-packaged editors**: if you run Recall from Snap-packaged VS Code or a Snap shell, the repo's `pnpm run tauri ...` wrapper strips Snap-only GTK/runtime paths before launch to avoid host glibc symbol lookup failures.
+
+## Build from source
+
+**Prerequisites**
+- Rust (stable) — https://rustup.rs
+- Node 20+ and [pnpm](https://pnpm.io)
+- Platform-specific Tauri prerequisites — https://tauri.app/start/prerequisites/
+
+**Ubuntu / Debian**
+```bash
+sudo apt update
+sudo apt install pkg-config build-essential curl wget file libssl-dev libxdo-dev libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev libsoup-3.0-dev libayatana-appindicator3-dev librsvg2-dev
 ```
 
-This strips the quarantine attribute. The app itself is fine — Apple simply displays this message for all unsigned downloads on macOS Ventura and later.
-
-## Repository layout
-
-```
-.
-├── apps/
-│   └── desktop/          # Tauri 2 + React 19 desktop app
-│       ├── src/          # Frontend (React, hooks, components)
-│       └── src-tauri/    # Rust backend: DB, indexer, connectors
-├── packages/
-│   └── shared-types/     # TS types generated from Rust via ts-rs
-├── docs/
-│   ├── architecture.md   # System design
-│   ├── connectors.md     # How to add a new connector
-│   ├── development.md    # Local setup
-│   └── release.md        # Release engineering
-├── scripts/
-│   └── release.sh        # Version bump + tag
-└── .github/
-    └── workflows/        # CI + Release pipelines
+You can verify the Linux native prerequisites before starting Tauri with:
+```bash
+pnpm run tauri:prereqs
 ```
 
-## Quickstart (development)
-
-Prerequisites: Node ≥ 20.11, Rust stable, platform-specific Tauri 2 build deps ([see their docs](https://v2.tauri.app/start/prerequisites/)).
-
-```sh
-git clone https://github.com/akhshyganesh/recall.git
-cd recall
-npm install
-npm run tauri:dev
+**Run**
+```bash
+pnpm install
+pnpm tauri dev          # development
+pnpm tauri build        # production bundle
 ```
 
-Run only the web layer:
-
-```sh
-npm run dev
+**Checks**
+```bash
+pnpm exec tsc --noEmit          # frontend type-check
+cd src-tauri && cargo clippy    # Rust lint
 ```
 
-Regenerate TypeScript types from Rust:
+## Tech stack
 
-```sh
-npm run types:generate
-```
-
-Run the full check (typecheck every workspace + `cargo check`):
-
-```sh
-npm run check
-```
-
-See [`docs/development.md`](docs/development.md) for deeper guidance.
-
-## Architecture, at a glance
-
-Each connector lives in [`apps/desktop/src-tauri/src/connectors/`](apps/desktop/src-tauri/src/connectors/) and implements a single trait:
-
-```rust
-pub trait Connector: Send + Sync {
-    fn name(&self) -> &'static str;
-    fn agent_slug(&self) -> &'static str;
-    fn detect(&self) -> DetectionResult;
-    fn scan(&self, since: Option<&str>) -> Vec<NormalizedConversation>;
-}
-```
-
-The indexer runs every connector in parallel, normalizes the output, and upserts into SQLite. The frontend talks to the Rust backend exclusively through typed Tauri commands (see [`apps/desktop/src-tauri/src/commands.rs`](apps/desktop/src-tauri/src/commands.rs)). The TypeScript types for every IPC payload are **auto-generated from the Rust structs** via [`ts-rs`](https://crates.io/crates/ts-rs), so the frontend and backend cannot drift.
-
-For the full picture — database schema, rendering pipeline, update check, release flow — read [`docs/architecture.md`](docs/architecture.md).
+Tauri 2 · Rust · `portable-pty` · React 19 · TypeScript · xterm.js · CodeMirror 6 · Tailwind v4 · shadcn/ui · Zustand
 
 ## Contributing
 
-Yes, please. [`CONTRIBUTING.md`](CONTRIBUTING.md) walks through the contribution flow, and [`docs/connectors.md`](docs/connectors.md) is a step-by-step recipe for adding a new AI tool.
+Issues and PRs are welcome. Feel free to open issues, suggest features, or submit pull requests. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
-## Security
+## Acknowledgments
 
-Recall only **reads** local files written by AI assistants. It never modifies them and never sends them anywhere. See [`SECURITY.md`](SECURITY.md) for the threat model and how to report a vulnerability.
+Recall was built by combining the best of two earlier solo projects by [@akhshyganesh](https://github.com/akhshyganesh):
+
+- **Recall** — the original session history and workspace context tooling
+- **[terax-ai](https://github.com/akhshyganesh/terax-ai)** — a terminal-first IDE prototype whose layout, split-pane architecture, and IDE-like approach to the CLI inspired this version
+
+The big-company bet is that the future of development lives in the CLI — building a full terminal workspace that feels like an IDE for CLI programs is the idea behind Recall.
 
 ## License
 
-[MIT](LICENSE). © Akhshy Ganesh.
+Apache 2.0 — see [LICENSE](LICENSE). Copyright 2026 akhshyganesh.

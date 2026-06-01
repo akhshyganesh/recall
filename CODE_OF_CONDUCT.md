@@ -1,45 +1,34 @@
-# Contributor Covenant Code of Conduct
+# Code of conduct
 
-## Our pledge
+Recall is a small open-source project and we want it to stay a place people enjoy contributing to.
 
-We as members, contributors, and leaders pledge to make participation in our community a harassment-free experience for everyone, regardless of age, body size, visible or invisible disability, ethnicity, sex characteristics, gender identity and expression, level of experience, education, socio-economic status, nationality, personal appearance, race, caste, color, religion, or sexual identity and orientation.
+## The rules, briefly
 
-We pledge to act and interact in ways that contribute to an open, welcoming, diverse, inclusive, and healthy community.
+- **Be respectful.** Disagreement is fine; rudeness, condescension, and personal attacks are not.
+- **Assume good faith.** Most miscommunication isn't malicious — clarify before escalating.
+- **Stay on topic.** Issues, PRs, and discussions are about Recall. Take off-topic conversations elsewhere.
+- **No harassment.** Targeted insults, slurs, sustained disruption, sexualized comments, doxxing, or threats are not tolerated — anywhere, against anyone.
+- **No spam.** That includes promotional links, irrelevant cross-posting, and AI-generated noise that doesn't engage with the actual conversation.
 
-## Our standards
-
-Examples of behavior that contributes to a positive environment:
-
-- Demonstrating empathy and kindness
-- Being respectful of differing opinions, viewpoints, and experiences
-- Giving and gracefully accepting constructive feedback
-- Accepting responsibility, apologizing to those affected by our mistakes, and learning from the experience
-- Focusing on what is best for the overall community
-
-Examples of unacceptable behavior:
-
-- The use of sexualized language or imagery, and sexual attention or advances of any kind
-- Trolling, insulting or derogatory comments, and personal or political attacks
-- Public or private harassment
-- Publishing others' private information, such as a physical or email address, without their explicit permission
-- Other conduct which could reasonably be considered inappropriate in a professional setting
-
-## Enforcement responsibilities
-
-Project maintainers are responsible for clarifying and enforcing our standards of acceptable behavior and will take appropriate and fair corrective action in response to any behavior that they deem inappropriate, threatening, offensive, or harmful.
-
-## Scope
-
-This Code of Conduct applies within all community spaces, and also applies when an individual is officially representing the community in public spaces.
+This applies to everything inside the project: issues, PRs, discussions, commits, and any community space we create later (Discord, etc.).
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the project maintainers at **akhshy@akhshy.dev**. All complaints will be reviewed and investigated promptly and fairly.
+If you see a violation — or experience one — email **akhshy.balakannan@gmail.com** with subject `[Recall conduct]`. Include links and context.
 
-All project maintainers are obligated to respect the privacy and security of the reporter of any incident.
+Maintainers may, at their discretion:
 
-## Attribution
+1. Edit or delete the offending content
+2. Issue a private warning
+3. Lock the thread
+4. Block the account from the project
 
-This Code of Conduct is adapted from the [Contributor Covenant][homepage], version 2.1, available at https://www.contributor-covenant.org/version/2/1/code_of_conduct.html.
+We default to the lightest action that resolves the situation. Severe or repeat violations skip steps.
 
-[homepage]: https://www.contributor-covenant.org
+## Scope
+
+Maintainers act in this project's spaces. We don't police behavior outside the project, but we do consider patterns of behavior elsewhere when deciding on enforcement here.
+
+---
+
+*This document is intentionally short. It is inspired by the [Contributor Covenant](https://www.contributor-covenant.org/) but kept compact for a small project.*

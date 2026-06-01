@@ -1,6 +1,0 @@
-**/node_modules
-**/dist
-**/target
-**/gen
-packages/shared-types/src/generated
-docs/screenshots

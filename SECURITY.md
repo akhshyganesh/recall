@@ -1,44 +1,43 @@
-# Security Policy
+# Security
 
-## Threat model
+Recall runs shells, reads/writes files, renders previews, and handles local workspace context — so security bugs matter. If you find one, please tell us before posting it publicly.
 
-Recall is a **read-only** indexer of local files created by other tools. Concretely:
+## Reporting
 
-- It scans directories under `$HOME` belonging to the AI assistants listed in [`README.md`](README.md).
-- It reads session files, normalizes them, and writes a **copy** into a local SQLite database at `~/Library/Application Support/com.recall.app/recall.db` (macOS), `$XDG_DATA_HOME/com.recall.app/` (Linux), or the Windows equivalent.
-- It **never** modifies any file it scans.
-- It **never** makes an outbound network request except:
-  - The optional update check (`GET https://api.github.com/repos/akhshyganesh/recall/releases/latest`), which is initiated explicitly by the user opening Settings, or on app boot.
-  - The opener plugin, which launches external URLs **only** when the user clicks a button (release page, etc.).
+Use GitHub's private security reporting on the Recall repository. Include:
 
-There is no telemetry, no analytics, no authentication, no account.
+- What the issue is and what it lets an attacker do
+- Steps to reproduce (a small PoC is great)
+- Version, OS, arch
 
-## Reporting a vulnerability
+We'll get back to you within a few days. Once it's fixed, we'll credit you in the release notes — unless you'd rather stay anonymous.
 
-If you discover a vulnerability — memory safety, path traversal in connector parsing, data exfiltration vector, etc. — please **do not** open a public issue.
-
-Email: **akhshy@akhshy.dev** (or open a [private security advisory](https://github.com/akhshyganesh/recall/security/advisories/new) on GitHub).
-
-Include:
-
-- A description of the issue and its impact
-- Steps to reproduce (ideally a minimal fixture)
-- The version you tested (see *Settings → About*)
-- Your preferred name/handle for disclosure credit (or request anonymity)
-
-You can expect:
-
-1. Acknowledgement within 72 hours.
-2. An initial assessment within 7 days.
-3. A coordinated fix + release for confirmed issues; CVE will be requested when warranted.
+Please **don't** open a public GitHub issue for security reports.
 
 ## Supported versions
 
-Only the latest minor release on the `main` branch receives security fixes. Old releases remain available but are not patched.
+Only the latest minor line gets security fixes. Right now that's `1.0.x`.
 
-## Hardening notes for contributors
+## What's in scope
 
-- Treat every byte read from a session file as adversarial input. Use `serde_json::from_slice` with explicit types, not `Value::as_str().unwrap()`.
-- Never pass user/session data to `std::process::Command` or a shell.
-- Path validation: connectors must confine their filesystem reads to the tool's documented directory. No `..` traversal, no symlink escape outside `$HOME`.
-- UI: `react-markdown` is rendered with `remark-gfm` only; raw HTML is disabled.
+- The Rust backend in `src-tauri/` (PTY, FS, IPC, plugins)
+- The frontend in `src/` — anywhere untrusted input lands (terminal output, file content, preview content)
+- Release artifacts on GitHub and the auto-update channel
+- The auto-updater
+
+## What's not
+
+- Bugs in upstream deps (Tauri, xterm.js, CodeMirror, etc.) — report those upstream. We'll ship the fix once it's released.
+- Anything that needs an already-compromised machine or a local attacker with shell access
+- Older versions (`< 0.5`)
+
+## What we do to keep things safe
+
+- **No telemetry.** Recall only talks to the network when you ask it to (update checks, web preview).
+- **No Node in the renderer.** The frontend only reaches the host through the allow-listed Tauri commands.
+- **Signed releases.** Updates are verified before they're applied.
+
+## What we can't promise
+
+- Recall runs whatever you tell it to run, with your permissions. That's kind of the point of a terminal.
+- Local previews and external URLs are only as trustworthy as the sites you point the app at.
