@@ -48,15 +48,15 @@ jobs:
           - name: macOS Apple Silicon
             platform: macos-latest
             rustTargets: aarch64-apple-darwin
-            args: --target aarch64-apple-darwin --bundles dmg
+            args: --target aarch64-apple-darwin --bundles app,dmg
           - platform: ubuntu-22.04
             name: Ubuntu 22.04
             rustTargets: ""
-            args: --bundles deb
+            args: --bundles deb,appimage
           - platform: windows-latest
             name: Windows
             rustTargets: ""
-            args: --bundles nsis
+            args: --bundles nsis,msi
 
     runs-on: ${{ matrix.platform }}
 
@@ -68,7 +68,7 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf squashfs-tools
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4

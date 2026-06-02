@@ -48,6 +48,7 @@ export function AboutSection() {
                   : "Check for updates";
   const onUpdateClick = () => {
     if (available) void install();
+    else if (manualAvailable) void openUrl(status.info.releaseUrl);
     else void check({ manual: true });
   };
 
