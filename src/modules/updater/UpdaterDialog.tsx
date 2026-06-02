@@ -50,7 +50,7 @@ function releaseLines(body: string | null | undefined): string[] {
 }
 
 export function UpdaterDialog() {
-  const { status, install, dismiss } = useUpdater();
+  const { status, install, dismiss, restart, deferRestart } = useUpdater();
   const [copied, setCopied] = useState(false);
   const [distro, setDistro] = useState<DistroKey>("arch");
   const manualVersion =
@@ -110,7 +110,7 @@ export function UpdaterDialog() {
           </DialogTitle>
           <DialogDescription className="wrap-break-word leading-5">
             {ready
-              ? "Restart Recall to finish installing."
+              ? "Update installed. Restart now or on your next launch — your current sessions won't be lost if you choose later."
               : downloading
                 ? progress !== null
                   ? `${progress.toFixed(0)}% — ${formatBytes(status.downloaded)}`
@@ -191,6 +191,16 @@ export function UpdaterDialog() {
               </Button>
               <Button size="sm" onClick={() => void install()}>
                 Install &amp; restart
+              </Button>
+            </>
+          )}
+          {ready && (
+            <>
+              <Button variant="ghost" size="sm" onClick={deferRestart}>
+                Restart on next launch
+              </Button>
+              <Button size="sm" onClick={restart}>
+                Restart now
               </Button>
             </>
           )}

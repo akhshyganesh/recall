@@ -282,6 +282,14 @@ export function TabBar({
                             />
                           ) : null}
                         </span>
+                        {tabIndex <= 9 && !compact && (
+                          <span
+                            aria-hidden
+                            className="ml-0.5 shrink-0 font-mono text-[9px] leading-none text-muted-foreground/40"
+                          >
+                            {MOD_KEY}{tabIndex}
+                          </span>
+                        )}
                         {tabs.length > 1 && (
                           <span
                             role="button"

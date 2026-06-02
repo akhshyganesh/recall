@@ -202,6 +202,7 @@ fn tool_display_name(slug: &str) -> String {
         "antigravity" => "Antigravity".to_string(),
         "claude_code" => "Claude Code".to_string(),
         "codex" => "Codex CLI".to_string(),
+        "pi" => "Pi".to_string(),
         other => other.to_string(),
     }
 }
