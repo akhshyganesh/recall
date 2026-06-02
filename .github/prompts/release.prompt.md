@@ -9,10 +9,10 @@ You are the release agent for the **Recall** monorepo. Given a task description,
 
 ## Context
 
-- Monorepo: Tauri 2 desktop app (Rust backend + React frontend)
-- CI runs on every push to `main` and on PRs: frontend typecheck/build (Node 20 & 22), `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test --lib`, ts-rs type sync check
-- Release workflow triggers on `v*` tags and builds macOS-arm64 + Linux-x64 binaries via `tauri-apps/tauri-action`
-- Version lives in 5 files: `package.json`, `apps/desktop/package.json`, `packages/shared-types/package.json`, `apps/desktop/src-tauri/Cargo.toml`, `apps/desktop/src-tauri/tauri.conf.json`
+- Monorepo: Tauri 2 desktop app (Rust backend + React frontend), pnpm workspaces
+- CI runs on every push to `main` and on PRs: `pnpm run typecheck`, `pnpm run build`, `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test --lib`, ts-rs type sync check
+- Release workflow triggers on `v*` tags — `create-release` creates a single draft, `build` uploads macOS-arm64 + Linux-x64 + Windows-x64 artifacts in parallel, `publish-release` flips it live
+- Version lives in 3 files: `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`
 - The repo has `scripts/release.sh` for version bumps, but this agent handles the PR flow instead of committing directly to main
 
 ## Inputs
@@ -26,8 +26,8 @@ The user provides:
 ### Phase 1 — Implement
 
 1. Read the relevant source files to understand the current code.
-2. Implement the requested changes. For Rust changes run `cargo fmt`, `cargo clippy -- -D warnings`, and `cargo test --lib` from `apps/desktop/src-tauri/`. For frontend changes run `npm run typecheck`. Fix any errors before proceeding.
-3. If a version bump is needed (the user asked for a release), update the version in all 5 manifest files listed above.
+2. Implement the requested changes. For Rust changes run `cargo fmt`, `cargo clippy -- -D warnings`, and `cargo test --lib` from `src-tauri/`. For frontend changes run `pnpm run typecheck`. Fix any errors before proceeding.
+3. If a version bump is needed (the user asked for a release), update the version in all 3 manifest files listed above.
 
 ### Phase 2 — Branch & PR
 
@@ -51,7 +51,7 @@ The user provides:
 15. Push the tag: `git push origin v<VERSION>`.
 16. Monitor the release workflow: `gh run list --workflow=release.yml --limit 1` then `gh run watch <id> --exit-status`.
 17. If the release workflow fails, diagnose from `gh run view <id> --log-failed`, fix on a new branch, and loop back to Phase 2.
-18. Once the release succeeds, print the release URL and confirm: **"Release v<VERSION> is live at <URL> with macOS-arm64 and Linux-x64 binaries."**
+18. Once the release succeeds, print the release URL and confirm: **"Release v<VERSION> is live at <URL> with macOS-arm64, Linux-x64, and Windows-x64 binaries."**
 
 ## Rules
 

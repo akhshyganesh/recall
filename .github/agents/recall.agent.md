@@ -28,10 +28,10 @@ If ambiguous, ask the user: *"Should I also cut a release after merging, or just
 
 ## Project Context
 
-- **Stack**: Tauri 2, Rust (backend), React 19 + TypeScript (frontend), npm workspaces
-- **CI** (on push/PR to `main`): `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test --lib`, `npm run typecheck`, `npm run build` (Node 20 & 22), ts-rs type sync
-- **Release** (on `v*` tag push): `tauri-apps/tauri-action` builds macOS-arm64 + Linux-x64 binaries
-- **Version** is tracked in 5 files: root `package.json`, `apps/desktop/package.json`, `packages/shared-types/package.json`, `apps/desktop/src-tauri/Cargo.toml`, `apps/desktop/src-tauri/tauri.conf.json`
+- **Stack**: Tauri 2, Rust (backend), React 19 + TypeScript (frontend), pnpm workspaces
+- **CI** (on push/PR to `main`): `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test --lib`, `pnpm run typecheck`, `pnpm run build`, ts-rs type sync
+- **Release** (on `v*` tag push): `create-release → build (macOS-arm64, Linux-x64, Windows-x64 in parallel) → publish-release` via `tauri-apps/tauri-action`
+- **Version** is tracked in 3 files: root `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`
 - **Branch convention**: `feat/*`, `fix/*`, `chore/*`, `release/v*`
 
 ## Constraints
