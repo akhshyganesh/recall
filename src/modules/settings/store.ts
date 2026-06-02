@@ -37,7 +37,6 @@ export type Preferences = {
   autoUpdates: boolean;
   restoreWindowState: boolean;
   sessionsMcpEnabled: boolean;
-  plannerMcpEnabled: boolean;
   vimMode: boolean;
   showHidden: boolean;
   terminalWebglEnabled: boolean;
@@ -57,7 +56,6 @@ const KEY_AUTOSTART = "autostart";
 const KEY_AUTO_UPDATES = "autoUpdates";
 const KEY_RESTORE_WINDOW = "restoreWindowState";
 const KEY_SESSIONS_MCP_ENABLED = "sessionsMcpEnabled";
-const KEY_PLANNER_MCP_ENABLED = "plannerMcpEnabled";
 const KEY_VIM_MODE = "vimMode";
 const KEY_SHOW_HIDDEN = "showHidden";
 const LEGACY_KEY_SHOW_HIDDEN_DIRS = "showHiddenDirectories";
@@ -92,7 +90,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   autoUpdates: true,
   restoreWindowState: true,
   sessionsMcpEnabled: false,
-  plannerMcpEnabled: false,
   vimMode: false,
   showHidden: false,
   terminalWebglEnabled: true,
@@ -138,9 +135,6 @@ export async function loadPreferences(): Promise<Preferences> {
     sessionsMcpEnabled:
       get<boolean>(KEY_SESSIONS_MCP_ENABLED) ??
       DEFAULT_PREFERENCES.sessionsMcpEnabled,
-    plannerMcpEnabled:
-      get<boolean>(KEY_PLANNER_MCP_ENABLED) ??
-      DEFAULT_PREFERENCES.plannerMcpEnabled,
     vimMode: get<boolean>(KEY_VIM_MODE) ?? DEFAULT_PREFERENCES.vimMode,
     showHidden:
       get<boolean>(KEY_SHOW_HIDDEN) ??
@@ -194,10 +188,6 @@ export async function setRestoreWindowState(value: boolean): Promise<void> {
 
 export async function setSessionsMcpEnabled(value: boolean): Promise<void> {
   await writePref(KEY_SESSIONS_MCP_ENABLED, value);
-}
-
-export async function setPlannerMcpEnabled(value: boolean): Promise<void> {
-  await writePref(KEY_PLANNER_MCP_ENABLED, value);
 }
 
 export async function setVimMode(value: boolean): Promise<void> {
@@ -276,7 +266,6 @@ export async function onPreferencesChange(
     [KEY_AUTO_UPDATES]: "autoUpdates",
     [KEY_RESTORE_WINDOW]: "restoreWindowState",
     [KEY_SESSIONS_MCP_ENABLED]: "sessionsMcpEnabled",
-    [KEY_PLANNER_MCP_ENABLED]: "plannerMcpEnabled",
     [KEY_VIM_MODE]: "vimMode",
     [KEY_SHOW_HIDDEN]: "showHidden",
     [KEY_TERMINAL_WEBGL_ENABLED]: "terminalWebglEnabled",

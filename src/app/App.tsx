@@ -28,16 +28,13 @@ import {
 } from "@/modules/git-history";
 import { getLaunchDir } from "@/lib/launchDir";
 import { useZoom } from "@/lib/useZoom";
-import { FileExplorer, type FileExplorerHandle } from "@/modules/explorer";
+import { FileExplorer, QuickOpen, type FileExplorerHandle } from "@/modules/explorer";
 import {
   Header,
   type SearchInlineHandle,
   type SearchTarget,
 } from "@/modules/header";
 import { MarkdownStack } from "@/modules/markdown";
-import { PlannerStack } from "@/modules/planner";
-import { setPlannerMcpEnabled as applyPlannerMcpEnabled } from "@/modules/planner/api";
-import { requestPlannerView, type PlannerView } from "@/modules/planner/events";
 import {
   MediaStack,
   PreviewStack,
@@ -197,7 +194,6 @@ export default function App() {
     setActiveId,
     newTab,
     openSettingsTab,
-    openPlannerTab,
     openFileTab,
     openMediaTab,
     openSessionTab,
@@ -442,7 +438,6 @@ export default function App() {
   const initPrefs = usePreferencesStore((s) => s.init);
   const prefsHydrated = usePreferencesStore((s) => s.hydrated);
   const sessionsMcpEnabled = usePreferencesStore((s) => s.sessionsMcpEnabled);
-  const plannerMcpEnabled = usePreferencesStore((s) => s.plannerMcpEnabled);
   useEffect(() => {
     void initPrefs();
   }, [initPrefs]);
@@ -454,13 +449,6 @@ export default function App() {
     });
   }, [prefsHydrated, sessionsMcpEnabled]);
 
-  useEffect(() => {
-    if (!prefsHydrated) return;
-    void applyPlannerMcpEnabled(plannerMcpEnabled).catch((error) => {
-      console.error("failed to apply planner MCP preference", error);
-    });
-  }, [prefsHydrated, plannerMcpEnabled]);
-
   useEffect(() => listenSettingsTabRequests(openSettingsTab), [openSettingsTab]);
 
   const activeTab = tabs.find((t) => t.id === activeId);
@@ -471,7 +459,6 @@ export default function App() {
   const isMarkdownTab = activeTab?.kind === "markdown";
   const isMediaTab = activeTab?.kind === "media";
   const isSessionTab = activeTab?.kind === "session";
-  const isPlannerTab = activeTab?.kind === "planner";
   const isGitDiffTab =
     activeTab?.kind === "git-diff" || activeTab?.kind === "git-commit-file";
   const isGitHistoryTab = activeTab?.kind === "git-history";
@@ -853,13 +840,16 @@ export default function App() {
     handleClose(activeId);
   }, [activeId, closeActivePane, handleClose]);
 
-  const openPlannerView = useCallback(
-    (nextView: PlannerView) => {
-      openPlannerTab();
-      requestPlannerView(nextView);
-    },
-    [openPlannerTab],
-  );
+  const [quickOpenVisible, setQuickOpenVisible] = useState(false);
+  const [splitTabId, setSplitTabId] = useState<number | null>(null);
+
+  const openSplitView = useCallback((tabId: number) => {
+    setSplitTabId(tabId);
+  }, []);
+
+  const closeSplitView = useCallback(() => {
+    setSplitTabId(null);
+  }, []);
 
   const shortcutHandlers = useMemo<ShortcutHandlers>(
     () => ({
@@ -881,15 +871,12 @@ export default function App() {
       "terminal.clear": () => {
         if (activeLeafId !== null) terminalRefs.current.get(activeLeafId)?.clear();
       },
+      "file.quickOpen": () => setQuickOpenVisible(true),
       "sidebar.toggle": toggleSidebar,
       "explorer.focus": toggleExplorerFocus,
       "view.zoomIn": zoomIn,
       "view.zoomOut": zoomOut,
       "view.zoomReset": zoomReset,
-      "planner.open": openPlannerTab,
-      "planner.viewTable": () => openPlannerView("list"),
-      "planner.viewBoard": () => openPlannerView("board"),
-      "planner.viewSketch": () => openPlannerView("sketch"),
       "editor.undo": () => editorRefs.current.get(activeId)?.undo(),
       "editor.redo": () => editorRefs.current.get(activeId)?.redo(),
     }),
@@ -899,8 +886,6 @@ export default function App() {
       cycleTab,
       handleCloseTabOrPane,
       openNewTab,
-      openPlannerTab,
-      openPlannerView,
       openPreviewTab,
       openSettingsTab,
       selectByIndex,
@@ -1026,6 +1011,54 @@ export default function App() {
 
   const activeCwd = activeTerminalLeafCwd;
 
+  const splitTab = splitTabId !== null ? tabs.find((t) => t.id === splitTabId) ?? null : null;
+
+  const buildSecondarySurface = (secTab: NonNullable<typeof splitTab>) => {
+    const isSecEditor = secTab.kind === "editor";
+    const isSecPreview = secTab.kind === "preview";
+    const isSecMarkdown = secTab.kind === "markdown";
+    const isSecMedia = secTab.kind === "media";
+    const isSecSession = secTab.kind === "session";
+    const isSecGitDiff = secTab.kind === "git-diff" || secTab.kind === "git-commit-file";
+    const isSecGitHistory = secTab.kind === "git-history";
+    const isSecSettings = secTab.kind === "settings";
+    return (
+      <div className="relative h-full min-h-0">
+        <div className={cn("absolute inset-0 px-3 pt-2 pb-2", !isSecEditor && "invisible pointer-events-none")} aria-hidden={!isSecEditor}>
+          <EditorStack tabs={tabs} activeId={secTab.id} registerHandle={() => {}} onDirtyChange={() => {}} onCloseTab={() => {}} />
+        </div>
+        <div className={cn("absolute inset-0 px-3 pt-2 pb-2", !isSecPreview && "invisible pointer-events-none")} aria-hidden={!isSecPreview}>
+          <PreviewStack tabs={tabs} activeId={secTab.id} registerHandle={() => {}} onUrlChange={() => {}} />
+        </div>
+        <div className={cn("absolute inset-0 px-3 pt-2 pb-2", !isSecMarkdown && "invisible pointer-events-none")} aria-hidden={!isSecMarkdown}>
+          <MarkdownStack tabs={tabs} activeId={secTab.id} />
+        </div>
+        <div className={cn("absolute inset-0 px-3 pt-2 pb-2", !isSecMedia && "invisible pointer-events-none")} aria-hidden={!isSecMedia}>
+          <MediaStack tabs={tabs} activeId={secTab.id} />
+        </div>
+        <div className={cn("absolute inset-0 px-3 pt-2 pb-2", !isSecSession && "invisible pointer-events-none")} aria-hidden={!isSecSession}>
+          <SessionHistoryStack tabs={tabs} activeId={secTab.id} />
+        </div>
+        <div className={cn("absolute inset-0 px-3 pt-2 pb-2", !isSecGitDiff && "invisible pointer-events-none")} aria-hidden={!isSecGitDiff}>
+          <GitDiffStack tabs={tabs} activeId={secTab.id} />
+        </div>
+        <div className={cn("absolute inset-0", !isSecGitHistory && "invisible pointer-events-none")} aria-hidden={!isSecGitHistory}>
+          <GitHistoryStack tabs={tabs} activeId={secTab.id} onOpenCommitFile={openCommitFileDiffTab} onSearchHandle={() => {}} />
+        </div>
+        <div className={cn("absolute inset-0", !isSecSettings && "invisible pointer-events-none")} aria-hidden={!isSecSettings}>
+          {isSecSettings && secTab.kind === "settings" ? (
+            <SettingsPanel embedded activeTab={secTab.settingsTab} onActiveTabChange={() => {}} />
+          ) : null}
+        </div>
+        {secTab.kind === "terminal" && (
+          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+            Terminal split is not supported — use pane split (⌘D) instead.
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const workspaceSurface = (
     <div className="relative h-full min-h-0">
       <div
@@ -1104,15 +1137,6 @@ export default function App() {
       <div
         className={cn(
           "absolute inset-0 px-3 pt-2 pb-2",
-          !isPlannerTab && "invisible pointer-events-none",
-        )}
-        aria-hidden={!isPlannerTab}
-      >
-        {isPlannerTab ? <PlannerStack tabs={tabs} activeId={activeId} /> : null}
-      </div>
-      <div
-        className={cn(
-          "absolute inset-0 px-3 pt-2 pb-2",
           !isGitDiffTab && "invisible pointer-events-none",
         )}
         aria-hidden={!isGitDiffTab}
@@ -1167,12 +1191,12 @@ export default function App() {
             onNew={openNewTab}
             onNewPreview={() => openPreviewTab("")}
             onNewEditor={() => setNewEditorOpen(true)}
-            onNewPlanner={openPlannerTab}
             onNewGitGraph={openGitGraphFromContext}
             onClose={handleClose}
             onRenameTab={handleRenameTab}
             onPin={pinTab}
             onReorderTab={reorderTab}
+            onOpenInSplit={openSplitView}
             onToggleSidebar={toggleSidebar}
             onToggleSourceControl={toggleSourceControl}
             onSplit={splitActivePaneInActiveTab}
@@ -1246,9 +1270,38 @@ export default function App() {
                 minSize="30%"
               >
                 <div className="flex h-full min-h-0 flex-col border-y border-border/60 bg-card/35">
-                  <div className="relative min-h-0 flex-1">
-                    {workspaceSurface}
-                  </div>
+                  {splitTab ? (
+                    <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
+                      <ResizablePanel id="workspace-primary" defaultSize="50%" minSize="20%">
+                        <div className="relative h-full min-h-0">
+                          {workspaceSurface}
+                        </div>
+                      </ResizablePanel>
+                      <ResizableHandle withHandle />
+                      <ResizablePanel id="workspace-secondary" defaultSize="50%" minSize="20%">
+                        <div className="flex h-full min-h-0 flex-col">
+                          <div className="flex h-8 shrink-0 items-center gap-2 border-b border-border/50 bg-card/60 px-3">
+                            <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground/80">{splitTab.title}</span>
+                            <button
+                              type="button"
+                              onClick={closeSplitView}
+                              className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                              aria-label="Close split view"
+                            >
+                              <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1 1l9 9M10 1L1 10" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/></svg>
+                            </button>
+                          </div>
+                          <div className="relative min-h-0 flex-1">
+                            {buildSecondarySurface(splitTab)}
+                          </div>
+                        </div>
+                      </ResizablePanel>
+                    </ResizablePanelGroup>
+                  ) : (
+                    <div className="relative min-h-0 flex-1">
+                      {workspaceSurface}
+                    </div>
+                  )}
                 </div>
               </ResizablePanel>
               {sourceControl.hasRepo ? (
@@ -1289,6 +1342,13 @@ export default function App() {
           />
 
           <UpdaterDialog />
+
+          <QuickOpen
+            open={quickOpenVisible}
+            onOpenChange={setQuickOpenVisible}
+            rootPath={explorerRoot ?? home}
+            onOpenFile={handleOpenFile}
+          />
 
           <AlertDialog
             open={pendingCloseTab !== null}

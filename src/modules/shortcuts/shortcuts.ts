@@ -20,13 +20,10 @@ export type ShortcutId =
   | "search.focus"
   | "explorer.search"
   | "explorer.focus"
+  | "file.quickOpen"
   | "view.zoomIn"
   | "view.zoomOut"
   | "view.zoomReset"
-  | "planner.open"
-  | "planner.viewTable"
-  | "planner.viewBoard"
-  | "planner.viewSketch"
   | "shortcuts.open"
   | "settings.open"
   | "sidebar.toggle"
@@ -40,7 +37,6 @@ export type ShortcutGroup =
   | "Panes"
   | "Search"
   | "View"
-  | "Planner"
   | "Editor";
 
 export type KeyBinding = {
@@ -151,6 +147,12 @@ export const SHORTCUTS: Shortcut[] = [
     defaultBindings: [{ [MOD_PROP]: true, key: "1" }],
   },
   {
+    id: "file.quickOpen",
+    label: "Quick open file",
+    group: "Search",
+    defaultBindings: [{ [MOD_PROP]: true, key: "p" }],
+  },
+  {
     id: "explorer.search",
     label: "Search files",
     group: "Search",
@@ -200,30 +202,6 @@ export const SHORTCUTS: Shortcut[] = [
     group: "View",
     defaultBindings: [{ [MOD_PROP]: true, key: "0" }],
   },
-  {
-    id: "planner.open",
-    label: "Open planner",
-    group: "Planner",
-    defaultBindings: [{ [MOD_PROP]: true, key: "p" }],
-  },
-  {
-    id: "planner.viewTable",
-    label: "Planner: table view",
-    group: "Planner",
-    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "1" }],
-  },
-  {
-    id: "planner.viewBoard",
-    label: "Planner: board view",
-    group: "Planner",
-    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "2" }],
-  },
-  {
-    id: "planner.viewSketch",
-    label: "Planner: sketch view",
-    group: "Planner",
-    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "3" }],
-  },
   // Editor entries are display-only: CodeMirror's historyKeymap binds these
   // keys natively. We register them here so the shortcuts dialog can surface
   // them — they don't have App-level handlers, so `useGlobalShortcuts` falls
@@ -248,7 +226,6 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   "Tabs",
   "Panes",
   "View",
-  "Planner",
   "Search",
   "Editor",
 ];

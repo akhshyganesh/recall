@@ -1,6 +1,6 @@
 mod modules;
 
-use modules::{fs, git, planner, pty, sessions, workspace};
+use modules::{fs, git, pty, sessions, workspace};
 use std::sync::Mutex;
 use tauri::{Manager, State};
 use tauri_plugin_window_state::StateFlags;
@@ -57,7 +57,6 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(pty::PtyState::default())
         .manage(sessions::AppState::new().expect("Failed to initialize Recall session database"))
-        .manage(planner::PlannerState::new())
         .manage({
             let registry = workspace::WorkspaceRegistry::default();
             workspace::bootstrap_registry(&registry);
@@ -74,10 +73,6 @@ pub fn run() {
             sessions::commands::detect_sources,
             sessions::commands::get_sessions_mcp_status,
             sessions::commands::set_sessions_mcp_enabled,
-            planner::commands::get_planner_document,
-            planner::commands::save_planner_document,
-            planner::commands::get_planner_mcp_status,
-            planner::commands::set_planner_mcp_enabled,
             sessions::commands::scan_all,
             sessions::commands::scan_incremental,
             sessions::commands::get_sessions,
