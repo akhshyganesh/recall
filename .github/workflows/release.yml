@@ -10,8 +10,35 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  release:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      release_id: ${{ steps.create.outputs.result }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create draft release
+        id: create
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = context.ref.replace('refs/tags/', '');
+            const { data } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              name: `Recall ${tag}`,
+              body: 'See CHANGELOG.md for release notes.',
+              draft: true,
+              prerelease: false,
+            });
+            return data.id;
+
+  build:
     name: Build ${{ matrix.name }}
+    needs: create-release
     permissions:
       contents: write
     strategy:
@@ -90,7 +117,6 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         env:
-          # Raw App Store Connect API private key contents (.p8), stored as a secret.
           APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
         run: |
           if [[ -z "$APPLE_API_KEY_CONTENT" ]]; then
@@ -146,7 +172,7 @@ jobs:
       - name: Check Rust backend
         run: cargo check --manifest-path src-tauri/Cargo.toml
 
-      - name: Build and publish Tauri release
+      - name: Build and upload artifacts (non-macOS)
         if: runner.os != 'macOS'
         uses: tauri-apps/tauri-action@v0
         env:
@@ -154,14 +180,10 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: Recall ${{ github.ref_name }}
-          releaseBody: See CHANGELOG.md for release notes.
-          releaseDraft: true
-          prerelease: false
+          releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
 
-      - name: Build and publish Tauri release
+      - name: Build and upload artifacts (macOS ad-hoc)
         if: runner.os == 'macOS' && steps.macos_signing.outputs.signing_mode == 'adhoc'
         uses: tauri-apps/tauri-action@v0
         env:
@@ -170,14 +192,10 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_SIGNING_IDENTITY: "-"
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: Recall ${{ github.ref_name }}
-          releaseBody: See CHANGELOG.md for release notes.
-          releaseDraft: true
-          prerelease: false
+          releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
 
-      - name: Build and publish Tauri release
+      - name: Build and upload artifacts (macOS Apple signing)
         if: runner.os == 'macOS' && steps.macos_signing.outputs.signing_mode == 'apple'
         uses: tauri-apps/tauri-action@v0
         env:
@@ -191,9 +209,22 @@ jobs:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_KEY_PATH: ${{ steps.apple_notarization_key.outputs.key_path }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: Recall ${{ github.ref_name }}
-          releaseBody: See CHANGELOG.md for release notes.
-          releaseDraft: true
-          prerelease: false
+          releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
+
+  publish-release:
+    needs: [create-release, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: ${{ needs.create-release.outputs.release_id }},
+              draft: false,
+            });
