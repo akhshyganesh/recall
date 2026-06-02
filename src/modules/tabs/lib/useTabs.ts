@@ -111,12 +111,6 @@ export type SettingsSurfaceTab = {
   settingsTab: SettingsSection;
 };
 
-export type PlannerTab = {
-  id: number;
-  kind: "planner";
-  title: string;
-};
-
 export type Tab =
   | TerminalTab
   | EditorTab
@@ -127,8 +121,7 @@ export type Tab =
   | GitDiffTab
   | GitHistoryTab
   | GitCommitFileDiffTab
-  | SettingsSurfaceTab
-  | PlannerTab;
+  | SettingsSurfaceTab;
 
 export type TabPatch = Partial<{
   title: string;
@@ -215,29 +208,6 @@ export function useTabs(initial?: Partial<TerminalTab>) {
           title,
           settingsTab,
         },
-      ];
-    });
-    if (targetId !== null) setActiveId(targetId);
-    return targetId;
-  }, []);
-
-  const openPlannerTab = useCallback(() => {
-    let targetId: number | null = null;
-    setTabs((curr) => {
-      const existing = curr.find((t) => t.kind === "planner");
-      if (existing) {
-        targetId = existing.id;
-        return curr;
-      }
-      const id = nextIdRef.current++;
-      targetId = id;
-      return [
-        ...curr,
-        {
-          id,
-          kind: "planner",
-          title: "Planner",
-        } satisfies PlannerTab,
       ];
     });
     if (targetId !== null) setActiveId(targetId);
@@ -885,7 +855,6 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     setActiveId,
     newTab,
     openSettingsTab,
-    openPlannerTab,
     openFileTab,
     openMediaTab,
     openSessionTab,

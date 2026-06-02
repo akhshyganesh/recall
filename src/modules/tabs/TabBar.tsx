@@ -23,8 +23,8 @@ import {
   DatabaseIcon,
   GitBranchIcon,
   GitCompareIcon,
-  GridViewIcon,
   Globe02Icon,
+  LayoutTwoColumnIcon,
   PencilEdit02Icon,
   PlusSignIcon,
   Settings01Icon,
@@ -40,13 +40,13 @@ type Props = {
   onNew: () => void;
   onNewPreview: () => void;
   onNewEditor: () => void;
-  onNewPlanner: () => void;
   onNewGitGraph: () => void;
   onClose: (id: number) => void;
   onRename: (id: number, title: string) => void;
   /** Pin (promote) a preview tab to persistent on double-click. */
   onPin: (id: number) => void;
   onReorder?: (fromIndex: number, dropPosition: number) => void;
+  onOpenInSplit?: (id: number) => void;
   compact?: boolean;
 };
 
@@ -57,12 +57,12 @@ export function TabBar({
   onNew,
   onNewPreview,
   onNewEditor,
-  onNewPlanner,
   onNewGitGraph,
   onClose,
   onRename,
   onPin,
   onReorder,
+  onOpenInSplit,
   compact,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -225,16 +225,20 @@ export function TabBar({
                   );
                 }
 
+                const tabIndex = i + 1;
+                const indexHint = tabIndex <= 9 ? ` (⌘${tabIndex})` : "";
                 items.push(
                   <ContextMenu key={t.id}>
                     <ContextMenuTrigger asChild>
                       <TabsTrigger
                         value={String(t.id)}
                         data-tab-id={t.id}
-                        title={tooltipFor(t, label)}
+                        title={`${tooltipFor(t, label)}${indexHint}`}
                         onDoubleClick={() => isPreview && onPin(t.id)}
                         className={cn(
-                          "group h-7 shrink-0 justify-between gap-1.5 rounded-full border-0 text-xs font-semibold text-muted-foreground transition-all data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-sm hover:bg-muted hover:text-foreground",
+                          "group relative h-7 shrink-0 justify-between gap-1.5 rounded-full border-0 text-xs font-semibold text-muted-foreground transition-all",
+                          "data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-foreground/20",
+                          "hover:bg-muted hover:text-foreground",
                           compact
                             ? "px-1.5!"
                             : tabs.length === 1
@@ -306,6 +310,16 @@ export function TabBar({
                         />
                         Rename tab
                       </ContextMenuItem>
+                      {onOpenInSplit && t.kind !== "terminal" ? (
+                        <ContextMenuItem onSelect={() => onOpenInSplit(t.id)}>
+                          <HugeiconsIcon
+                            icon={LayoutTwoColumnIcon}
+                            size={14}
+                            strokeWidth={1.75}
+                          />
+                          Open in split view
+                        </ContextMenuItem>
+                      ) : null}
                       {tabs.length > 1 ? (
                         <>
                           <ContextMenuSeparator />
@@ -385,13 +399,6 @@ export function TabBar({
                 {fmtShortcut(MOD_KEY, SHIFT_KEY, "P")}
               </span>
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => onNewPlanner()}>
-              <HugeiconsIcon icon={GridViewIcon} size={14} strokeWidth={1.75} />
-              <span className="flex-1">Planner</span>
-              <span className="text-xs text-muted-foreground">
-                {fmtShortcut(MOD_KEY, "P")}
-              </span>
-            </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => onNewGitGraph()}>
               <HugeiconsIcon icon={GitBranchIcon} size={14} strokeWidth={1.75} />
               <span className="flex-1">Git Graph</span>
@@ -458,16 +465,6 @@ function TabIcon({ tab }: { tab: Tab }) {
       />
     );
   }
-  if (tab.kind === "planner") {
-    return (
-      <HugeiconsIcon
-        icon={GridViewIcon}
-        size={14}
-        strokeWidth={2}
-        className="shrink-0"
-      />
-    );
-  }
   return (
     <HugeiconsIcon
       icon={ComputerTerminal02Icon}
@@ -488,7 +485,6 @@ function labelFor(t: Tab, terminalLabels: Map<number, string>): string {
   if (t.kind === "git-history") return t.title;
   if (t.kind === "git-commit-file") return t.title;
   if (t.kind === "settings") return t.title;
-  if (t.kind === "planner") return t.title;
   return terminalLabels.get(t.id) ?? t.title;
 }
 

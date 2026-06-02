@@ -42,13 +42,13 @@ type Props = {
   onNew: () => void;
   onNewPreview: () => void;
   onNewEditor: () => void;
-  onNewPlanner: () => void;
   onNewGitGraph: () => void;
   onClose: (id: number) => void;
   onRenameTab: (id: number, title: string) => void;
   /** Promote a preview (transient) tab to persistent. */
   onPin: (id: number) => void;
   onReorderTab: (fromIndex: number, dropPosition: number) => void;
+  onOpenInSplit?: (id: number) => void;
   onToggleSidebar: () => void;
   onToggleSourceControl: () => void;
   onSplit: (dir: "row" | "col") => void;
@@ -77,12 +77,12 @@ export function Header({
   onNew,
   onNewPreview,
   onNewEditor,
-  onNewPlanner,
   onNewGitGraph,
   onClose,
   onRenameTab,
   onPin,
   onReorderTab,
+  onOpenInSplit,
   onToggleSidebar,
   onToggleSourceControl,
   onSplit,
@@ -255,12 +255,12 @@ export function Header({
             onNew={onNew}
             onNewPreview={onNewPreview}
             onNewEditor={onNewEditor}
-            onNewPlanner={onNewPlanner}
             onNewGitGraph={onNewGitGraph}
             onClose={onClose}
             onRename={onRenameTab}
             onPin={onPin}
             onReorder={onReorderTab}
+            onOpenInSplit={onOpenInSplit}
             compact={compact}
           />
           <div data-tauri-drag-region className="h-full min-w-2 flex-1" />

@@ -18,8 +18,7 @@ import { useEffect, useState, type JSX } from "react";
 import { AboutSection } from "./sections/AboutSection";
 import { EditorSection } from "./sections/EditorSection";
 import { GeneralSection } from "./sections/GeneralSection";
-import { PlannerMcpSection, SessionsMcpSection } from "./sections/McpSection";
-import { PlannerSection } from "./sections/PlannerSection";
+import { SessionsMcpSection } from "./sections/McpSection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
 import { StartupSection } from "./sections/StartupSection";
 import { TerminalSection } from "./sections/TerminalSection";
@@ -53,13 +52,6 @@ const TABS: {
     component: TerminalSection,
   },
   {
-    id: "planner",
-    label: "Planner",
-    group: "workspace",
-    icon: DatabaseIcon,
-    component: PlannerSection,
-  },
-  {
     id: "startup",
     label: "Startup",
     group: "app",
@@ -72,13 +64,6 @@ const TABS: {
     group: "app",
     icon: DatabaseIcon,
     component: SessionsMcpSection,
-  },
-  {
-    id: "planner-mcp",
-    label: "Planner MCP",
-    group: "app",
-    icon: DatabaseIcon,
-    component: PlannerMcpSection,
   },
   {
     id: "shortcuts",
