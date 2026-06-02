@@ -3,6 +3,7 @@ pub mod claude_code;
 pub mod codex;
 pub mod copilot;
 pub mod copilot_cli;
+pub mod pi;
 
 use crate::modules::sessions::models::{DetectionResult, NormalizedConversation};
 
@@ -12,6 +13,7 @@ pub const SUPPORTED_AGENT_SLUGS: &[&str] = &[
     "antigravity",
     "claude_code",
     "codex",
+    "pi",
 ];
 
 pub trait Connector: Send + Sync {
@@ -28,6 +30,7 @@ pub fn all_connectors() -> Vec<Box<dyn Connector>> {
         Box::new(antigravity::AntigravityConnector::new()),
         Box::new(claude_code::ClaudeCodeConnector::new()),
         Box::new(codex::CodexConnector::new()),
+        Box::new(pi::PiConnector::new()),
     ]
 }
 
@@ -141,6 +144,18 @@ mod tests {
             "copilot_cli",
             copilot_cli_root.to_string_lossy().to_string(),
         );
+
+        let pi_root = base_dir.join("home").join(".pi").join("agent");
+        write_fixture(
+            &pi_root.join("sessions/--tmp-pi-project--/2026-06-02T06-22-33-551Z_test-pi-session.jsonl"),
+            concat!(
+                "{\"type\":\"session\",\"version\":3,\"id\":\"test-pi-session\",\"timestamp\":\"2026-06-02T06:22:33.551Z\",\"cwd\":\"/tmp/pi-project\"}\n",
+                "{\"type\":\"model_change\",\"id\":\"abc\",\"parentId\":null,\"timestamp\":\"2026-06-02T06:22:33.643Z\",\"provider\":\"ollama\",\"modelId\":\"qwen3:27b\"}\n",
+                "{\"type\":\"message\",\"id\":\"msg1\",\"timestamp\":\"2026-06-02T06:22:35.786Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Fix pi session\"}]}}\n",
+                "{\"type\":\"message\",\"id\":\"msg2\",\"timestamp\":\"2026-06-02T06:22:51.905Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Patched pi session\"}],\"model\":\"qwen3:27b\"}}\n",
+            ),
+        );
+        roots.insert("pi", pi_root.to_string_lossy().to_string());
 
         roots
     }

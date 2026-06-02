@@ -219,14 +219,14 @@ export function Header({
       ref={rootRef}
       className="flex shrink-0 select-none flex-col border-b border-border/55"
     >
-      {/* Tab row */}
+      {/* Combined header row */}
       <div
         data-tauri-drag-region
-        className={`flex h-10 items-center gap-2 bg-card/65 ${
+        className={`flex h-9 items-center gap-2 bg-card/65 ${
           IS_MAC ? "pr-2 pl-20" : "pr-0 pl-2"
         }`}
       >
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 items-center">
           <Button
             onClick={onToggleSidebar}
             title="Toggle sidebar"
@@ -236,9 +236,6 @@ export function Header({
           >
             <HugeiconsIcon icon={SidebarLeftIcon} size={18} strokeWidth={1.75} />
           </Button>
-          <div className="hidden h-8 shrink-0 items-center rounded-lg bg-background/80 text-[10px] font-bold uppercase text-foreground ring-1 ring-border/55 sm:flex">
-            <span className="px-2">Recall</span>
-          </div>
         </div>
 
         {!IS_MAC && <span className="mx-1 h-5 w-px shrink-0 bg-border" />}
@@ -264,6 +261,16 @@ export function Header({
             compact={compact}
           />
           <div data-tauri-drag-region className="h-full min-w-2 flex-1" />
+          {/* Breadcrumb: visible on wider screens, tucked between tabs and actions */}
+          <div className="hidden max-w-52 items-center overflow-hidden lg:flex">
+            <CwdBreadcrumb
+              cwd={cwd}
+              filePath={filePath}
+              home={home}
+              onCd={onCd}
+            />
+          </div>
+          <WorkspaceEnvSelector onSelect={onWorkspaceChange} />
         </div>
 
         <SearchInline ref={searchRef} target={searchTarget} compact={compact} />
@@ -283,22 +290,6 @@ export function Header({
             <WindowControls />
           </>
         )}
-      </div>
-
-      {/* Context bar: breadcrumb + workspace selector */}
-      <div className="flex h-7 shrink-0 items-center gap-3 border-t border-border/40 bg-background/60 px-3">
-        <div
-          className="flex min-w-0 flex-1 items-center"
-          data-tauri-drag-region
-        >
-          <CwdBreadcrumb
-            cwd={cwd}
-            filePath={filePath}
-            home={home}
-            onCd={onCd}
-          />
-        </div>
-        <WorkspaceEnvSelector onSelect={onWorkspaceChange} />
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import { IS_LINUX } from "@/lib/platform";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 
 const LAST_CHECK_KEY = "recall:updater:last-check";
+const PENDING_RELAUNCH_KEY = "recall:updater:pending-relaunch";
 const CHECK_INTERVAL_MS = 30 * 60 * 1000;
 const GITHUB_LATEST_RELEASE =
   "https://api.github.com/repos/akhshyganesh/recall/releases/latest";
@@ -85,7 +86,6 @@ interface HookOptions {
 export function useUpdater({ autoCheck = true }: HookOptions = {}) {
   const [status, setStatus] = useState<UpdaterStatus>({ kind: "idle" });
   const prefsHydrated = usePreferencesStore((s) => s.hydrated);
-  const autoUpdates = usePreferencesStore((s) => s.autoUpdates);
 
   const installUpdate = useCallback(async (update: Update) => {
     let total: number | null = null;
@@ -107,7 +107,7 @@ export function useUpdater({ autoCheck = true }: HookOptions = {}) {
           setStatus({ kind: "ready" });
         }
       });
-      await relaunch();
+      // Status is "ready" — let the user decide when to restart.
     } catch (err) {
       setStatus({ kind: "error", message: String(err) });
     }
@@ -133,11 +133,7 @@ export function useUpdater({ autoCheck = true }: HookOptions = {}) {
       const update = await check();
       if (update) {
         localStorage.setItem(LAST_CHECK_KEY, String(Date.now()));
-        if (!manual && autoUpdates) {
-          await installUpdate(update);
-        } else {
-          setStatus({ kind: "available", update });
-        }
+        setStatus({ kind: "available", update });
       } else {
         localStorage.setItem(LAST_CHECK_KEY, String(Date.now()));
         setStatus({ kind: "uptodate" });
@@ -145,7 +141,7 @@ export function useUpdater({ autoCheck = true }: HookOptions = {}) {
     } catch (err) {
       setStatus({ kind: "error", message: String(err) });
     }
-  }, [autoUpdates, installUpdate]);
+  }, []);
 
   const install = useCallback(async () => {
     if (status.kind !== "available") return;
@@ -156,10 +152,25 @@ export function useUpdater({ autoCheck = true }: HookOptions = {}) {
     setStatus({ kind: "idle" });
   }, []);
 
+  const restart = useCallback(() => {
+    void relaunch();
+  }, []);
+
+  const deferRestart = useCallback(() => {
+    localStorage.setItem(PENDING_RELAUNCH_KEY, "true");
+    setStatus({ kind: "idle" });
+  }, []);
+
   useEffect(() => {
+    // If a previous session staged an update, apply it now.
+    if (localStorage.getItem(PENDING_RELAUNCH_KEY) === "true") {
+      localStorage.removeItem(PENDING_RELAUNCH_KEY);
+      void relaunch();
+      return;
+    }
     if (!autoCheck || !prefsHydrated) return;
     void runCheck();
   }, [autoCheck, prefsHydrated, runCheck]);
 
-  return { status, check: runCheck, install, dismiss };
+  return { status, check: runCheck, install, dismiss, restart, deferRestart };
 }
