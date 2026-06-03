@@ -26,9 +26,9 @@ import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import {
   Alert02Icon,
   ArrowDown01Icon,
-  ArrowRight01Icon,
   ArrowUp01Icon,
   CheckmarkCircle01Icon,
+  Clock01Icon,
   Download01Icon,
   FolderCloudIcon,
   FolderGitTwoIcon,
@@ -545,11 +545,16 @@ export const SourceControlPanel = memo(function SourceControlPanel({
         </header>
 
         <div className="flex shrink-0 items-stretch border-b border-border/40">
-          {onOpenGitGraph ? (
+          {/* Branches toggle — primary action, takes full width */}
+          {scm.panelState === "ready" && scm.status ? (
             <button
               type="button"
-              onClick={() => onOpenGitGraph()}
-              className="group flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-3 py-2 text-left text-muted-foreground transition-colors hover:bg-foreground/4 hover:text-foreground"
+              onClick={() => setBranchPanelOpen((v) => !v)}
+              aria-label="Toggle branch list"
+              className={cn(
+                "flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-3 py-2 text-muted-foreground transition-colors hover:bg-foreground/4 hover:text-foreground",
+                branchPanelOpen && "bg-foreground/5 text-foreground",
+              )}
             >
               <HugeiconsIcon
                 icon={GitBranchIcon}
@@ -558,14 +563,13 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 className="shrink-0"
               />
               <span className="min-w-0 flex-1 truncate text-[12px] font-medium">
-                Commit Graph
+                Branches
               </span>
-              <HugeiconsIcon
-                icon={ArrowRight01Icon}
-                size={12}
-                strokeWidth={2}
-                className="shrink-0 opacity-50 transition-transform group-hover:translate-x-0.5"
-              />
+              {totalBranchCount !== null ? (
+                <span className="text-[11px] font-medium tabular-nums">
+                  {totalBranchCount}
+                </span>
+              ) : null}
             </button>
           ) : (
             <div className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2">
@@ -580,22 +584,20 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               </span>
             </div>
           )}
-          {scm.panelState === "ready" && scm.status ? (
+          {/* Commit graph — secondary, icon-only right button */}
+          {onOpenGitGraph ? (
             <button
               type="button"
-              onClick={() => setBranchPanelOpen((v) => !v)}
-              aria-label="Toggle branch list"
-              className={cn(
-                "flex shrink-0 cursor-pointer items-center gap-1.5 border-l border-border/40 px-3 py-2 text-muted-foreground transition-colors hover:bg-foreground/4 hover:text-foreground",
-                branchPanelOpen && "bg-foreground/5 text-foreground",
-              )}
+              onClick={() => onOpenGitGraph()}
+              title="Open commit graph"
+              className="group flex shrink-0 cursor-pointer items-center border-l border-border/40 px-3 py-2 text-muted-foreground transition-colors hover:bg-foreground/4 hover:text-foreground"
             >
-              <HugeiconsIcon icon={GitBranchIcon} size={12} strokeWidth={1.9} />
-              {totalBranchCount !== null ? (
-                <span className="text-[11px] font-medium tabular-nums">
-                  {totalBranchCount}
-                </span>
-              ) : null}
+              <HugeiconsIcon
+                icon={Clock01Icon}
+                size={13}
+                strokeWidth={1.85}
+                className="shrink-0"
+              />
             </button>
           ) : null}
         </div>
@@ -615,7 +617,6 @@ export const SourceControlPanel = memo(function SourceControlPanel({
             statusAhead={scm.status.ahead}
             statusBehind={scm.status.behind}
             onBranchQueryChange={scm.setBranchQuery}
-            onFetchBranches={() => void scm.fetchBranches()}
             onRefreshBranches={() => void scm.refreshBranches()}
             onSwitchLocalBranch={(name) => void scm.switchLocalBranch(name)}
             onSwitchRemoteBranch={(name) => void scm.switchRemoteBranch(name)}
@@ -860,7 +861,6 @@ function BranchManager({
   statusAhead,
   statusBehind,
   onBranchQueryChange,
-  onFetchBranches,
   onRefreshBranches,
   onSwitchLocalBranch,
   onSwitchRemoteBranch,
@@ -880,7 +880,6 @@ function BranchManager({
   statusAhead: number;
   statusBehind: number;
   onBranchQueryChange: (value: string) => void;
-  onFetchBranches: () => void;
   onRefreshBranches: () => void;
   onSwitchLocalBranch: (name: string) => void;
   onSwitchRemoteBranch: (name: string) => void;
@@ -953,18 +952,6 @@ function BranchManager({
           onClick={onRefreshBranches}
         >
           <HugeiconsIcon icon={Refresh01Icon} size={13} strokeWidth={1.85} />
-        </IconActionButton>
-        <IconActionButton
-          label={fetchBusy ? "Fetching…" : "Fetch from remote"}
-          disabled={busy}
-          side="bottom"
-          onClick={onFetchBranches}
-        >
-          {fetchBusy ? (
-            <Spinner className="size-3" />
-          ) : (
-            <HugeiconsIcon icon={FolderCloudIcon} size={13} strokeWidth={1.85} />
-          )}
         </IconActionButton>
       </div>
 
