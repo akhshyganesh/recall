@@ -254,13 +254,6 @@ function Recorder({
   onRecord: (b: KeyBinding) => void;
   onCancel: () => void;
 }) {
-  const [_mods, setMods] = useState({
-    ctrl: false,
-    shift: false,
-    alt: false,
-    meta: false,
-  });
-
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => {
       e.preventDefault();
@@ -273,12 +266,6 @@ function Recorder({
 
       const isMod = ["Control", "Shift", "Alt", "Meta"].includes(e.key);
       if (isMod) {
-        setMods({
-          ctrl: e.ctrlKey,
-          shift: e.shiftKey,
-          alt: e.altKey,
-          meta: e.metaKey,
-        });
         return;
       }
 
@@ -299,16 +286,8 @@ function Recorder({
       });
     };
 
-    const onUp = (e: KeyboardEvent) => {
-      const isMod = ["Control", "Shift", "Alt", "Meta"].includes(e.key);
-      if (isMod) {
-        setMods({
-          ctrl: e.ctrlKey,
-          shift: e.shiftKey,
-          alt: e.altKey,
-          meta: e.metaKey,
-        });
-      }
+    const onUp = (_e: KeyboardEvent) => {
+      // no-op: modifier tracking removed
     };
 
     window.addEventListener("keydown", onDown, { capture: true });

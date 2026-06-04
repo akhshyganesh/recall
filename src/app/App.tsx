@@ -677,6 +677,14 @@ export default function App() {
         null)
       : null;
 
+  useEffect(() => {
+    const cwd = activeTerminalLeafCwd;
+    const parts = cwd ? cwd.replace(/\\/g, "/").split("/").filter(Boolean) : [];
+    const folder = parts[parts.length - 1] ?? "Recall";
+    const title = folder === "Recall" ? "Recall" : `${folder} — Recall`;
+    void getCurrentWebviewWindow().setTitle(title);
+  }, [activeTerminalLeafCwd]);
+
   const workspaceFallbackPath = launchCwdResolved
     ? (launchCwd ?? home ?? null)
     : null;
