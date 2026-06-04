@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -124,6 +125,13 @@ export function useFileTree(rootPath: string | null, options?: Options) {
 
   useEffect(() => {
     if (!rootPath) return;
+
+    // Register a live watcher for instant tree updates.
+    void invoke("fs_watch_add", { path: rootPath }).catch(() => {});
+    const unlistenPromise = listen<string[]>("fs:changed", () => {
+      void refreshLoadedPaths();
+    });
+
     const refreshOnFocus = () => void refreshLoadedPaths();
     const refreshOnVisibility = () => {
       if (document.visibilityState === "visible") void refreshLoadedPaths();
@@ -136,6 +144,8 @@ export function useFileTree(rootPath: string | null, options?: Options) {
       window.clearInterval(interval);
       window.removeEventListener("focus", refreshOnFocus);
       document.removeEventListener("visibilitychange", refreshOnVisibility);
+      void invoke("fs_watch_remove", { path: rootPath }).catch(() => {});
+      void unlistenPromise.then((unlisten) => unlisten());
     };
   }, [rootPath, refreshLoadedPaths]);
 

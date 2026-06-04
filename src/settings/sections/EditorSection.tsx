@@ -17,7 +17,7 @@ import {
 } from "@/modules/settings/store";
 import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { SectionHeader } from "../components/SectionHeader";
+import { SettingsCard } from "../components/SettingsCard";
 import { SettingRow } from "../components/SettingRow";
 
 export function EditorSection() {
@@ -27,13 +27,8 @@ export function EditorSection() {
   const onPickEditor = (id: EditorThemeId) => void setEditorTheme(id);
 
   return (
-    <div className="flex flex-col gap-6">
-      <SectionHeader
-        title="Editor"
-        description="CodeMirror theme and editing behavior."
-      />
-
-      <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-4">
+      <SettingsCard title="Theme">
         <SettingRow
           title="Editor theme"
           description="Choose the default theme for file editors and diffs."
@@ -42,15 +37,10 @@ export function EditorSection() {
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
-                className="h-9 justify-between gap-2 px-2.5 text-[12px]"
+                className="h-8 min-w-44 justify-between gap-2 px-2.5 text-[12px]"
               >
                 <span>{EDITOR_THEME_LABELS[editorTheme]}</span>
-                <HugeiconsIcon
-                  icon={ArrowDown01Icon}
-                  size={12}
-                  strokeWidth={2}
-                  className="opacity-70"
-                />
+                <HugeiconsIcon icon={ArrowDown01Icon} size={12} strokeWidth={2} className="opacity-70" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-[220px]">
@@ -58,10 +48,7 @@ export function EditorSection() {
                 <DropdownMenuItem
                   key={themeId}
                   onSelect={() => onPickEditor(themeId)}
-                  className={cn(
-                    "text-[12px]",
-                    themeId === editorTheme && "bg-accent/50",
-                  )}
+                  className={cn("text-[12px]", themeId === editorTheme && "bg-accent/50")}
                 >
                   {EDITOR_THEME_LABELS[themeId]}
                 </DropdownMenuItem>
@@ -69,17 +56,19 @@ export function EditorSection() {
             </DropdownMenuContent>
           </DropdownMenu>
         </SettingRow>
+      </SettingsCard>
 
+      <SettingsCard title="Keybindings">
         <SettingRow
           title="Vim mode"
-          description="Enable Vim keybindings in the code editor."
+          description="Enable Vim keybindings in the code editor. Supports normal, insert, and visual modes."
         >
           <Switch
             checked={vimMode}
             onCheckedChange={(value) => void setVimMode(value)}
           />
         </SettingRow>
-      </div>
+      </SettingsCard>
     </div>
   );
 }

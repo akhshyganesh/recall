@@ -23,6 +23,10 @@ type Props = {
   initialCwd?: string;
   /** Live-updated working directory (from OSC 7). */
   cwd?: string;
+  branchLabel?: string | null;
+  stagedCount?: number;
+  changedCount?: number;
+  onOpenSourceControl?: () => void;
   onSearchReady?: (leafId: number, addon: SearchAddon) => void;
   onExit?: (leafId: number, code: number) => void;
   onCwd?: (leafId: number, cwd: string) => void;
@@ -36,6 +40,10 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       focused = true,
       initialCwd,
       cwd,
+      branchLabel,
+      stagedCount = 0,
+      changedCount = 0,
+      onOpenSourceControl,
       onSearchReady,
       onExit,
       onCwd,
@@ -71,34 +79,54 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
 
     return (
       <div
-        className={cn(
-          "zoom-exempt flex h-full w-full flex-col overflow-hidden rounded-lg border bg-background transition-colors",
-          focused ? "border-border/50" : "border-border/20",
-        )}
+        className="zoom-exempt flex h-full w-full flex-col overflow-hidden bg-background [animation:terminal-enter_300ms_cubic-bezier(0.22,1,0.36,1)_both]"
         style={{
           visibility: visible ? "visible" : "hidden",
           pointerEvents: visible ? "auto" : "none",
         }}
       >
-        <div
+        <div ref={containerRef} className="min-h-0 flex-1" />
+        <button
+          type="button"
+          onClick={onOpenSourceControl}
+          disabled={!onOpenSourceControl}
           className={cn(
-            "flex h-7 shrink-0 items-center gap-1.5 border-b px-3 transition-colors",
-            focused
-              ? "border-border/30 bg-muted/25"
-              : "border-border/15 bg-muted/10",
+            "flex h-7 w-full shrink-0 items-center gap-2 border-t px-3 text-[9.5px] text-muted-foreground/72",
+            focused ? "border-border/22 bg-background" : "border-border/12 bg-background",
+            onOpenSourceControl &&
+              "cursor-pointer transition-colors hover:bg-accent/18 hover:text-foreground/85",
           )}
+          title={cwdLabel}
         >
-          <HugeiconsIcon
-            icon={Folder01Icon}
-            size={11}
-            strokeWidth={1.75}
-            className="shrink-0 text-muted-foreground/50"
-          />
-          <span className="truncate font-mono text-[11px] text-muted-foreground/70">
-            {cwdLabel}
+          <span className="flex min-w-0 items-center gap-1.5">
+            <HugeiconsIcon
+              icon={Folder01Icon}
+              size={10}
+              strokeWidth={1.8}
+              className="shrink-0 text-muted-foreground/55"
+            />
+            <span className="truncate font-mono text-[10px] text-foreground/78">
+              {cwdLabel}
+            </span>
           </span>
-        </div>
-        <div ref={containerRef} className="min-h-0 flex-1 p-2" />
+          <span className="ml-auto flex shrink-0 items-center gap-1.5">
+            {branchLabel ? (
+              <span className="font-mono text-[9px] text-muted-foreground/82">
+                {branchLabel}
+              </span>
+            ) : null}
+            {changedCount > 0 ? (
+              <span className="font-mono text-[9px]">
+                {changedCount} changed
+              </span>
+            ) : null}
+            {stagedCount > 0 ? (
+              <span className="font-mono text-[9px] text-emerald-400">
+                {stagedCount} staged
+              </span>
+            ) : null}
+          </span>
+        </button>
       </div>
     );
   },

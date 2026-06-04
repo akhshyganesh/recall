@@ -2,9 +2,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { ThemePref } from "@/modules/settings/store";
-import {
-  setShowHidden,
-} from "@/modules/settings/store";
+import { setShowHidden, setAutostart } from "@/modules/settings/store";
 import { useTheme } from "@/modules/theme";
 import {
   ComputerIcon,
@@ -12,7 +10,9 @@ import {
   Sun03Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { SectionHeader } from "../components/SectionHeader";
+import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
+import { useEffect } from "react";
+import { SettingsCard } from "../components/SettingsCard";
 import { SettingRow } from "../components/SettingRow";
 
 const APPEARANCE: {
@@ -28,52 +28,83 @@ const APPEARANCE: {
 export function GeneralSection() {
   const { theme, setTheme } = useTheme();
   const showHidden = usePreferencesStore((s) => s.showHidden);
+  const autostart = usePreferencesStore((s) => s.autostart);
+
+  useEffect(() => {
+    let alive = true;
+    void isEnabled()
+      .then((on) => {
+        if (!alive) return;
+        if (on !== usePreferencesStore.getState().autostart) {
+          void setAutostart(on);
+        }
+      })
+      .catch(() => undefined);
+    return () => { alive = false; };
+  }, []);
+
+  const onToggleAutostart = async (next: boolean) => {
+    try {
+      if (next) await enable();
+      else await disable();
+      await setAutostart(next);
+    } catch (error) {
+      console.error("autostart toggle failed", error);
+    }
+  };
 
   return (
-    <div className="flex flex-col gap-6">
-      <SectionHeader
-        title="General"
-        description="Appearance and workspace visibility."
-      />
+    <div className="flex flex-col">
+      <SettingsCard title="Appearance">
+        <SettingRow title="Theme" description="App color scheme.">
+          <div className="flex gap-1">
+            {APPEARANCE.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => setTheme(o.id)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-[11.5px] font-medium transition-all",
+                  theme === o.id
+                    ? "border-foreground/30 bg-foreground/8 text-foreground"
+                    : "border-border/40 text-muted-foreground hover:border-border hover:text-foreground",
+                )}
+              >
+                <HugeiconsIcon
+                  icon={o.icon}
+                  size={13}
+                  strokeWidth={theme === o.id ? 2 : 1.75}
+                />
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </SettingRow>
+      </SettingsCard>
 
-      <div className="flex flex-col gap-2">
-        <span className="text-[11px] font-medium tracking-tight text-muted-foreground">
-          Appearance
-        </span>
-        <div className="grid grid-cols-3 gap-2">
-          {APPEARANCE.map((o) => (
-            <button
-              key={o.id}
-              type="button"
-              onClick={() => setTheme(o.id)}
-              className={cn(
-                "group flex h-20 flex-col items-center justify-center gap-1.5 rounded-lg border bg-card transition-all",
-                theme === o.id
-                  ? "border-foreground/60 ring-1 ring-foreground/20"
-                  : "border-border/60 hover:border-border",
-              )}
-            >
-              <HugeiconsIcon icon={o.icon} size={18} strokeWidth={1.5} />
-              <span className="text-[11.5px]">{o.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <span className="text-[11px] font-medium tracking-tight text-muted-foreground">
-          Explorer
-        </span>
+      <SettingsCard title="Files">
         <SettingRow
           title="Show hidden files"
-          description="Include dot-prefixed files and folders (.env, .gitignore, .config) in the file explorer and search."
+          description="Include dot-prefixed files and folders in the explorer."
         >
           <Switch
             checked={showHidden}
             onCheckedChange={(v) => void setShowHidden(v)}
           />
         </SettingRow>
-      </div>
+      </SettingsCard>
+
+      <SettingsCard title="Startup">
+        <SettingRow
+          title="Launch at login"
+          description="Open Recall automatically when you sign in."
+        >
+          <Switch
+            checked={autostart}
+            onCheckedChange={(value) => void onToggleAutostart(value)}
+          />
+        </SettingRow>
+      </SettingsCard>
     </div>
   );
 }

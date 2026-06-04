@@ -53,71 +53,71 @@
 
 :root {
   --background: oklch(0.975 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(0.945 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --foreground: oklch(0.12 0 0);
+  --card: oklch(0.952 0 0);
+  --card-foreground: oklch(0.12 0 0);
   --popover: oklch(0.965 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.17 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.9 0 0);
-  --secondary-foreground: oklch(0.18 0 0);
-  --muted: oklch(0.905 0 0);
-  --muted-foreground: oklch(0.42 0 0);
-  --accent: oklch(0.82 0 0);
-  --accent-foreground: oklch(0.13 0 0);
-    --destructive: oklch(0.56 0.205 28);
-  --border: oklch(0.72 0 0);
-  --input: oklch(0.88 0 0);
-  --ring: oklch(0.52 0 0);
+  --popover-foreground: oklch(0.12 0 0);
+  --primary: oklch(0.38 0.17 192);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.91 0 0);
+  --secondary-foreground: oklch(0.17 0 0);
+  --muted: oklch(0.91 0 0);
+  --muted-foreground: oklch(0.46 0 0);
+  --accent: oklch(0.88 0 0);
+  --accent-foreground: oklch(0.12 0 0);
+  --destructive: oklch(0.56 0.205 28);
+  --border: oklch(0.82 0 0);
+  --input: oklch(0.89 0 0);
+  --ring: oklch(0.38 0.17 192);
   --chart-1: oklch(0.24 0 0);
   --chart-2: oklch(0.38 0 0);
   --chart-3: oklch(0.52 0 0);
   --chart-4: oklch(0.66 0 0);
   --chart-5: oklch(0.8 0 0);
-    --radius: 0.625rem;
-  --sidebar: oklch(0.93 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.17 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.84 0 0);
-  --sidebar-accent-foreground: oklch(0.13 0 0);
-  --sidebar-border: oklch(0.7 0 0);
-  --sidebar-ring: oklch(0.52 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.945 0 0);
+  --sidebar-foreground: oklch(0.12 0 0);
+  --sidebar-primary: oklch(0.38 0.17 192);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.87 0 0);
+  --sidebar-accent-foreground: oklch(0.12 0 0);
+  --sidebar-border: oklch(0.80 0 0);
+  --sidebar-ring: oklch(0.38 0.17 192);
 }
 
 .dark {
-  --background: oklch(0.12 0 0);
-  --foreground: oklch(0.935 0 0);
-  --card: oklch(0.18 0 0);
-  --card-foreground: oklch(0.935 0 0);
-  --popover: oklch(0.2 0 0);
-  --popover-foreground: oklch(0.935 0 0);
-  --primary: oklch(0.9 0 0);
-  --primary-foreground: oklch(0.12 0 0);
-  --secondary: oklch(0.28 0 0);
-  --secondary-foreground: oklch(0.9 0 0);
-  --muted: oklch(0.25 0 0);
-  --muted-foreground: oklch(0.68 0 0);
-  --accent: oklch(0.34 0 0);
+  --background: oklch(0.095 0.008 265);
+  --foreground: oklch(0.94 0 0);
+  --card: oklch(0.14 0.006 265);
+  --card-foreground: oklch(0.94 0 0);
+  --popover: oklch(0.17 0.006 265);
+  --popover-foreground: oklch(0.94 0 0);
+  --primary: oklch(0.68 0.17 192);
+  --primary-foreground: oklch(0.05 0 0);
+  --secondary: oklch(0.24 0.007 265);
+  --secondary-foreground: oklch(0.91 0 0);
+  --muted: oklch(0.21 0.007 265);
+  --muted-foreground: oklch(0.58 0.01 265);
+  --accent: oklch(0.23 0.007 265);
   --accent-foreground: oklch(0.94 0 0);
-    --destructive: oklch(0.68 0.18 27);
-  --border: oklch(0.39 0 0 / 72%);
-  --input: oklch(0.27 0 0);
-  --ring: oklch(0.68 0 0);
+  --destructive: oklch(0.68 0.18 27);
+  --border: oklch(0.30 0.008 265 / 65%);
+  --input: oklch(0.22 0.007 265);
+  --ring: oklch(0.68 0.17 192);
   --chart-1: oklch(0.88 0 0);
   --chart-2: oklch(0.74 0 0);
-  --chart-3: oklch(0.6 0 0);
+  --chart-3: oklch(0.60 0 0);
   --chart-4: oklch(0.46 0 0);
   --chart-5: oklch(0.32 0 0);
-  --sidebar: oklch(0.16 0 0);
-  --sidebar-foreground: oklch(0.935 0 0);
-  --sidebar-primary: oklch(0.9 0 0);
-  --sidebar-primary-foreground: oklch(0.12 0 0);
-  --sidebar-accent: oklch(0.28 0 0);
+  --sidebar: oklch(0.12 0.008 265);
+  --sidebar-foreground: oklch(0.94 0 0);
+  --sidebar-primary: oklch(0.68 0.17 192);
+  --sidebar-primary-foreground: oklch(0.05 0 0);
+  --sidebar-accent: oklch(0.21 0.007 265);
   --sidebar-accent-foreground: oklch(0.94 0 0);
-  --sidebar-border: oklch(0.39 0 0 / 72%);
-  --sidebar-ring: oklch(0.68 0 0);
+  --sidebar-border: oklch(0.28 0.008 265 / 65%);
+  --sidebar-ring: oklch(0.68 0.17 192);
 }
 
 @layer base {
@@ -276,6 +276,17 @@ html *::-webkit-scrollbar {
   width: 0;
   height: 0;
   display: none;
+}
+
+@keyframes terminal-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes recall-collapsible-down {

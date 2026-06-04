@@ -19,7 +19,6 @@ import {
 import { Copy01Icon, Link01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState, type ReactNode } from "react";
-import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
 
 type McpStatus = { running: boolean; endpoint: string };
@@ -32,8 +31,7 @@ export function SessionsMcpSection() {
   const { copied, handleCopy } = useCopyFeedback();
 
   return (
-    <div className="flex flex-col gap-6">
-      <SectionHeader title="Session MCP" description="Connect local agents to indexed Recall session history." />
+    <div className="flex flex-col gap-4">
       <McpConnectionCard title="Session Connect" description="Expose indexed session history to local agents so they can inspect prior work, project context, and transcript history." enabled={sessionsMcpEnabled} connection={sessionsConnection} endpointFallback={SESSIONS_MCP_ENDPOINT} setupSteps={SESSIONS_MCP_SETUP_STEPS} skillMarkdown={SESSIONS_MCP_SKILL_MARKDOWN} endpointCopyTarget="sessions-endpoint" skillCopyTarget="sessions-skill" copied={copied} onCopy={handleCopy} />
     </div>
   );

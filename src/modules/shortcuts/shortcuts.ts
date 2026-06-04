@@ -27,6 +27,7 @@ export type ShortcutId =
   | "shortcuts.open"
   | "settings.open"
   | "sidebar.toggle"
+  | "view.zen"
   | "editor.undo"
   | "editor.redo"
   | "terminal.clear";
@@ -201,6 +202,12 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Reset zoom",
     group: "View",
     defaultBindings: [{ [MOD_PROP]: true, key: "0" }],
+  },
+  {
+    id: "view.zen",
+    label: "Toggle zen mode",
+    group: "View",
+    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "z" }],
   },
   // Editor group — also handled by CodeMirror's historyKeymap natively.
   {

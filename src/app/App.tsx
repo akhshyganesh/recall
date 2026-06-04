@@ -14,6 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { native } from "@/lib/native";
 import {
@@ -43,6 +44,7 @@ import {
 import {
   listenSettingsTabRequests,
   settingsTabTitle,
+  type SettingsTab,
 } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setSessionsMcpEnabled as applySessionsMcpEnabled } from "@/modules/sessions/api";
@@ -81,6 +83,7 @@ import {
   useWorkspaceEnvStore,
   type WorkspaceEnv,
 } from "@/modules/workspace";
+import { invoke } from "@tauri-apps/api/core";
 import { homeDir } from "@tauri-apps/api/path";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type { SearchAddon } from "@xterm/addon-search";
@@ -88,6 +91,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { PanelImperativeHandle } from "react-resizable-panels";
 import { SettingsPanel } from "@/settings/SettingsApp";
+import {
+  closeRightPanel,
+  createRightPanelState,
+  getVisibleRightPanelView,
+  sanitizeRightPanelState,
+  toggleGitContextPanel,
+  type RightPanelState,
+  type RightPanelViewId,
+} from "./rightPanelState";
 
 function dirname(path: string | null): string | null {
   if (!path) return null;
@@ -136,10 +148,11 @@ const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 480;
 const SIDEBAR_WIDTH_STORAGE_KEY = "recall.sidebar.width";
 const SIDEBAR_VIEW_STORAGE_KEY = "recall.sidebar.view.v2";
-const GIT_CONTEXT_DEFAULT_WIDTH = 300;
-const GIT_CONTEXT_MIN_WIDTH = 240;
-const GIT_CONTEXT_MAX_WIDTH = 460;
-const GIT_CONTEXT_WIDTH_STORAGE_KEY = "recall.git-context.width";
+// Single right panel used for both Settings and Source Control views.
+const RIGHT_PANEL_DEFAULT_WIDTH = 380;
+const RIGHT_PANEL_MIN_WIDTH = 240;
+const RIGHT_PANEL_MAX_WIDTH = 600;
+const RIGHT_PANEL_WIDTH_STORAGE_KEY = "recall.right-panel.width";
 
 function clampSidebarWidth(width: number): number {
   return Math.min(
@@ -170,23 +183,35 @@ function readSidebarView(): SidebarViewId {
   return "explorer";
 }
 
-function clampGitContextWidth(width: number): number {
+function clampRightPanelWidth(width: number): number {
   return Math.min(
-    GIT_CONTEXT_MAX_WIDTH,
-    Math.max(GIT_CONTEXT_MIN_WIDTH, Math.round(width)),
-  );
+    RIGHT_PANEL_MAX_WIDTH,
+    Math.max(RIGHT_PANEL_MIN_WIDTH, Math.round(width)),
+   );
 }
 
-function readGitContextWidth(): number {
+function readRightPanelWidth(): number {
   try {
-    const stored = window.localStorage.getItem(GIT_CONTEXT_WIDTH_STORAGE_KEY);
+    const stored = window.localStorage.getItem(RIGHT_PANEL_WIDTH_STORAGE_KEY);
     const parsed = stored ? Number.parseInt(stored, 10) : NaN;
     return Number.isFinite(parsed)
-      ? clampGitContextWidth(parsed)
-      : GIT_CONTEXT_DEFAULT_WIDTH;
+       ? clampRightPanelWidth(parsed)
+       : RIGHT_PANEL_DEFAULT_WIDTH;
+   } catch {
+    return RIGHT_PANEL_DEFAULT_WIDTH;
+   }
+}
+
+export type { RightPanelViewId } from "./rightPanelState";
+
+function readRightPanelView(): RightPanelViewId {
+  try {
+    const stored = window.localStorage.getItem("recall.right-panel.view");
+    if (stored === "git-context") return stored;
   } catch {
-    return GIT_CONTEXT_DEFAULT_WIDTH;
+    // ignore
   }
+  return "closed";
 }
 
 export default function App() {
@@ -245,12 +270,17 @@ export default function App() {
   const explorerReturnFocusRef = useRef<HTMLElement | null>(null);
 
   const sidebarRef = useRef<PanelImperativeHandle | null>(null);
-  const gitContextRef = useRef<PanelImperativeHandle | null>(null);
+  const rightPanelRef = useRef<PanelImperativeHandle | null>(null);
   const sidebarWidthRef = useRef(readSidebarWidth());
-  const gitContextWidthRef = useRef(readGitContextWidth());
+  const rightPanelWidthRef = useRef(readRightPanelWidth());
   const sidebarWidthWriteTimerRef = useRef(0);
-  const gitContextWidthWriteTimerRef = useRef(0);
+  const rightPanelWidthWriteTimerRef = useRef(0);
   const [sidebarView, setSidebarViewState] = useState<SidebarViewId>(readSidebarView);
+  const [rightPanelState, setRightPanelState] = useState<RightPanelState>(() =>
+    createRightPanelState(readRightPanelView()),
+  );
+  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
+  const [settingsDialogTab, setSettingsDialogTab] = useState<SettingsTab>("general");
   const persistSidebarView = useCallback((view: SidebarViewId) => {
     setSidebarViewState(view);
     try {
@@ -282,6 +312,16 @@ export default function App() {
     },
     [persistSidebarView, sidebarView],
   );
+  const openSidebarSettings = useCallback((tab: SettingsTab = "general") => {
+    setSettingsDialogTab(tab);
+    setSettingsDialogOpen(true);
+  }, []);
+  const toggleSidebarSettings = useCallback(() => {
+    setSettingsDialogOpen((prev) => !prev);
+  }, []);
+  const closeSidebarSettings = useCallback(() => {
+    setSettingsDialogOpen(false);
+  }, []);
   const persistSidebarWidth = useCallback((next: number) => {
     sidebarWidthRef.current = next;
     if (sidebarWidthWriteTimerRef.current) {
@@ -295,34 +335,32 @@ export default function App() {
         // ignore
       }
     }, 200);
-  }, []);
-  const persistGitContextWidth = useCallback((next: number) => {
-    gitContextWidthRef.current = next;
-    if (gitContextWidthWriteTimerRef.current) {
-      window.clearTimeout(gitContextWidthWriteTimerRef.current);
-    }
-    gitContextWidthWriteTimerRef.current = window.setTimeout(() => {
-      gitContextWidthWriteTimerRef.current = 0;
+    }, []);
+  const persistRightPanelWidth = useCallback((next: number) => {
+    rightPanelWidthRef.current = next;
+    if (rightPanelWidthWriteTimerRef.current) {
+      window.clearTimeout(rightPanelWidthWriteTimerRef.current);
+     }
+    rightPanelWidthWriteTimerRef.current = window.setTimeout(() => {
+      rightPanelWidthWriteTimerRef.current = 0;
       try {
-        window.localStorage.setItem(
-          GIT_CONTEXT_WIDTH_STORAGE_KEY,
-          String(next),
-        );
-      } catch {
-        // ignore
-      }
-    }, 200);
-  }, []);
+        window.localStorage.setItem(RIGHT_PANEL_WIDTH_STORAGE_KEY, String(next));
+       } catch {
+         // ignore
+       }
+     }, 200);
+   }, []);
+
   useEffect(() => {
     return () => {
       if (sidebarWidthWriteTimerRef.current) {
         window.clearTimeout(sidebarWidthWriteTimerRef.current);
-      }
-      if (gitContextWidthWriteTimerRef.current) {
-        window.clearTimeout(gitContextWidthWriteTimerRef.current);
-      }
-    };
-  }, []);
+       }
+      if (rightPanelWidthWriteTimerRef.current) {
+        window.clearTimeout(rightPanelWidthWriteTimerRef.current);
+       }
+     };
+   }, []);
 
   const toggleExplorerFocus = useCallback(() => {
     const explorer = explorerRef.current;
@@ -365,7 +403,8 @@ export default function App() {
   const [pendingDeleteTabs, setPendingDeleteTabs] = useState<number[] | null>(
     null,
   );
-  const [gitContextOpen, setGitContextOpen] = useState(true);
+  const [zenMode, setZenMode] = useState(false);
+  const [pendingRunningTab, setPendingRunningTab] = useState<number | null>(null);
   useEffect(() => {
     homeDir()
       .then(async (p) => {
@@ -547,6 +586,20 @@ export default function App() {
         setPendingCloseTab(id);
         return;
       }
+      if (t?.kind === "terminal") {
+        const tabLeafIds = leafIds(t.paneTree);
+        void (async () => {
+          for (const leafId of tabLeafIds) {
+            const hasChild = await invoke<boolean>("pty_has_child", { id: leafId }).catch(() => false);
+            if (hasChild) {
+              setPendingRunningTab(id);
+              return;
+            }
+          }
+          disposeTab(id);
+        })();
+        return;
+      }
       disposeTab(id);
     },
     [tabs, disposeTab],
@@ -566,6 +619,17 @@ export default function App() {
 
   const cancelClose = useCallback(() => {
     setPendingCloseTab(null);
+  }, []);
+
+  const confirmRunningClose = useCallback(() => {
+    if (pendingRunningTab !== null) {
+      disposeTab(pendingRunningTab);
+      setPendingRunningTab(null);
+    }
+  }, [pendingRunningTab, disposeTab]);
+
+  const cancelRunningClose = useCallback(() => {
+    setPendingRunningTab(null);
   }, []);
 
   const cycleTab = useCallback(
@@ -700,7 +764,10 @@ export default function App() {
     return explorerRoot ?? workspaceFallbackPath;
   })();
   const sourceControl = useSourceControl(sourceControlContextPath, true);
-  const showGitContext = gitContextOpen && sourceControl.hasRepo;
+  const rightPanelView = getVisibleRightPanelView(
+    rightPanelState,
+    sourceControl.hasRepo,
+  );
   const branchName = sourceControl.status?.isDetached
     ? "detached"
     : (sourceControl.status?.branch ?? sourceControl.repo?.branch ?? null);
@@ -717,46 +784,62 @@ export default function App() {
       ? `${branchName} ${branchDivergence}`
       : branchName
     : null;
-  const branchTitle = sourceControl.repo
-    ? `${sourceControl.repo.repoRoot}${
-        sourceControl.upstream ? ` · ${sourceControl.upstream}` : ""
-      }`
-    : undefined;
+  const stagedChangeCount = sourceControl.status?.changedFiles.filter(
+    (file) => file.staged,
+  ).length ?? 0;
+  const changedFileCount = sourceControl.status?.changedFiles.length ?? 0;
 
   const toggleSourceControl = useCallback(() => {
     if (!sourceControl.hasRepo) return;
-    setGitContextOpen((open) => !open);
+    setRightPanelState((prev) =>
+      toggleGitContextPanel(prev, sourceControl.hasRepo),
+    );
+  }, [sourceControl.hasRepo]);
+
+  const rightPanelOpen = rightPanelView !== "closed";
+
+  useEffect(() => {
+    setRightPanelState((prev) =>
+      sanitizeRightPanelState(prev, sourceControl.hasRepo),
+    );
   }, [sourceControl.hasRepo]);
 
   useEffect(() => {
-    if (!sourceControl.hasRepo) return;
+    try {
+      window.localStorage.setItem("recall.right-panel.view", rightPanelView);
+    } catch {
+      // ignore
+    }
+  }, [rightPanelView]);
 
+  useEffect(() => {
     let retryFrame = 0;
     const applyPanelState = (allowRetry: boolean) => {
-      const panel = gitContextRef.current;
+      const panel = rightPanelRef.current;
       if (!panel) return;
       try {
-        if (gitContextOpen) panel.resize(`${gitContextWidthRef.current}px`);
+        if (rightPanelOpen) panel.resize(`${rightPanelWidthRef.current}px`);
         else panel.collapse();
-      } catch (error) {
+       } catch (error) {
         if (
           allowRetry &&
           error instanceof Error &&
-          error.message.includes("Layout not found for Panel git-context")
-        ) {
+          error.message.includes("Layout not found for Panel right-panel")
+         ) {
           retryFrame = window.requestAnimationFrame(() => applyPanelState(false));
           return;
-        }
-        console.warn("git context panel resize skipped:", error);
-      }
-    };
+         }
+        console.warn("right panel resize skipped:", error);
+       }
+     };
 
     const frame = window.requestAnimationFrame(() => applyPanelState(true));
     return () => {
       window.cancelAnimationFrame(frame);
       if (retryFrame) window.cancelAnimationFrame(retryFrame);
-    };
-  }, [gitContextOpen, sourceControl.hasRepo]);
+     };
+   }, [rightPanelOpen, rightPanelView]);
+
 
   const openGitGraphFromContext = useCallback(async () => {
     const known = sourceControl.hasRepo ? sourceControl.repo : null;
@@ -900,6 +983,13 @@ export default function App() {
     setUnsplitDragPos(null);
     setUnsplitOverHeader(false);
   }, [unsplitDraggingTabId, removeSplitTab]);
+  const draggingTab = useMemo(
+    () =>
+      unsplitDraggingTabId === null
+        ? null
+        : tabs.find((tab) => tab.id === unsplitDraggingTabId) ?? null,
+    [tabs, unsplitDraggingTabId],
+  );
 
   const shortcutHandlers = useMemo<ShortcutHandlers>(
     () => ({
@@ -916,8 +1006,8 @@ export default function App() {
       "pane.focusPrev": () => focusNextPaneInTab(activeId, -1),
       "pane.source": toggleSourceControl,
       "search.focus": () => searchInlineRef.current?.focus(),
-      "shortcuts.open": () => openSettingsTab("shortcuts"),
-      "settings.open": () => openSettingsTab("general"),
+      "shortcuts.open": () => openSidebarSettings("shortcuts"),
+      "settings.open": () => openSidebarSettings("general"),
       "terminal.clear": () => {
         if (activeLeafId !== null) terminalRefs.current.get(activeLeafId)?.clear();
       },
@@ -927,6 +1017,7 @@ export default function App() {
       "view.zoomIn": zoomIn,
       "view.zoomOut": zoomOut,
       "view.zoomReset": zoomReset,
+      "view.zen": () => setZenMode((z) => !z),
       "editor.undo": () => editorRefs.current.get(activeId)?.undo(),
       "editor.redo": () => editorRefs.current.get(activeId)?.redo(),
     }),
@@ -937,7 +1028,7 @@ export default function App() {
       handleCloseTabOrPane,
       openNewTab,
       openPreviewTab,
-      openSettingsTab,
+      openSidebarSettings,
       selectByIndex,
       splitActivePaneInActiveTab,
       focusNextPaneInTab,
@@ -1063,6 +1154,29 @@ export default function App() {
   const hasSplit = splitTabs.length > 0;
   const primaryTabs = hasSplit ? tabs.filter((t) => !rowSplitTabIds.includes(t.id) && !colSplitTabIds.includes(t.id)) : tabs;
 
+  const handleCloseOthers = useCallback(
+    (keepId: number) => {
+      for (const t of primaryTabs) {
+        if (t.id === keepId) continue;
+        if (t.kind === "editor" && t.dirty) continue;
+        disposeTab(t.id);
+      }
+    },
+    [primaryTabs, disposeTab],
+  );
+
+  const handleCloseToRight = useCallback(
+    (id: number) => {
+      const idx = primaryTabs.findIndex((t) => t.id === id);
+      if (idx < 0) return;
+      for (const t of primaryTabs.slice(idx + 1)) {
+        if (t.kind === "editor" && t.dirty) continue;
+        disposeTab(t.id);
+      }
+    },
+    [primaryTabs, disposeTab],
+  );
+
   const renderSplitPanel = (t: Tab) => (
     <div className="group/pane flex h-full min-h-0 flex-col">
       <div className="flex h-7 shrink-0 select-none items-center gap-1 border-b border-border/40 bg-card/50 px-1.5">
@@ -1111,6 +1225,10 @@ export default function App() {
             onCwd={handleTerminalCwd}
             onExit={handleLeafExit}
             onFocusLeaf={handleFocusLeaf}
+            branchLabel={branchLabel}
+            stagedCount={stagedChangeCount}
+            changedCount={changedFileCount}
+            onOpenSourceControl={sourceControl.hasRepo ? toggleSourceControl : undefined}
           />
         </div>
       );
@@ -1159,7 +1277,7 @@ export default function App() {
     <div className="relative h-full min-h-0">
       <div
         className={cn(
-          "absolute inset-0 p-2",
+          "absolute inset-0",
           !isTerminalTab && "invisible pointer-events-none",
         )}
         aria-hidden={!isTerminalTab}
@@ -1172,6 +1290,10 @@ export default function App() {
           onCwd={handleTerminalCwd}
           onExit={handleLeafExit}
           onFocusLeaf={handleFocusLeaf}
+          branchLabel={branchLabel}
+          stagedCount={stagedChangeCount}
+          changedCount={changedFileCount}
+          onOpenSourceControl={sourceControl.hasRepo ? toggleSourceControl : undefined}
         />
       </div>
       <div
@@ -1280,7 +1402,7 @@ export default function App() {
     <ThemeProvider>
       <TooltipProvider>
         <div className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
-          <Header
+          {!zenMode && <Header
             tabs={primaryTabs}
             activeId={activeId}
             onSelect={setActiveId}
@@ -1307,28 +1429,19 @@ export default function App() {
               reorderTab(fromFull, dropFull);
             }}
             onOpenInSplit={openSplitView}
+            onCloseOthers={handleCloseOthers}
+            onCloseToRight={handleCloseToRight}
             onDragToSplit={handleDragToSplit}
             onSplitZoneChange={setSplitDragZone}
             getWorkspaceRect={getWorkspaceRect}
             onToggleSidebar={toggleSidebar}
-            onToggleSourceControl={toggleSourceControl}
-            onSplit={splitActivePaneInActiveTab}
-            canSplit={
-              activeTerminalTab !== null &&
-              leafIds(activeTerminalTab.paneTree).length < MAX_PANES_PER_TAB
-            }
-            onOpenSettings={() => openSettingsTab("general")}
-            sourceControlAvailable={sourceControl.hasRepo}
-            sourceControlOpen={showGitContext}
-            branchLabel={branchLabel}
-            branchTitle={branchTitle}
             searchTarget={searchTarget}
             searchRef={searchInlineRef}
             onWorkspaceChange={switchWorkspace}
             unsplitDropActive={unsplitOverHeader}
-          />
+          />}
 
-          <main className="zoom-content flex min-h-0 flex-1 flex-col bg-background p-1.5">
+          <main className="zoom-content flex min-h-0 flex-1 flex-col bg-background">
             <ResizablePanelGroup
               id="workspace-layout"
               orientation="horizontal"
@@ -1347,7 +1460,7 @@ export default function App() {
                   if (size.inPixels > 0) persistSidebarWidth(size.inPixels);
                 }}
               >
-                <div className="flex h-full min-h-0 flex-col border border-sidebar-border bg-sidebar text-sidebar-foreground">
+                <div className="flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground">
                   <div className="min-h-0 flex-1">
                     {sidebarView === "sessions" ? (
                       <SessionSidebar
@@ -1367,13 +1480,9 @@ export default function App() {
                       />
                     )}
                   </div>
-                  <SidebarRail
-                    activeView={sidebarView}
-                    onSelectView={cycleSidebarView}
-                  />
                 </div>
               </ResizablePanel>
-              <ResizableHandle withHandle />
+              <ResizableHandle />
               <ResizablePanel
                 id="workspace"
                 defaultSize="78%"
@@ -1381,7 +1490,7 @@ export default function App() {
               >
                 <div
                   ref={workspacePanelRef}
-                  className="relative flex h-full min-h-0 flex-col border-y border-border/60 bg-card/35"
+                  className="relative flex h-full min-h-0 flex-col bg-background"
                 >
                   {hasSplit ? (() => {
                     const rowSplitTabs = tabs.filter((t) => rowSplitTabIds.includes(t.id));
@@ -1404,7 +1513,7 @@ export default function App() {
                           <div className="relative h-full min-h-0">{workspaceSurface}</div>
                         </ResizablePanel>
                         {colSplitTabs.flatMap((t) => [
-                          <ResizableHandle key={`col-handle-${t.id}`} withHandle />,
+                          <ResizableHandle key={`col-handle-${t.id}`} />,
                           <ResizablePanel
                             key={`col-pane-${t.id}`}
                             id={`workspace-col-${t.id}`}
@@ -1437,7 +1546,7 @@ export default function App() {
                           {leftColumnInner}
                         </ResizablePanel>
                         {rowSplitTabs.flatMap((t) => [
-                          <ResizableHandle key={`row-handle-${t.id}`} withHandle />,
+                          <ResizableHandle key={`row-handle-${t.id}`} />,
                           <ResizablePanel
                             key={`row-pane-${t.id}`}
                             id={`workspace-row-${t.id}`}
@@ -1466,57 +1575,68 @@ export default function App() {
                   )}
                 </div>
               </ResizablePanel>
-              {sourceControl.hasRepo ? (
-                <>
-                  <ResizableHandle withHandle />
-                  <ResizablePanel
-                    id="git-context"
-                    panelRef={gitContextRef}
-                    collapsible
-                    collapsedSize={0}
-                    defaultSize={`${gitContextWidthRef.current}px`}
-                    minSize={`${GIT_CONTEXT_MIN_WIDTH}px`}
-                    maxSize={`${GIT_CONTEXT_MAX_WIDTH}px`}
-                    groupResizeBehavior="preserve-pixel-size"
-                    onResize={(size) => {
-                      if (size.inPixels > 0) {
-                        persistGitContextWidth(size.inPixels);
-                      }
-                    }}
-                  >
-                    <SourceControlPanel
-                      open={showGitContext}
-                      sourceControl={sourceControl}
-                      onOpenDiff={openGitDiffTab}
-                      onOpenGitGraph={openGitGraphFromContext}
-                    />
-                  </ResizablePanel>
-                </>
-              ) : null}
-            </ResizablePanelGroup>
-          </main>
+               {rightPanelOpen && <ResizableHandle />}
+                <ResizablePanel
+                 id="right-panel"
+                 panelRef={rightPanelRef}
+                 defaultSize={`${rightPanelWidthRef.current}px`}
+                 minSize={`${RIGHT_PANEL_MIN_WIDTH}px`}
+                 maxSize={`${RIGHT_PANEL_MAX_WIDTH}px`}
+                 groupResizeBehavior="preserve-pixel-size"
+                 collapsible
+                 collapsedSize={0}
+                 onResize={(size) => {
+                    if (size.inPixels > 0) persistRightPanelWidth(size.inPixels);
+                    else setRightPanelState((prev) => closeRightPanel(prev));
+                      }}
+                >
+                 <div className="flex h-full bg-card/25">
+                   {sourceControl.hasRepo && rightPanelView === "git-context" ? (
+                     <SourceControlPanel
+                       open={rightPanelView === "git-context"}
+                       sourceControl={sourceControl}
+                       onOpenDiff={openGitDiffTab}
+                       onOpenGitGraph={openGitGraphFromContext}
+                     />
+                   ) : null}
+                  </div>
+                </ResizablePanel>
+             </ResizablePanelGroup>
+           </main>
 
-          {unsplitDraggingTabId !== null && unsplitDragPos !== null && (() => {
-            const draggingTab = tabs.find((t) => t.id === unsplitDraggingTabId);
-            if (!draggingTab) return null;
-            return createPortal(
-              <div
-                className={cn(
-                  "pointer-events-none fixed z-[9999] flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold shadow-lg",
-                  unsplitOverHeader
-                    ? "border-2 border-primary bg-primary/15 text-foreground"
-                    : "border border-border/80 bg-card text-foreground",
-                )}
-                style={{ left: unsplitDragPos.x + 14, top: unsplitDragPos.y + 12 }}
-              >
-                <span className="max-w-[8rem] truncate">{draggingTab.title}</span>
-                {unsplitOverHeader && (
-                  <span className="shrink-0 text-primary opacity-80">↑ to tab bar</span>
-                )}
-              </div>,
-              document.body,
-            );
-          })()}
+          {!zenMode && (
+            <SidebarRail
+              activeView={sidebarView}
+              onSelectView={cycleSidebarView}
+              settingsOpen={settingsDialogOpen}
+              onToggleSettings={toggleSidebarSettings}
+            />
+          )}
+
+           {draggingTab && unsplitDragPos
+             ? createPortal(
+                 <div
+                   className={cn(
+                     "pointer-events-none fixed z-[9999] flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold shadow-lg",
+                     unsplitOverHeader
+                       ? "border-2 border-primary bg-primary/15 text-foreground"
+                       : "border border-border/80 bg-card text-foreground",
+                   )}
+                   style={{
+                     left: unsplitDragPos.x + 14,
+                     top: unsplitDragPos.y + 12,
+                   }}
+                 >
+                   <span className="max-w-[8rem] truncate">{draggingTab.title}</span>
+                   {unsplitOverHeader && (
+                     <span className="shrink-0 text-primary opacity-80">
+                       ↑ to tab bar
+                     </span>
+                   )}
+                 </div>,
+                 document.body,
+               )
+             : null}
 
           <NewEditorDialog
             open={newEditorOpen}
@@ -1526,6 +1646,18 @@ export default function App() {
           />
 
           <UpdaterDialog />
+
+          <Dialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen}>
+            <DialogContent showCloseButton={false} className="gap-0 overflow-hidden rounded-xl border border-border/40 p-0 max-w-[680px] h-[600px]">
+              <DialogTitle className="sr-only">Settings</DialogTitle>
+              <SettingsPanel
+                embedded
+                activeTab={settingsDialogTab}
+                onActiveTabChange={setSettingsDialogTab}
+                onClose={closeSidebarSettings}
+              />
+            </DialogContent>
+          </Dialog>
 
           <QuickOpen
             open={quickOpenVisible}
@@ -1585,6 +1717,27 @@ export default function App() {
                   Cancel
                 </AlertDialogCancel>
                 <AlertDialogAction onClick={confirmDeleteClose}>
+                  Close Anyway
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <AlertDialog
+            open={pendingRunningTab !== null}
+            onOpenChange={(open) => !open && cancelRunningClose()}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Running Process</AlertDialogTitle>
+                <AlertDialogDescription>
+                  A process is running in this terminal. Close it anyway?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={cancelRunningClose}>
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction onClick={confirmRunningClose}>
                   Close Anyway
                 </AlertDialogAction>
               </AlertDialogFooter>

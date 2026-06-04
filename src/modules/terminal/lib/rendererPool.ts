@@ -97,28 +97,32 @@ function resolveCssVar(varName: string): string | undefined {
 function buildXtermTheme(): ITheme {
   const bg = resolveCssVar("background") ?? "#1e1e1e";
   const fg = resolveCssVar("foreground") ?? "#e8e8e8";
-  const sel = resolveCssVar("accent") ?? "#363636";
+  const card = resolveCssVar("card") ?? bg;
+  const muted = resolveCssVar("muted-foreground") ?? "#9a9a9a";
+  const primary = resolveCssVar("primary") ?? fg;
+  const destructive = resolveCssVar("destructive") ?? "#d16969";
+  const sel = resolveCssVar("accent") ?? card;
   return {
     background: bg,
     foreground: fg,
-    cursor: fg,
+    cursor: primary,
     cursorAccent: bg,
     selectionBackground: sel,
-    black: "#111111",
-    red: "#8a8a8a",
-    green: "#6f6f6f",
-    yellow: "#7a7a7a",
-    blue: "#5f5f5f",
-    magenta: "#737373",
-    cyan: "#808080",
+    black: card,
+    red: destructive,
+    green: primary,
+    yellow: "#d7ba7d",
+    blue: "#6a8fb0",
+    magenta: "#a18cc4",
+    cyan: "#77a5a5",
     white: "#e5e5e5",
-    brightBlack: "#555555",
-    brightRed: "#a3a3a3",
-    brightGreen: "#9a9a9a",
-    brightYellow: "#b0b0b0",
-    brightBlue: "#c2c2c2",
-    brightMagenta: "#adadad",
-    brightCyan: "#bababa",
+    brightBlack: muted,
+    brightRed: "#f38ba8",
+    brightGreen: "#89dceb",
+    brightYellow: "#f9e2af",
+    brightBlue: "#89b4fa",
+    brightMagenta: "#cba6f7",
+    brightCyan: "#94e2d5",
     brightWhite: "#f7f7f7",
   };
 }

@@ -18,7 +18,6 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState, useMemo } from "react";
-import { SectionHeader } from "../components/SectionHeader";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -72,27 +71,8 @@ export function ShortcutsSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-4">
-        <SectionHeader
-          title="Shortcuts"
-          description="View and customize keyboard shortcuts."
-        />
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 gap-1.5 rounded-sm px-2.5 text-[11px]"
-          onClick={() => setResetDialogOpen(true)}
-        >
-          <HugeiconsIcon
-            icon={ArrowTurnBackwardIcon}
-            size={12}
-            strokeWidth={2}
-          />
-          Reset All
-        </Button>
-      </div>
-
-      <div className="relative max-w-md">
+      <div className="flex items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-md">
         <HugeiconsIcon
           icon={Search01Icon}
           size={14}
@@ -100,11 +80,21 @@ export function ShortcutsSection() {
           className="absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
         />
         <Input
-          placeholder="Search shortcuts..."
+          placeholder="Search shortcuts…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="h-9 rounded-sm pl-9 text-[12.5px]"
+          className="h-9 rounded-lg pl-9 text-[12.5px]"
         />
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 gap-1.5 rounded-lg px-3 text-[11.5px] shrink-0"
+          onClick={() => setResetDialogOpen(true)}
+        >
+          <HugeiconsIcon icon={ArrowTurnBackwardIcon} size={12} strokeWidth={2} />
+          Reset all
+        </Button>
       </div>
 
       <div className="flex flex-col gap-6">
@@ -113,8 +103,8 @@ export function ShortcutsSection() {
           if (items.length === 0) return null;
 
           return (
-            <div key={group} className="grid gap-3 md:grid-cols-[112px_1fr]">
-              <h3 className="pt-2 text-[11px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+            <div key={group} className="flex flex-col gap-2">
+              <h3 className="px-1 text-[11px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
                 {group}
               </h3>
               <div className="flex flex-col divide-y divide-border/50 overflow-hidden rounded-sm border border-border/70 bg-card/50">

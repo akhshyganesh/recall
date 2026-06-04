@@ -20,11 +20,11 @@ import {
   Cancel01Icon,
   Clock01Icon,
   ComputerTerminal02Icon,
-  DatabaseIcon,
   GitBranchIcon,
   GitCompareIcon,
   Globe02Icon,
   LayoutTwoColumnIcon,
+  Orbit01Icon,
   PencilEdit02Icon,
   PlusSignIcon,
   Settings01Icon,
@@ -48,6 +48,8 @@ type Props = {
   onPin: (id: number) => void;
   onReorder?: (fromIndex: number, dropPosition: number) => void;
   onOpenInSplit?: (id: number) => void;
+  onCloseOthers?: (id: number) => void;
+  onCloseToRight?: (id: number) => void;
   /** Called when a tab is dragged into a split drop zone. */
   onDragToSplit?: (tabId: number, dir: "row" | "col") => void;
   /** Called during drag to notify parent of the hovered split zone (null = none). */
@@ -70,6 +72,8 @@ export function TabBar({
   onPin,
   onReorder,
   onOpenInSplit,
+  onCloseOthers,
+  onCloseToRight,
   onDragToSplit,
   onSplitZoneChange,
   getWorkspaceRect,
@@ -262,7 +266,7 @@ export function TabBar({
           value={String(activeId)}
           onValueChange={(v) => onSelect(Number(v))}
         >
-          <TabsList className="h-7 w-max gap-1 rounded-full bg-transparent p-0">
+          <TabsList className="h-7 w-max gap-0 bg-transparent p-0">
             {(() => {
               const items: ReactNode[] = [];
               tabs.forEach((t, i) => {
@@ -301,7 +305,7 @@ export function TabBar({
                         onDoubleClick={() => isPreview && onPin(t.id)}
                         onMouseDown={(e) => e.preventDefault()}
                         className={cn(
-                          "group relative h-7! flex-none! shrink-0 justify-between! gap-1.5! rounded-sm! border-0! text-xs! font-semibold transition-all",
+                          "group relative h-7! flex-none! shrink-0 justify-between! gap-1.5! rounded-none! border-0! text-xs! font-semibold transition-all",
                           t.id === activeId
                             ? "bg-sidebar-primary! text-sidebar-primary-foreground!"
                             : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -411,6 +415,26 @@ export function TabBar({
                             />
                             Close tab
                           </ContextMenuItem>
+                          {onCloseOthers && (
+                            <ContextMenuItem onSelect={() => onCloseOthers(t.id)}>
+                              <HugeiconsIcon
+                                icon={Cancel01Icon}
+                                size={14}
+                                strokeWidth={1.75}
+                              />
+                              Close others
+                            </ContextMenuItem>
+                          )}
+                          {onCloseToRight && i < tabs.length - 1 && (
+                            <ContextMenuItem onSelect={() => onCloseToRight(t.id)}>
+                              <HugeiconsIcon
+                                icon={Cancel01Icon}
+                                size={14}
+                                strokeWidth={1.75}
+                              />
+                              Close to right
+                            </ContextMenuItem>
+                          )}
                         </>
                       ) : null}
                     </ContextMenuContent>
@@ -443,7 +467,7 @@ export function TabBar({
             <Button
               variant="ghost"
               size="icon"
-              className="size-7 shrink-0 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground aria-expanded:bg-foreground aria-expanded:text-background"
+              className="size-7 shrink-0 rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground aria-expanded:bg-foreground aria-expanded:text-background"
               title="New tab"
             >
               <HugeiconsIcon icon={PlusSignIcon} size={14} strokeWidth={2} />
@@ -490,7 +514,7 @@ export function TabBar({
     {draggedTab !== null && dragPos !== null && createPortal(
       <div
         className={cn(
-          "pointer-events-none fixed z-[9999] flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold shadow-lg",
+          "pointer-events-none fixed z-[9999] flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs font-semibold shadow-lg",
           activeSplitZone
             ? "border-2 border-primary bg-primary/15 text-foreground"
             : "border border-border/80 bg-card text-foreground",
@@ -522,7 +546,7 @@ function TabIcon({ tab }: { tab: Tab }) {
   if (tab.kind === "session") {
     return (
       <HugeiconsIcon
-        icon={DatabaseIcon}
+        icon={Orbit01Icon}
         size={14}
         strokeWidth={2}
         className="shrink-0"
