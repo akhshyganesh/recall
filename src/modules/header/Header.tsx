@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { WindowControls } from "@/components/WindowControls";
 import { IS_MAC, KEY_SEP, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
+import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   getBindingTokens,
@@ -49,6 +50,9 @@ type Props = {
   onPin: (id: number) => void;
   onReorderTab: (fromIndex: number, dropPosition: number) => void;
   onOpenInSplit?: (id: number) => void;
+  onDragToSplit?: (tabId: number, dir: "row" | "col") => void;
+  onSplitZoneChange?: (zone: "row" | "col" | null) => void;
+  getWorkspaceRect?: () => DOMRect | null;
   onToggleSidebar: () => void;
   onToggleSourceControl: () => void;
   onSplit: (dir: "row" | "col") => void;
@@ -66,6 +70,8 @@ type Props = {
   home: string | null;
   onCd: (path: string) => void;
   onWorkspaceChange: (env: WorkspaceEnv) => void;
+  /** True while the user is dragging a split tab back toward the tab bar. */
+  unsplitDropActive?: boolean;
 };
 
 const COMPACT_WIDTH = 720;
@@ -83,6 +89,9 @@ export function Header({
   onPin,
   onReorderTab,
   onOpenInSplit,
+  onDragToSplit,
+  onSplitZoneChange,
+  getWorkspaceRect,
   onToggleSidebar,
   onToggleSourceControl,
   onSplit,
@@ -99,6 +108,7 @@ export function Header({
   home,
   onCd,
   onWorkspaceChange,
+  unsplitDropActive,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(false);
@@ -217,7 +227,10 @@ export function Header({
   return (
     <div
       ref={rootRef}
-      className="flex shrink-0 select-none flex-col border-b border-border/55"
+      className={cn(
+        "flex shrink-0 select-none flex-col border-b border-border/55 transition-colors",
+        unsplitDropActive && "border-b-primary/60 bg-primary/5",
+      )}
     >
       {/* Combined header row */}
       <div
@@ -258,6 +271,9 @@ export function Header({
             onPin={onPin}
             onReorder={onReorderTab}
             onOpenInSplit={onOpenInSplit}
+            onDragToSplit={onDragToSplit}
+            onSplitZoneChange={onSplitZoneChange}
+            getWorkspaceRect={getWorkspaceRect}
             compact={compact}
           />
           <div data-tauri-drag-region className="h-full min-w-2 flex-1" />
