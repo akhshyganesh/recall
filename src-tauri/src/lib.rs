@@ -63,6 +63,7 @@ pub fn run() {
             registry
         })
         .manage(LaunchDir(Mutex::new(parse_launch_dir())))
+        .manage(fs::watch::WatchState::default())
         .setup(|app| {
             let session_state = app.state::<sessions::AppState>();
             sessions::spawn_initial_scan(session_state.db_handle());
@@ -90,6 +91,7 @@ pub fn run() {
             pty::pty_write,
             pty::pty_resize,
             pty::pty_close,
+            pty::pty_has_child,
             fs::tree::list_subdirs,
             fs::tree::fs_read_dir,
             fs::file::fs_read_file,
@@ -102,6 +104,8 @@ pub fn run() {
             fs::mutate::fs_delete,
             fs::search::fs_search,
             fs::search::fs_list_files,
+            fs::watch::fs_watch_add,
+            fs::watch::fs_watch_remove,
             git::commands::git_resolve_repo,
             git::commands::git_panel_snapshot,
             git::commands::git_status,

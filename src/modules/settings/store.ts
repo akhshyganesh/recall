@@ -34,8 +34,6 @@ export type Preferences = {
   theme: ThemePref;
   editorTheme: EditorThemeId;
   autostart: boolean;
-  autoUpdates: boolean;
-  restoreWindowState: boolean;
   sessionsMcpEnabled: boolean;
   vimMode: boolean;
   showHidden: boolean;
@@ -44,7 +42,6 @@ export type Preferences = {
   terminalLetterSpacing: number;
   terminalFontSize: number;
   terminalScrollback: number;
-  lastWslDistro: string | null;
   zoomLevel: number;
   shortcuts: Record<ShortcutId, KeyBinding[]>;
 };
@@ -53,8 +50,6 @@ const STORE_PATH = "recall-settings.json";
 const KEY_THEME = "theme";
 const KEY_EDITOR_THEME = "editorTheme";
 const KEY_AUTOSTART = "autostart";
-const KEY_AUTO_UPDATES = "autoUpdates";
-const KEY_RESTORE_WINDOW = "restoreWindowState";
 const KEY_SESSIONS_MCP_ENABLED = "sessionsMcpEnabled";
 const KEY_VIM_MODE = "vimMode";
 const KEY_SHOW_HIDDEN = "showHidden";
@@ -64,7 +59,6 @@ const KEY_TERMINAL_FONT_FAMILY = "terminalFontFamily";
 const KEY_TERMINAL_LETTER_SPACING = "terminalLetterSpacing";
 const KEY_TERMINAL_FONT_SIZE = "terminalFontSize";
 const KEY_TERMINAL_SCROLLBACK = "terminalScrollback";
-const KEY_LAST_WSL_DISTRO = "lastWslDistro";
 const KEY_ZOOM_LEVEL = "zoomLevel";
 const KEY_SHORTCUTS = "shortcuts";
 
@@ -87,8 +81,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
   editorTheme: "atomone",
   autostart: false,
-  autoUpdates: true,
-  restoreWindowState: true,
   sessionsMcpEnabled: false,
   vimMode: false,
   showHidden: false,
@@ -97,7 +89,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalLetterSpacing: 0,
   terminalFontSize: TERMINAL_FONT_SIZE_DEFAULT,
   terminalScrollback: TERMINAL_SCROLLBACK_DEFAULT,
-  lastWslDistro: null,
   zoomLevel: 1.0,
   shortcuts: {} as Record<ShortcutId, KeyBinding[]>,
 };
@@ -127,11 +118,6 @@ export async function loadPreferences(): Promise<Preferences> {
     editorTheme:
       get<EditorThemeId>(KEY_EDITOR_THEME) ?? DEFAULT_PREFERENCES.editorTheme,
     autostart: get<boolean>(KEY_AUTOSTART) ?? DEFAULT_PREFERENCES.autostart,
-    autoUpdates:
-      get<boolean>(KEY_AUTO_UPDATES) ?? DEFAULT_PREFERENCES.autoUpdates,
-    restoreWindowState:
-      get<boolean>(KEY_RESTORE_WINDOW) ??
-      DEFAULT_PREFERENCES.restoreWindowState,
     sessionsMcpEnabled:
       get<boolean>(KEY_SESSIONS_MCP_ENABLED) ??
       DEFAULT_PREFERENCES.sessionsMcpEnabled,
@@ -156,9 +142,6 @@ export async function loadPreferences(): Promise<Preferences> {
       get<number>(KEY_TERMINAL_SCROLLBACK) ??
         DEFAULT_PREFERENCES.terminalScrollback,
     ),
-    lastWslDistro:
-      get<string | null>(KEY_LAST_WSL_DISTRO) ??
-      DEFAULT_PREFERENCES.lastWslDistro,
     zoomLevel: get<number>(KEY_ZOOM_LEVEL) ?? DEFAULT_PREFERENCES.zoomLevel,
     shortcuts:
       get<Record<ShortcutId, KeyBinding[]>>(KEY_SHORTCUTS) ??
@@ -176,14 +159,6 @@ export async function setEditorTheme(value: EditorThemeId): Promise<void> {
 
 export async function setAutostart(value: boolean): Promise<void> {
   await writePref(KEY_AUTOSTART, value);
-}
-
-export async function setAutoUpdates(value: boolean): Promise<void> {
-  await writePref(KEY_AUTO_UPDATES, value);
-}
-
-export async function setRestoreWindowState(value: boolean): Promise<void> {
-  await writePref(KEY_RESTORE_WINDOW, value);
 }
 
 export async function setSessionsMcpEnabled(value: boolean): Promise<void> {
@@ -233,10 +208,6 @@ export async function setTerminalScrollback(value: number): Promise<void> {
   await writePref(KEY_TERMINAL_SCROLLBACK, clampScrollback(value));
 }
 
-export async function setLastWslDistro(value: string | null): Promise<void> {
-  await writePref(KEY_LAST_WSL_DISTRO, value);
-}
-
 export async function setZoomLevel(value: number): Promise<void> {
   await writePref(KEY_ZOOM_LEVEL, value);
 }
@@ -263,8 +234,6 @@ export async function onPreferencesChange(
     [KEY_THEME]: "theme",
     [KEY_EDITOR_THEME]: "editorTheme",
     [KEY_AUTOSTART]: "autostart",
-    [KEY_AUTO_UPDATES]: "autoUpdates",
-    [KEY_RESTORE_WINDOW]: "restoreWindowState",
     [KEY_SESSIONS_MCP_ENABLED]: "sessionsMcpEnabled",
     [KEY_VIM_MODE]: "vimMode",
     [KEY_SHOW_HIDDEN]: "showHidden",
@@ -273,7 +242,6 @@ export async function onPreferencesChange(
     [KEY_TERMINAL_LETTER_SPACING]: "terminalLetterSpacing",
     [KEY_TERMINAL_FONT_SIZE]: "terminalFontSize",
     [KEY_TERMINAL_SCROLLBACK]: "terminalScrollback",
-    [KEY_LAST_WSL_DISTRO]: "lastWslDistro",
     [KEY_ZOOM_LEVEL]: "zoomLevel",
     [KEY_SHORTCUTS]: "shortcuts",
   };

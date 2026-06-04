@@ -96,7 +96,7 @@ export function EditorStack({
             )}
             aria-hidden={!visible}
           >
-            <div className="h-full overflow-hidden rounded-md border border-border/60 bg-background">
+            <div className="h-full overflow-hidden bg-background">
               <EditorPane
                 ref={getRefCallback(t.id)}
                 path={t.path}

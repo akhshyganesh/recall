@@ -160,3 +160,32 @@ pub fn pty_close(state: tauri::State<PtyState>, id: u32) -> Result<(), String> {
     }
     Ok(())
 }
+
+/// Returns true when the PTY's foreground process group is not the shell
+/// itself — i.e., there is a child job running in the foreground.
+/// Always returns false on Windows (no tcgetpgrp equivalent).
+#[tauri::command]
+pub fn pty_has_child(state: tauri::State<PtyState>, id: u32) -> bool {
+    #[cfg(unix)]
+    {
+        let sessions = state.sessions.read().unwrap();
+        let Some(session) = sessions.get(&id) else {
+            return false;
+        };
+        let Some(shell_pid) = session.shell_pid else {
+            return false;
+        };
+        let master = session.master.lock().unwrap();
+        let Some(pgid) = master.process_group_leader() else {
+            return false;
+        };
+        // If the foreground process group differs from the shell's pid, there
+        // is a foreground child job running inside this PTY.
+        pgid > 0 && pgid as u32 != shell_pid
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (state, id);
+        false
+    }
+}

@@ -31,7 +31,6 @@ import {
   Clock01Icon,
   Download01Icon,
   FolderCloudIcon,
-  FolderGitTwoIcon,
   GitBranchIcon,
   Refresh01Icon,
   RemoveSquareIcon,
@@ -439,111 +438,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
 
   return (
     <TooltipProvider delayDuration={800} skipDelayDuration={300}>
-      <aside className="flex h-full min-w-0 flex-col bg-card/80 backdrop-blur contain-[layout_style]">
-        <header className="flex shrink-0 items-center justify-between gap-2 border-b border-border/50 px-3 pb-2.5 pt-3">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <div className="inline-flex min-w-0 items-center gap-1.5 rounded-md bg-foreground/5 px-2 py-1 text-[11.5px] font-medium leading-none text-foreground transition-colors hover:bg-foreground/10">
-              <HugeiconsIcon
-                icon={FolderGitTwoIcon}
-                size={12}
-                strokeWidth={1.9}
-                className="shrink-0 text-muted-foreground"
-              />
-              <span className="max-w-35 truncate">{repoLabel}</span>
-            </div>
-            {scm.status && (scm.status.ahead > 0 || scm.status.behind > 0) ? (
-              <div className="flex shrink-0 items-center gap-0.5 text-[10px] font-semibold tabular-nums leading-none text-muted-foreground">
-                {scm.status.ahead > 0 ? (
-                  <span className="inline-flex items-center gap-0.5 rounded-md border border-border/60 px-1 py-0.5">
-                    <HugeiconsIcon
-                      icon={ArrowUp01Icon}
-                      size={9}
-                      strokeWidth={2.2}
-                    />
-                    {scm.status.ahead}
-                  </span>
-                ) : null}
-                {scm.status.behind > 0 ? (
-                  <span className="inline-flex items-center gap-0.5 rounded-md border border-border/60 px-1 py-0.5">
-                    <HugeiconsIcon
-                      icon={ArrowDown01Icon}
-                      size={9}
-                      strokeWidth={2.2}
-                    />
-                    {scm.status.behind}
-                  </span>
-                ) : null}
-              </div>
-            ) : null}
-            {scm.status?.isDetached ? (
-              <span className="rounded bg-muted/55 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                detached
-              </span>
-            ) : null}
-          </div>
-          <div className="flex shrink-0 items-center gap-0.5">
-            <IconActionButton
-              label={fetchBusy ? "Fetching…" : "Fetch from remote"}
-              disabled={!canFetch}
-              onClick={handleFetch}
-              side="bottom"
-            >
-              {fetchBusy ? (
-                <Spinner className="size-3" />
-              ) : (
-                <HugeiconsIcon
-                  icon={FolderCloudIcon}
-                  size={14}
-                  strokeWidth={1.85}
-                />
-              )}
-            </IconActionButton>
-            <IconActionButton
-              label={
-                pullBusy
-                  ? "Pulling…"
-                  : isDiverged
-                    ? "Branch diverged — resolve in terminal"
-                    : !hasUpstream
-                      ? "No upstream configured"
-                      : (scm.status?.behind ?? 0) === 0
-                        ? "Already up to date"
-                        : `Pull ${scm.status?.behind ?? 0} commits (fast-forward)`
-              }
-              disabled={!canPull}
-              onClick={handlePull}
-              side="bottom"
-            >
-              {pullBusy ? (
-                <Spinner className="size-3" />
-              ) : (
-                <HugeiconsIcon
-                  icon={Download01Icon}
-                  size={14}
-                  strokeWidth={1.9}
-                />
-              )}
-            </IconActionButton>
-            <IconActionButton
-              label="Refresh source control"
-              disabled={isRefreshing || !!scm.actionBusy}
-              onClick={handleRefresh}
-              side="bottom"
-            >
-              {isRefreshing ? (
-                <Spinner className="size-3.5" />
-              ) : (
-                <HugeiconsIcon
-                  icon={Refresh01Icon}
-                  size={14}
-                  strokeWidth={1.9}
-                  className={cn(refreshAnimating && "animate-spin")}
-                />
-              )}
-            </IconActionButton>
-          </div>
-        </header>
-
+      <aside className="flex h-full min-w-0 flex-1 flex-col bg-card/80 backdrop-blur contain-[layout_style]">
         <div className="flex shrink-0 items-stretch border-b border-border/40">
           {/* Branches toggle — primary action, takes full width */}
           {scm.panelState === "ready" && scm.status ? (
@@ -584,22 +479,68 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               </span>
             </div>
           )}
-          {/* Commit graph — secondary, icon-only right button */}
-          {onOpenGitGraph ? (
-            <button
-              type="button"
-              onClick={() => onOpenGitGraph()}
-              title="Open commit graph"
-              className="group flex shrink-0 cursor-pointer items-center border-l border-border/40 px-3 py-2 text-muted-foreground transition-colors hover:bg-foreground/4 hover:text-foreground"
+          <div className="flex shrink-0 items-center gap-0.5 border-l border-border/40 px-1">
+            <IconActionButton
+              label={fetchBusy ? "Fetching…" : "Fetch from remote"}
+              disabled={!canFetch}
+              onClick={handleFetch}
+              side="bottom"
             >
-              <HugeiconsIcon
-                icon={Clock01Icon}
-                size={13}
-                strokeWidth={1.85}
-                className="shrink-0"
-              />
-            </button>
-          ) : null}
+              {fetchBusy ? (
+                <Spinner className="size-3" />
+              ) : (
+                <HugeiconsIcon icon={FolderCloudIcon} size={13} strokeWidth={1.85} />
+              )}
+            </IconActionButton>
+            <IconActionButton
+              label={
+                pullBusy
+                  ? "Pulling…"
+                  : isDiverged
+                    ? "Branch diverged — resolve in terminal"
+                    : !hasUpstream
+                      ? "No upstream configured"
+                      : (scm.status?.behind ?? 0) === 0
+                        ? "Already up to date"
+                        : `Pull ${scm.status?.behind ?? 0} commits (fast-forward)`
+              }
+              disabled={!canPull}
+              onClick={handlePull}
+              side="bottom"
+            >
+              {pullBusy ? (
+                <Spinner className="size-3" />
+              ) : (
+                <HugeiconsIcon icon={Download01Icon} size={13} strokeWidth={1.9} />
+              )}
+            </IconActionButton>
+            <IconActionButton
+              label="Refresh source control"
+              disabled={isRefreshing || !!scm.actionBusy}
+              onClick={handleRefresh}
+              side="bottom"
+            >
+              {isRefreshing ? (
+                <Spinner className="size-3.5" />
+              ) : (
+                <HugeiconsIcon
+                  icon={Refresh01Icon}
+                  size={13}
+                  strokeWidth={1.9}
+                  className={cn(refreshAnimating && "animate-spin")}
+                />
+              )}
+            </IconActionButton>
+            {onOpenGitGraph ? (
+              <IconActionButton
+                label="Open commit graph"
+                onClick={onOpenGitGraph}
+                side="bottom"
+              >
+                <HugeiconsIcon icon={Clock01Icon} size={13} strokeWidth={1.85} />
+              </IconActionButton>
+            ) : null}
+          </div>
         </div>
 
         {scm.panelState === "ready" && scm.status && branchPanelOpen ? (
@@ -650,7 +591,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
 
         {scm.panelState === "ready" && scm.status ? (
           <>
-            <div className="relative shrink-0 space-y-2 border-b border-border/40 bg-card/55 px-2.5 pb-2.5 pt-2.5">
+            <div className="relative shrink-0 space-y-2 border-b border-border/35 bg-card/40 px-2.5 pb-2.5 pt-2.5">
               <div
                 className={cn(
                   "relative rounded-sm border bg-background/95 shadow-sm transition-colors",
@@ -1160,6 +1101,7 @@ const RowRenderer = memo(function RowRenderer(props: RowRendererProps) {
       return <EntryRow {...props} row={row} />;
   }
 });
+void RowRenderer;
 
 function DivergedBanner() {
   return (

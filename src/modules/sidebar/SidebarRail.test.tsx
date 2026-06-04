@@ -23,4 +23,18 @@ describe("SidebarRail", () => {
     );
     expect(html).not.toContain("Source Control");
   });
+
+  it("renders the settings toggle when provided", () => {
+    const html = renderToStaticMarkup(
+      <SidebarRail
+        activeView="explorer"
+        onSelectView={vi.fn()}
+        settingsOpen
+        onToggleSettings={vi.fn()}
+      />,
+    );
+
+    expect(html).toContain('aria-label="Settings"');
+    expect(html).toContain('aria-pressed="true"');
+  });
 });

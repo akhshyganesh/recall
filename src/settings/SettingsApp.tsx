@@ -5,12 +5,13 @@ import { cn } from "@/lib/utils";
 import type { SettingsTab } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
-  ComputerIcon,
-  DatabaseIcon,
-  GridViewIcon,
+  Cancel01Icon,
+  ComputerTerminal02Icon,
   InformationCircleIcon,
   KeyboardIcon,
-  Settings01Icon,
+  Link01Icon,
+  PencilEdit02Icon,
+  SlidersHorizontalIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -20,81 +21,28 @@ import { EditorSection } from "./sections/EditorSection";
 import { GeneralSection } from "./sections/GeneralSection";
 import { SessionsMcpSection } from "./sections/McpSection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
-import { StartupSection } from "./sections/StartupSection";
 import { TerminalSection } from "./sections/TerminalSection";
 
 const TABS: {
   id: SettingsTab;
   label: string;
-  group: "workspace" | "app" | "reference";
   icon: Parameters<typeof HugeiconsIcon>[0]["icon"];
   component: () => JSX.Element;
 }[] = [
-  {
-    id: "general",
-    label: "General",
-    group: "workspace",
-    icon: Settings01Icon,
-    component: GeneralSection,
-  },
-  {
-    id: "editor",
-    label: "Editor",
-    group: "workspace",
-    icon: GridViewIcon,
-    component: EditorSection,
-  },
-  {
-    id: "terminal",
-    label: "Terminal",
-    group: "workspace",
-    icon: ComputerIcon,
-    component: TerminalSection,
-  },
-  {
-    id: "startup",
-    label: "Startup",
-    group: "app",
-    icon: Settings01Icon,
-    component: StartupSection,
-  },
-  {
-    id: "sessions-mcp",
-    label: "Session MCP",
-    group: "app",
-    icon: DatabaseIcon,
-    component: SessionsMcpSection,
-  },
-  {
-    id: "shortcuts",
-    label: "Shortcuts",
-    group: "reference",
-    icon: KeyboardIcon,
-    component: ShortcutsSection,
-  },
-  {
-    id: "about",
-    label: "About",
-    group: "reference",
-    icon: InformationCircleIcon,
-    component: AboutSection,
-  },
+  { id: "general", label: "General", icon: SlidersHorizontalIcon, component: GeneralSection },
+  { id: "terminal", label: "Terminal", icon: ComputerTerminal02Icon, component: TerminalSection },
+  { id: "editor", label: "Editor", icon: PencilEdit02Icon, component: EditorSection },
+  { id: "integrations", label: "Integrations", icon: Link01Icon, component: SessionsMcpSection },
+  { id: "shortcuts", label: "Shortcuts", icon: KeyboardIcon, component: ShortcutsSection },
+  { id: "about", label: "About", icon: InformationCircleIcon, component: AboutSection },
 ];
 
-const TAB_GROUPS: Array<{
-  id: "workspace" | "app" | "reference";
-  label: string;
-}> = [
-  { id: "workspace", label: "Workspace" },
-  { id: "app", label: "App" },
-  { id: "reference", label: "Reference" },
-];
-
-const VALID_TABS: SettingsTab[] = TABS.map((tab) => tab.id);
+const VALID_TABS = new Set<string>(TABS.map((t) => t.id));
 
 function normalizeTab(tab: string | null | undefined): SettingsTab {
-  if (tab === "integrations" || tab === "mcp") return "sessions-mcp";
-  if (tab && (VALID_TABS as string[]).includes(tab)) return tab as SettingsTab;
+  if (tab === "sessions-mcp" || tab === "mcp" || tab === "integrations") return "integrations";
+  if (tab === "startup") return "general";
+  if (tab && VALID_TABS.has(tab)) return tab as SettingsTab;
   return "general";
 }
 
@@ -109,6 +57,7 @@ type SettingsPanelProps = {
   activeTab?: SettingsTab;
   onActiveTabChange?: (tab: SettingsTab) => void;
   embedded?: boolean;
+  onClose?: () => void;
 };
 
 export function SettingsPanel({
@@ -116,12 +65,13 @@ export function SettingsPanel({
   activeTab,
   onActiveTabChange,
   embedded = false,
+  onClose,
 }: SettingsPanelProps) {
-  const [internalActive, setInternalActive] =
-    useState<SettingsTab>(initialTab);
+  const [internalActive, setInternalActive] = useState<SettingsTab>(initialTab);
   const init = usePreferencesStore((s) => s.init);
   const active = activeTab ?? internalActive;
-  const ActiveSection = TABS.find((t) => t.id === active)?.component ?? GeneralSection;
+  const activeTabMeta = TABS.find((t) => t.id === active) ?? TABS[0];
+  const ActiveSection = activeTabMeta.component;
 
   const setActive = (tab: SettingsTab) => {
     if (activeTab === undefined) setInternalActive(tab);
@@ -145,7 +95,7 @@ export function SettingsPanel({
     return () => {
       void unlistenPromise.then((un) => un());
     };
-  }, [embedded, activeTab, onActiveTabChange]);
+  }, [embedded]);
 
   return (
     <div
@@ -154,63 +104,81 @@ export function SettingsPanel({
         embedded ? "h-full" : "h-screen",
       )}
     >
+      {/* Standalone window chrome */}
       {!embedded && (
         <header
           data-tauri-drag-region
-          className={`flex h-12 shrink-0 items-center justify-between border-b border-border/55 bg-card/60 ${
-            IS_MAC ? "pr-3 pl-22" : "pr-0 pl-3"
-          }`}
+          className={cn(
+            "flex h-10 shrink-0 items-center gap-2.5 border-b border-border/30 bg-card/50",
+            IS_MAC ? "pr-3 pl-22" : "pr-0 pl-4",
+          )}
         >
-          <div className="flex items-center gap-2" data-tauri-drag-region>
-            <span className="flex size-7 items-center justify-center rounded-md bg-background/80 ring-1 ring-border/55">
-              <AppLogoMark />
-            </span>
-            <span className="text-[11px] font-bold text-foreground uppercase">
-              Settings
-            </span>
-          </div>
-          {USE_CUSTOM_WINDOW_CONTROLS && <WindowControls closeOnly />}
+          <span
+            className="flex size-4 items-center justify-center opacity-50"
+            data-tauri-drag-region
+          >
+            <AppLogoMark />
+          </span>
+          <span
+            className="text-[11px] font-semibold tracking-tight text-foreground/55"
+            data-tauri-drag-region
+          >
+            Settings
+          </span>
+          {USE_CUSTOM_WINDOW_CONTROLS && (
+            <div className="ml-auto">
+              <WindowControls closeOnly />
+            </div>
+          )}
         </header>
       )}
 
-      <div className="grid min-h-0 flex-1 grid-cols-[188px_minmax(0,1fr)] overflow-hidden">
-        <aside className="flex min-w-0 flex-col border-r border-border/55 bg-card/25 px-3 py-4">
-          <nav className="flex flex-col gap-3 overflow-y-auto pr-1">
-            {TAB_GROUPS.map((group) => {
-              const items = TABS.filter((tab) => tab.group === group.id);
-              if (items.length === 0) return null;
-              return (
-                <div key={group.id} className="flex flex-col gap-1">
-                  <div className="px-2 text-[10px] font-bold text-muted-foreground uppercase">
-                    {group.label}
-                  </div>
-                  {items.map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => setActive(t.id)}
-                      className={cn(
-                        "flex h-8 items-center gap-2 rounded-lg px-2 text-left text-[12px] font-semibold transition-all",
-                        active === t.id
-                          ? "bg-foreground text-background shadow-sm"
-                          : "text-muted-foreground hover:bg-background/75 hover:text-foreground",
-                      )}
-                    >
-                      <HugeiconsIcon icon={t.icon} size={13} strokeWidth={1.75} />
-                      <span>{t.label}</span>
-                    </button>
-                  ))}
-                </div>
-              );
-            })}
-          </nav>
-        </aside>
+      {/* Tab strip + close */}
+      <div className="flex shrink-0 items-stretch border-b border-border/30">
+        <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {TABS.map((tab) => {
+            const isActive = active === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActive(tab.id)}
+                className={cn(
+                  "relative flex shrink-0 items-center gap-1.5 px-3 py-2.5 text-[11.5px] font-medium transition-colors",
+                  isActive
+                    ? "text-foreground"
+                    : "text-muted-foreground/70 hover:text-foreground",
+                )}
+              >
+                {isActive && (
+                  <span className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-foreground" />
+                )}
+                <HugeiconsIcon
+                  icon={tab.icon}
+                  size={13}
+                  strokeWidth={isActive ? 2 : 1.75}
+                  className="shrink-0"
+                />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        {onClose && (
+          <button
+            type="button"
+            aria-label="Close settings"
+            onClick={onClose}
+            className="flex shrink-0 items-center justify-center px-3 text-muted-foreground/60 transition-colors hover:text-foreground"
+          >
+            <HugeiconsIcon icon={Cancel01Icon} size={13} strokeWidth={2} />
+          </button>
+        )}
+      </div>
 
-        <main className="min-h-0 overflow-y-auto bg-card/15 px-5 py-6 [-ms-overflow-style:none] [scrollbar-width:none] md:px-8 [&::-webkit-scrollbar]:hidden">
-          <div className="w-full">
-            <ActiveSection />
-          </div>
-        </main>
+      {/* Section content */}
+      <div className="min-h-0 flex-1 overflow-y-auto pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <ActiveSection />
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import { SearchAddon } from "@xterm/addon-search";
 import { SerializeAddon } from "@xterm/addon-serialize";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
+import type { ITheme } from "@xterm/xterm";
 import { Terminal } from "@xterm/xterm";
 import { terminalWordNavigationSequence } from "./keymap";
 
@@ -79,6 +80,53 @@ function getRecycler(): HTMLDivElement {
   return el;
 }
 
+function resolveCssVar(varName: string): string | undefined {
+  const el = document.createElement("span");
+  el.style.cssText = `display:none;color:var(--${varName})`;
+  document.documentElement.appendChild(el);
+  const raw = getComputedStyle(el).color;
+  el.remove();
+  const m = raw.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (!m) return undefined;
+  const r = parseInt(m[1]).toString(16).padStart(2, "0");
+  const g = parseInt(m[2]).toString(16).padStart(2, "0");
+  const b = parseInt(m[3]).toString(16).padStart(2, "0");
+  return `#${r}${g}${b}`;
+}
+
+function buildXtermTheme(): ITheme {
+  const bg = resolveCssVar("background") ?? "#1e1e1e";
+  const fg = resolveCssVar("foreground") ?? "#e8e8e8";
+  const card = resolveCssVar("card") ?? bg;
+  const muted = resolveCssVar("muted-foreground") ?? "#9a9a9a";
+  const primary = resolveCssVar("primary") ?? fg;
+  const destructive = resolveCssVar("destructive") ?? "#d16969";
+  const sel = resolveCssVar("accent") ?? card;
+  return {
+    background: bg,
+    foreground: fg,
+    cursor: primary,
+    cursorAccent: bg,
+    selectionBackground: sel,
+    black: card,
+    red: destructive,
+    green: primary,
+    yellow: "#d7ba7d",
+    blue: "#6a8fb0",
+    magenta: "#a18cc4",
+    cyan: "#77a5a5",
+    white: "#e5e5e5",
+    brightBlack: muted,
+    brightRed: "#f38ba8",
+    brightGreen: "#89dceb",
+    brightYellow: "#f9e2af",
+    brightBlue: "#89b4fa",
+    brightMagenta: "#cba6f7",
+    brightCyan: "#94e2d5",
+    brightWhite: "#f7f7f7",
+  };
+}
+
 function termOptions() {
   const prefs = usePreferencesStore.getState();
   return {
@@ -90,6 +138,7 @@ function termOptions() {
     cursorInactiveStyle: "outline" as const,
     scrollback: prefs.terminalScrollback,
     allowProposedApi: true,
+    theme: buildXtermTheme(),
   };
 }
 
@@ -596,6 +645,13 @@ export function applyScrollback(value: number): void {
   for (const slot of slots) {
     if (slot.term.options.scrollback === value) continue;
     slot.term.options.scrollback = value;
+  }
+}
+
+export function applyXtermTheme(): void {
+  const theme = buildXtermTheme();
+  for (const slot of slots) {
+    slot.term.options.theme = theme;
   }
 }
 

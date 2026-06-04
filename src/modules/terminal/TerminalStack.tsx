@@ -14,6 +14,10 @@ type Props = {
   onCwd: (leafId: number, cwd: string) => void;
   onExit: (leafId: number, code: number) => void;
   onFocusLeaf: (tabId: number, leafId: number) => void;
+  branchLabel?: string | null;
+  stagedCount?: number;
+  changedCount?: number;
+  onOpenSourceControl?: () => void;
 };
 
 type Bundle = {
@@ -31,6 +35,10 @@ export function TerminalStack({
   onCwd,
   onExit,
   onFocusLeaf,
+  branchLabel,
+  stagedCount,
+  changedCount,
+  onOpenSourceControl,
 }: Props) {
   const terminals = useMemo(
     () => tabs.filter((t) => t.kind === "terminal"),
@@ -97,6 +105,10 @@ export function TerminalStack({
               activeLeafId={t.activeLeafId}
               onFocusLeaf={(leafId) => onFocusLeaf(t.id, leafId)}
               getBundle={getBundle}
+              branchLabel={branchLabel}
+              stagedCount={stagedCount}
+              changedCount={changedCount}
+              onOpenSourceControl={onOpenSourceControl}
             />
           </div>
         );

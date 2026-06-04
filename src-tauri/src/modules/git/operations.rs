@@ -1042,13 +1042,9 @@ fn split_name_status_numstat(bytes: &[u8]) -> (&[u8], &[u8]) {
         })
         .collect();
     let mut split_at = bytes.len();
-    for (idx, tok) in tokens.iter().enumerate() {
+    for tok in &tokens {
         if tok.1.contains('\t') {
             split_at = tok.0;
-            // Walk back: numstat for R/C with -z emits "<a>\t<r>" then two
-            // NUL-separated paths. The two trailing path tokens belong to the
-            // numstat block, not name-status.
-            let _ = idx;
             break;
         }
     }

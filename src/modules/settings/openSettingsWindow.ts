@@ -2,8 +2,7 @@ export type SettingsTab =
   | "general"
   | "editor"
   | "terminal"
-  | "startup"
-  | "sessions-mcp"
+  | "integrations"
   | "shortcuts"
   | "about";
 
@@ -11,8 +10,7 @@ export const SETTINGS_TAB_LABELS: Record<SettingsTab, string> = {
   general: "General",
   editor: "Editor",
   terminal: "Terminal",
-  startup: "Startup",
-  "sessions-mcp": "Session MCP",
+  integrations: "Integrations",
   shortcuts: "Shortcuts",
   about: "About",
 };

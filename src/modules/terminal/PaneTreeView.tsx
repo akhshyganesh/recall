@@ -21,6 +21,10 @@ type Props = {
   activeLeafId: number;
   onFocusLeaf: (leafId: number) => void;
   getBundle: (leafId: number) => LeafBundle;
+  branchLabel?: string | null;
+  stagedCount?: number;
+  changedCount?: number;
+  onOpenSourceControl?: () => void;
 };
 
 export function PaneTreeView({
@@ -29,6 +33,10 @@ export function PaneTreeView({
   activeLeafId,
   onFocusLeaf,
   getBundle,
+  branchLabel,
+  stagedCount,
+  changedCount,
+  onOpenSourceControl,
 }: Props) {
   if (node.kind === "leaf") {
     const focused = node.id === activeLeafId;
@@ -51,6 +59,11 @@ export function PaneTreeView({
           visible={tabVisible}
           focused={focused}
           initialCwd={node.cwd}
+          cwd={node.cwd}
+          branchLabel={branchLabel}
+          stagedCount={stagedCount}
+          changedCount={changedCount}
+          onOpenSourceControl={onOpenSourceControl}
           ref={b.setRef}
           onSearchReady={(_id, addon) => b.onSearch(addon)}
           onCwd={(_id, cwd) => b.onCwd(cwd)}
@@ -74,6 +87,10 @@ export function PaneTreeView({
               activeLeafId={activeLeafId}
               onFocusLeaf={onFocusLeaf}
               getBundle={getBundle}
+              branchLabel={branchLabel}
+              stagedCount={stagedCount}
+              changedCount={changedCount}
+              onOpenSourceControl={onOpenSourceControl}
             />
           </ResizablePanel>
         </Fragment>

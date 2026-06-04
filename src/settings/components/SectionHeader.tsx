@@ -5,10 +5,10 @@ type Props = {
 
 export function SectionHeader({ title, description }: Props) {
   return (
-    <div className="flex flex-col gap-1 border-b border-border/55 pb-4">
-      <h1 className="text-[15px] font-bold uppercase tracking-normal">{title}</h1>
+    <div className="flex flex-col gap-1 pb-4">
+      <h1 className="text-[14px] font-semibold tracking-tight text-foreground">{title}</h1>
       {description ? (
-        <p className="text-[12px] text-muted-foreground">{description}</p>
+        <p className="text-[11.5px] text-muted-foreground">{description}</p>
       ) : null}
     </div>
   );

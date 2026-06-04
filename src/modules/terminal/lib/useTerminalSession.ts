@@ -16,6 +16,7 @@ import {
   applyLetterSpacing,
   applyScrollback,
   applyWebglPreference,
+  applyXtermTheme,
   configureRendererPool,
   focusSlot,
   getSlotForLeaf,
@@ -375,6 +376,13 @@ export function useTerminalSession({
   useEffect(() => {
     applyWebglPreference(webglPref);
   }, [webglPref]);
+
+  const appTheme = usePreferencesStore((p) => p.theme);
+  useEffect(() => {
+    // Re-read CSS vars after the DOM has applied the new theme class.
+    const id = requestAnimationFrame(applyXtermTheme);
+    return () => cancelAnimationFrame(id);
+  }, [appTheme]);
 
   useEffect(() => {
     const s = sessions.get(leafId);
