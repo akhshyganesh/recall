@@ -106,8 +106,5 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
 
 function formatCwd(cwd?: string): string {
   if (!cwd) return "shell";
-  const parts = cwd.replace(/\\/g, "/").split("/").filter(Boolean);
-  if (parts.length === 0) return "/";
-  if (parts.length <= 2) return (cwd.startsWith("/") ? "/" : "") + parts.join("/");
-  return `…/${parts.slice(-2).join("/")}`;
+  return cwd.replace(/\\/g, "/");
 }

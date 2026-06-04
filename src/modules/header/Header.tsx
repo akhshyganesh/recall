@@ -14,7 +14,6 @@ import {
   SHORTCUTS,
   type ShortcutId,
 } from "@/modules/shortcuts/shortcuts";
-import { CwdBreadcrumb } from "@/modules/statusbar/CwdBreadcrumb";
 import { WorkspaceEnvSelector } from "@/modules/statusbar/WorkspaceEnvSelector";
 import type { Tab } from "@/modules/tabs";
 import { TabBar } from "@/modules/tabs";
@@ -65,10 +64,6 @@ type Props = {
   branchTitle?: string;
   searchTarget: SearchTarget;
   searchRef: RefObject<SearchInlineHandle | null>;
-  cwd: string | null;
-  filePath?: string | null;
-  home: string | null;
-  onCd: (path: string) => void;
   onWorkspaceChange: (env: WorkspaceEnv) => void;
   /** True while the user is dragging a split tab back toward the tab bar. */
   unsplitDropActive?: boolean;
@@ -103,10 +98,6 @@ export function Header({
   branchTitle,
   searchTarget,
   searchRef,
-  cwd,
-  filePath,
-  home,
-  onCd,
   onWorkspaceChange,
   unsplitDropActive,
 }: Props) {
@@ -277,16 +268,6 @@ export function Header({
             compact={compact}
           />
           <div data-tauri-drag-region className="h-full min-w-2 flex-1" />
-          {/* Breadcrumb: parent → current, single line */}
-          <div className="hidden min-w-0 max-w-56 shrink items-center overflow-hidden lg:flex">
-            <CwdBreadcrumb
-              cwd={cwd}
-              filePath={filePath}
-              home={home}
-              onCd={onCd}
-              compact
-            />
-          </div>
           <WorkspaceEnvSelector onSelect={onWorkspaceChange} />
         </div>
 

@@ -582,20 +582,6 @@ export default function App() {
     newTab(inheritedCwdForNewTab());
   }, [newTab, inheritedCwdForNewTab]);
 
-  const sendCd = useCallback(
-    (path: string) => {
-      if (activeLeafId === null) return;
-      const term = terminalRefs.current.get(activeLeafId);
-      if (!term) return;
-      const quoted = path.includes(" ")
-        ? `'${path.replace(/'/g, `'\\''`)}'`
-        : path;
-      term.write(`cd ${quoted}\r`);
-      term.focus();
-    },
-    [activeLeafId],
-  );
-
   const cdInNewTab = useCallback(
     (path: string) => {
       const tabId = newTab(path);
@@ -691,22 +677,6 @@ export default function App() {
         null)
       : null;
 
-  const activeFilePath = (() => {
-    if (activeTab?.kind === "editor") return activeTab.path;
-    if (activeTab?.kind === "media") return activeTab.path;
-    if (activeTab?.kind === "git-diff") {
-      if (/^([A-Za-z]:|\/|\\)/.test(activeTab.path)) return activeTab.path;
-      const root = activeTab.repoRoot.replace(/[\\/]+$/, "");
-      const rel = activeTab.path.replace(/^[\\/]+/, "");
-      return `${root}/${rel}`;
-    }
-    if (activeTab?.kind === "git-commit-file") {
-      const root = activeTab.repoRoot.replace(/[\\/]+$/, "");
-      const rel = activeTab.path.replace(/^[\\/]+/, "");
-      return `${root}/${rel}`;
-    }
-    return null;
-  })();
   const workspaceFallbackPath = launchCwdResolved
     ? (launchCwd ?? home ?? null)
     : null;
@@ -1081,8 +1051,6 @@ export default function App() {
     gitHistoryHandle,
   ]);
 
-  const activeCwd = activeTerminalLeafCwd;
-
   const splitTabs = tabs.filter((t) => rowSplitTabIds.includes(t.id) || colSplitTabIds.includes(t.id));
   const hasSplit = splitTabs.length > 0;
   const primaryTabs = hasSplit ? tabs.filter((t) => !rowSplitTabIds.includes(t.id) && !colSplitTabIds.includes(t.id)) : tabs;
@@ -1348,10 +1316,6 @@ export default function App() {
             branchTitle={branchTitle}
             searchTarget={searchTarget}
             searchRef={searchInlineRef}
-            cwd={activeCwd}
-            filePath={activeFilePath}
-            home={home}
-            onCd={sendCd}
             onWorkspaceChange={switchWorkspace}
             unsplitDropActive={unsplitOverHeader}
           />
