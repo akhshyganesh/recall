@@ -62,6 +62,7 @@ import {
   useTabs,
   useWorkspaceCwd,
   type MediaKind,
+  type Tab,
 } from "@/modules/tabs";
 import {
   disposeSession,
@@ -84,6 +85,7 @@ import { homeDir } from "@tauri-apps/api/path";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type { SearchAddon } from "@xterm/addon-search";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { PanelImperativeHandle } from "react-resizable-panels";
 import { SettingsPanel } from "@/settings/SettingsApp";
 
@@ -841,15 +843,85 @@ export default function App() {
   }, [activeId, closeActivePane, handleClose]);
 
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
-  const [splitTabId, setSplitTabId] = useState<number | null>(null);
+  const [rowSplitTabIds, setRowSplitTabIds] = useState<number[]>([]);
+  const [colSplitTabIds, setColSplitTabIds] = useState<number[]>([]);
+  const [splitDragZone, setSplitDragZone] = useState<"row" | "col" | null>(null);
+  const workspacePanelRef = useRef<HTMLDivElement>(null);
+  // Refs so callbacks can read current split IDs without stale closures.
+  const rowSplitTabIdsRef = useRef<number[]>([]);
+  const colSplitTabIdsRef = useRef<number[]>([]);
+  rowSplitTabIdsRef.current = rowSplitTabIds;
+  colSplitTabIdsRef.current = colSplitTabIds;
 
-  const openSplitView = useCallback((tabId: number) => {
-    setSplitTabId(tabId);
+  const openSplitView = useCallback((tabId: number, dir: "row" | "col" = "row") => {
+    if (rowSplitTabIdsRef.current.includes(tabId) || colSplitTabIdsRef.current.includes(tabId)) return;
+    if (dir === "row") {
+      setRowSplitTabIds((prev) => [...prev, tabId]);
+    } else {
+      setColSplitTabIds((prev) => [...prev, tabId]);
+    }
+    setActiveId((prev) => {
+      if (prev !== tabId) return prev;
+      const allSplit = new Set([...rowSplitTabIdsRef.current, ...colSplitTabIdsRef.current, tabId]);
+      const other = tabsRef.current.find((t) => !allSplit.has(t.id));
+      return other?.id ?? prev;
+    });
   }, []);
 
-  const closeSplitView = useCallback(() => {
-    setSplitTabId(null);
+  const removeSplitTab = useCallback((tabId: number) => {
+    setRowSplitTabIds((prev) => prev.filter((id) => id !== tabId));
+    setColSplitTabIds((prev) => prev.filter((id) => id !== tabId));
   }, []);
+
+  const handleDragToSplit = useCallback(
+    (tabId: number, dir: "row" | "col") => openSplitView(tabId, dir),
+    [openSplitView],
+  );
+
+  const getWorkspaceRect = useCallback(
+    () => workspacePanelRef.current?.getBoundingClientRect() ?? null,
+    [],
+  );
+
+  const [unsplitDraggingTabId, setUnsplitDraggingTabId] = useState<number | null>(null);
+  const [unsplitDragPos, setUnsplitDragPos] = useState<{ x: number; y: number } | null>(null);
+  const [unsplitOverHeader, setUnsplitOverHeader] = useState(false);
+  const unsplitStartRef = useRef<{ x: number; y: number; tabId: number } | null>(null);
+
+  const handleUnsplitPointerDown = useCallback((e: React.PointerEvent, tabId: number) => {
+    e.stopPropagation();
+    unsplitStartRef.current = { x: e.clientX, y: e.clientY, tabId };
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+  }, []);
+
+  const handleUnsplitPointerMove = useCallback((e: React.PointerEvent) => {
+    const start = unsplitStartRef.current;
+    if (!start) return;
+    if (unsplitDraggingTabId === null) {
+      if (Math.abs(e.clientX - start.x) <= 5 && Math.abs(e.clientY - start.y) <= 5) return;
+      setUnsplitDraggingTabId(start.tabId);
+      setUnsplitDragPos({ x: e.clientX, y: e.clientY });
+      return;
+    }
+    setUnsplitDragPos({ x: e.clientX, y: e.clientY });
+    const wsRect = workspacePanelRef.current?.getBoundingClientRect();
+    setUnsplitOverHeader(!!wsRect && e.clientY < wsRect.top);
+  }, [unsplitDraggingTabId]);
+
+  const handleUnsplitPointerUp = useCallback((e: React.PointerEvent) => {
+    const draggingId = unsplitDraggingTabId ?? unsplitStartRef.current?.tabId;
+    if (draggingId !== null && draggingId !== undefined) {
+      const wsRect = workspacePanelRef.current?.getBoundingClientRect();
+      if (wsRect && e.clientY < wsRect.top) {
+        removeSplitTab(draggingId);
+        setActiveId(draggingId);
+      }
+    }
+    unsplitStartRef.current = null;
+    setUnsplitDraggingTabId(null);
+    setUnsplitDragPos(null);
+    setUnsplitOverHeader(false);
+  }, [unsplitDraggingTabId, removeSplitTab]);
 
   const shortcutHandlers = useMemo<ShortcutHandlers>(
     () => ({
@@ -1011,9 +1083,62 @@ export default function App() {
 
   const activeCwd = activeTerminalLeafCwd;
 
-  const splitTab = splitTabId !== null ? tabs.find((t) => t.id === splitTabId) ?? null : null;
+  const splitTabs = tabs.filter((t) => rowSplitTabIds.includes(t.id) || colSplitTabIds.includes(t.id));
+  const hasSplit = splitTabs.length > 0;
+  const primaryTabs = hasSplit ? tabs.filter((t) => !rowSplitTabIds.includes(t.id) && !colSplitTabIds.includes(t.id)) : tabs;
 
-  const buildSecondarySurface = (secTab: NonNullable<typeof splitTab>) => {
+  const renderSplitPanel = (t: Tab) => (
+    <div className="group/pane flex h-full min-h-0 flex-col">
+      <div className="flex h-7 shrink-0 select-none items-center gap-1 border-b border-border/40 bg-card/50 px-1.5">
+        <div
+          className={cn(
+            "flex min-w-0 flex-1 cursor-grab items-center gap-1 active:cursor-grabbing",
+            unsplitDraggingTabId === t.id && "opacity-40",
+          )}
+          onPointerDown={(e) => handleUnsplitPointerDown(e, t.id)}
+          onPointerMove={handleUnsplitPointerMove}
+          onPointerUp={handleUnsplitPointerUp}
+          onPointerCancel={handleUnsplitPointerUp}
+          title="Drag up to the tab bar to un-split"
+        >
+          <span className="shrink-0 text-[8px] leading-none text-muted-foreground/40">⠿</span>
+          <span className="min-w-0 truncate text-xs font-medium text-muted-foreground">
+            {t.title}
+          </span>
+        </div>
+        <button
+          type="button"
+          aria-label="Close pane"
+          className="shrink-0 rounded-sm p-0.5 text-muted-foreground/40 opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover/pane:opacity-100"
+          onClick={() => removeSplitTab(t.id)}
+        >
+          <svg width="9" height="9" viewBox="0 0 11 11" fill="none">
+            <path d="M1 1l9 9M10 1L1 10" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <div className="relative min-h-0 flex-1">
+        {buildSplitPaneContent(t)}
+      </div>
+    </div>
+  );
+
+  const buildSplitPaneContent = (secTab: Tab) => {
+    if (secTab.kind === "terminal") {
+      return (
+        <div className="absolute inset-0">
+          <TerminalStack
+            tabs={[secTab]}
+            activeId={secTab.id}
+            registerHandle={registerTerminalHandle}
+            onSearchReady={handleSearchReady}
+            onCwd={handleTerminalCwd}
+            onExit={handleLeafExit}
+            onFocusLeaf={handleFocusLeaf}
+          />
+        </div>
+      );
+    }
     const isSecEditor = secTab.kind === "editor";
     const isSecPreview = secTab.kind === "preview";
     const isSecMarkdown = secTab.kind === "markdown";
@@ -1024,22 +1149,22 @@ export default function App() {
     const isSecSettings = secTab.kind === "settings";
     return (
       <div className="relative h-full min-h-0">
-        <div className={cn("absolute inset-0 px-3 pt-2 pb-2", !isSecEditor && "invisible pointer-events-none")} aria-hidden={!isSecEditor}>
+        <div className={cn("absolute inset-0", !isSecEditor && "invisible pointer-events-none")} aria-hidden={!isSecEditor}>
           <EditorStack tabs={tabs} activeId={secTab.id} registerHandle={() => {}} onDirtyChange={() => {}} onCloseTab={() => {}} />
         </div>
-        <div className={cn("absolute inset-0 px-3 pt-2 pb-2", !isSecPreview && "invisible pointer-events-none")} aria-hidden={!isSecPreview}>
+        <div className={cn("absolute inset-0", !isSecPreview && "invisible pointer-events-none")} aria-hidden={!isSecPreview}>
           <PreviewStack tabs={tabs} activeId={secTab.id} registerHandle={() => {}} onUrlChange={() => {}} />
         </div>
-        <div className={cn("absolute inset-0 px-3 pt-2 pb-2", !isSecMarkdown && "invisible pointer-events-none")} aria-hidden={!isSecMarkdown}>
+        <div className={cn("absolute inset-0", !isSecMarkdown && "invisible pointer-events-none")} aria-hidden={!isSecMarkdown}>
           <MarkdownStack tabs={tabs} activeId={secTab.id} />
         </div>
-        <div className={cn("absolute inset-0 px-3 pt-2 pb-2", !isSecMedia && "invisible pointer-events-none")} aria-hidden={!isSecMedia}>
+        <div className={cn("absolute inset-0", !isSecMedia && "invisible pointer-events-none")} aria-hidden={!isSecMedia}>
           <MediaStack tabs={tabs} activeId={secTab.id} />
         </div>
-        <div className={cn("absolute inset-0 px-3 pt-2 pb-2", !isSecSession && "invisible pointer-events-none")} aria-hidden={!isSecSession}>
+        <div className={cn("absolute inset-0", !isSecSession && "invisible pointer-events-none")} aria-hidden={!isSecSession}>
           <SessionHistoryStack tabs={tabs} activeId={secTab.id} />
         </div>
-        <div className={cn("absolute inset-0 px-3 pt-2 pb-2", !isSecGitDiff && "invisible pointer-events-none")} aria-hidden={!isSecGitDiff}>
+        <div className={cn("absolute inset-0", !isSecGitDiff && "invisible pointer-events-none")} aria-hidden={!isSecGitDiff}>
           <GitDiffStack tabs={tabs} activeId={secTab.id} />
         </div>
         <div className={cn("absolute inset-0", !isSecGitHistory && "invisible pointer-events-none")} aria-hidden={!isSecGitHistory}>
@@ -1050,11 +1175,6 @@ export default function App() {
             <SettingsPanel embedded activeTab={secTab.settingsTab} onActiveTabChange={() => {}} />
           ) : null}
         </div>
-        {secTab.kind === "terminal" && (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            Terminal split is not supported — use pane split (⌘D) instead.
-          </div>
-        )}
       </div>
     );
   };
@@ -1069,7 +1189,7 @@ export default function App() {
         aria-hidden={!isTerminalTab}
       >
         <TerminalStack
-          tabs={tabs}
+          tabs={primaryTabs}
           activeId={activeId}
           registerHandle={registerTerminalHandle}
           onSearchReady={handleSearchReady}
@@ -1185,7 +1305,7 @@ export default function App() {
       <TooltipProvider>
         <div className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
           <Header
-            tabs={tabs}
+            tabs={primaryTabs}
             activeId={activeId}
             onSelect={setActiveId}
             onNew={openNewTab}
@@ -1195,8 +1315,25 @@ export default function App() {
             onClose={handleClose}
             onRenameTab={handleRenameTab}
             onPin={pinTab}
-            onReorderTab={reorderTab}
+            onReorderTab={(fromPrimaryIdx, dropPrimaryPos) => {
+              // Map primary-tabs indices to full-tabs indices.
+              const fromTab = primaryTabs[fromPrimaryIdx];
+              if (!fromTab) return;
+              const fromFull = tabs.findIndex((t) => t.id === fromTab.id);
+              let dropFull: number;
+              if (dropPrimaryPos >= primaryTabs.length) {
+                const last = primaryTabs[primaryTabs.length - 1];
+                dropFull = last ? tabs.findIndex((t) => t.id === last.id) + 1 : tabs.length;
+              } else {
+                const dropTab = primaryTabs[dropPrimaryPos];
+                dropFull = tabs.findIndex((t) => t.id === dropTab.id);
+              }
+              reorderTab(fromFull, dropFull);
+            }}
             onOpenInSplit={openSplitView}
+            onDragToSplit={handleDragToSplit}
+            onSplitZoneChange={setSplitDragZone}
+            getWorkspaceRect={getWorkspaceRect}
             onToggleSidebar={toggleSidebar}
             onToggleSourceControl={toggleSourceControl}
             onSplit={splitActivePaneInActiveTab}
@@ -1216,6 +1353,7 @@ export default function App() {
             home={home}
             onCd={sendCd}
             onWorkspaceChange={switchWorkspace}
+            unsplitDropActive={unsplitOverHeader}
           />
 
           <main className="zoom-content flex min-h-0 flex-1 flex-col bg-background p-1.5">
@@ -1269,37 +1407,89 @@ export default function App() {
                 defaultSize="78%"
                 minSize="30%"
               >
-                <div className="flex h-full min-h-0 flex-col border-y border-border/60 bg-card/35">
-                  {splitTab ? (
-                    <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
-                      <ResizablePanel id="workspace-primary" defaultSize="50%" minSize="20%">
-                        <div className="relative h-full min-h-0">
-                          {workspaceSurface}
-                        </div>
-                      </ResizablePanel>
-                      <ResizableHandle withHandle />
-                      <ResizablePanel id="workspace-secondary" defaultSize="50%" minSize="20%">
-                        <div className="flex h-full min-h-0 flex-col">
-                          <div className="flex h-8 shrink-0 items-center gap-2 border-b border-border/50 bg-card/60 px-3">
-                            <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground/80">{splitTab.title}</span>
-                            <button
-                              type="button"
-                              onClick={closeSplitView}
-                              className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-                              aria-label="Close split view"
-                            >
-                              <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1 1l9 9M10 1L1 10" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/></svg>
-                            </button>
-                          </div>
-                          <div className="relative min-h-0 flex-1">
-                            {buildSecondarySurface(splitTab)}
-                          </div>
-                        </div>
-                      </ResizablePanel>
-                    </ResizablePanelGroup>
-                  ) : (
+                <div
+                  ref={workspacePanelRef}
+                  className="relative flex h-full min-h-0 flex-col border-y border-border/60 bg-card/35"
+                >
+                  {hasSplit ? (() => {
+                    const rowSplitTabs = tabs.filter((t) => rowSplitTabIds.includes(t.id));
+                    const colSplitTabs = tabs.filter((t) => colSplitTabIds.includes(t.id));
+                    const hasRowSplits = rowSplitTabs.length > 0;
+                    const hasColSplits = colSplitTabs.length > 0;
+
+                    // Left column: primary workspace + any "below" (col) splits stacked vertically
+                    const leftColumnInner = hasColSplits ? (
+                      <ResizablePanelGroup
+                        key={`col-split-${colSplitTabs.length}`}
+                        orientation="vertical"
+                        className="min-h-0 flex-1 h-full"
+                      >
+                        <ResizablePanel
+                          id="workspace-primary"
+                          defaultSize={`${(100 / (colSplitTabs.length + 1)).toFixed(1)}%`}
+                          minSize="15%"
+                        >
+                          <div className="relative h-full min-h-0">{workspaceSurface}</div>
+                        </ResizablePanel>
+                        {colSplitTabs.flatMap((t) => [
+                          <ResizableHandle key={`col-handle-${t.id}`} withHandle />,
+                          <ResizablePanel
+                            key={`col-pane-${t.id}`}
+                            id={`workspace-col-${t.id}`}
+                            defaultSize={`${(100 / (colSplitTabs.length + 1)).toFixed(1)}%`}
+                            minSize="15%"
+                          >
+                            {renderSplitPanel(t)}
+                          </ResizablePanel>,
+                        ])}
+                      </ResizablePanelGroup>
+                    ) : (
+                      <div className="relative h-full min-h-0">{workspaceSurface}</div>
+                    );
+
+                    if (!hasRowSplits) {
+                      return <div className="min-h-0 flex-1">{leftColumnInner}</div>;
+                    }
+
+                    return (
+                      <ResizablePanelGroup
+                        key={`row-split-${rowSplitTabs.length}`}
+                        orientation="horizontal"
+                        className="min-h-0 flex-1"
+                      >
+                        <ResizablePanel
+                          id="workspace-left-col"
+                          defaultSize={`${(100 / (rowSplitTabs.length + 1)).toFixed(1)}%`}
+                          minSize="15%"
+                        >
+                          {leftColumnInner}
+                        </ResizablePanel>
+                        {rowSplitTabs.flatMap((t) => [
+                          <ResizableHandle key={`row-handle-${t.id}`} withHandle />,
+                          <ResizablePanel
+                            key={`row-pane-${t.id}`}
+                            id={`workspace-row-${t.id}`}
+                            defaultSize={`${(100 / (rowSplitTabs.length + 1)).toFixed(1)}%`}
+                            minSize="15%"
+                          >
+                            {renderSplitPanel(t)}
+                          </ResizablePanel>,
+                        ])}
+                      </ResizablePanelGroup>
+                    );
+                  })() : (
                     <div className="relative min-h-0 flex-1">
                       {workspaceSurface}
+                    </div>
+                  )}
+                  {splitDragZone !== null && (
+                    <div className="pointer-events-none absolute inset-0 z-50">
+                      {splitDragZone === "row" && (
+                        <div className="absolute inset-y-0 right-0 w-[35%] rounded-l-lg border-2 border-dashed border-primary/60 bg-primary/10 m-1.5" />
+                      )}
+                      {splitDragZone === "col" && (
+                        <div className="absolute inset-x-0 bottom-0 h-[55%] rounded-t-lg border-2 border-dashed border-primary/60 bg-primary/10 m-1.5" />
+                      )}
                     </div>
                   )}
                 </div>
@@ -1333,6 +1523,28 @@ export default function App() {
               ) : null}
             </ResizablePanelGroup>
           </main>
+
+          {unsplitDraggingTabId !== null && unsplitDragPos !== null && (() => {
+            const draggingTab = tabs.find((t) => t.id === unsplitDraggingTabId);
+            if (!draggingTab) return null;
+            return createPortal(
+              <div
+                className={cn(
+                  "pointer-events-none fixed z-[9999] flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold shadow-lg",
+                  unsplitOverHeader
+                    ? "border-2 border-primary bg-primary/15 text-foreground"
+                    : "border border-border/80 bg-card text-foreground",
+                )}
+                style={{ left: unsplitDragPos.x + 14, top: unsplitDragPos.y + 12 }}
+              >
+                <span className="max-w-[8rem] truncate">{draggingTab.title}</span>
+                {unsplitOverHeader && (
+                  <span className="shrink-0 text-primary opacity-80">↑ to tab bar</span>
+                )}
+              </div>,
+              document.body,
+            );
+          })()}
 
           <NewEditorDialog
             open={newEditorOpen}

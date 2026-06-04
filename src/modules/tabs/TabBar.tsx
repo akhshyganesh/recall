@@ -31,6 +31,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { EditorTab, MediaTab, Tab, TerminalTab } from "./lib/useTabs";
 
 type Props = {
@@ -47,6 +48,12 @@ type Props = {
   onPin: (id: number) => void;
   onReorder?: (fromIndex: number, dropPosition: number) => void;
   onOpenInSplit?: (id: number) => void;
+  /** Called when a tab is dragged into a split drop zone. */
+  onDragToSplit?: (tabId: number, dir: "row" | "col") => void;
+  /** Called during drag to notify parent of the hovered split zone (null = none). */
+  onSplitZoneChange?: (zone: "row" | "col" | null) => void;
+  /** Returns the workspace area bounding rect for split-zone hit testing. */
+  getWorkspaceRect?: () => DOMRect | null;
   compact?: boolean;
 };
 
@@ -63,6 +70,9 @@ export function TabBar({
   onPin,
   onReorder,
   onOpenInSplit,
+  onDragToSplit,
+  onSplitZoneChange,
+  getWorkspaceRect,
   compact,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -72,9 +82,13 @@ export function TabBar({
   const [renameValue, setRenameValue] = useState("");
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
   const [dropIdx, setDropIdx] = useState<number | null>(null);
-  // Refs hold the latest drag state so pointer-event handlers never go stale.
-  const dragStartRef = useRef<{ x: number; idx: number } | null>(null);
+  // Visual state: ghost cursor position and active split zone for cursor + badge rendering.
+  const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
+  const [activeSplitZone, setActiveSplitZone] = useState<"row" | "col" | null>(null);
+  // Refs hold latest drag state so pointer-event handlers never go stale.
+  const dragStartRef = useRef<{ x: number; y: number; idx: number; tabId: number } | null>(null);
   const dragActiveRef = useRef<{ draggingIdx: number; dropIdx: number } | null>(null);
+  const splitZoneRef = useRef<"row" | "col" | null>(null);
   const terminalLabels = useMemo(() => buildTerminalLabels(tabs), [tabs]);
 
   // Horizontal wheel scroll without holding shift.
@@ -144,50 +158,99 @@ export function TabBar({
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!onReorder || e.button !== 0) return;
+    if (e.button !== 0) return;
+    if (!onReorder && !onDragToSplit) return;
+    if ((e.target as Element).closest('[aria-label="Close tab"]')) return;
     const tabEl = (e.target as Element).closest("[data-tab-id]");
     if (!tabEl) return;
     const tabId = Number(tabEl.getAttribute("data-tab-id"));
     const idx = tabs.findIndex((t) => t.id === tabId);
     if (idx < 0) return;
-    dragStartRef.current = { x: e.clientX, idx };
+    dragStartRef.current = { x: e.clientX, y: e.clientY, idx, tabId };
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const start = dragStartRef.current;
-    if (!start || !onReorder) return;
+    if (!start) return;
+
     if (draggingIdx === null) {
-      if (Math.abs(e.clientX - start.x) <= 5) return;
-      // Threshold crossed — start drag
-      const newDrop = computeDropIdx(e.clientX);
-      dragActiveRef.current = { draggingIdx: start.idx, dropIdx: newDrop };
+      if (Math.abs(e.clientX - start.x) <= 5 && Math.abs(e.clientY - start.y) <= 5) return;
       setDraggingIdx(start.idx);
-      setDropIdx(newDrop);
       scrollRef.current?.setPointerCapture(e.pointerId);
-    } else {
-      const newDrop = computeDropIdx(e.clientX);
-      dragActiveRef.current = { draggingIdx, dropIdx: newDrop };
-      setDropIdx(newDrop);
     }
+
+    setDragPos({ x: e.clientX, y: e.clientY });
+
+    const activeDragIdx = draggingIdx ?? start.idx;
+    const tabBarRect = scrollRef.current?.getBoundingClientRect();
+    const wsRect = getWorkspaceRect?.();
+
+    let zone: "row" | "col" | null = null;
+    if (wsRect) {
+      // Right 35% of workspace → side split (reachable by dragging right within the tab bar).
+      // Lower 55% of workspace → bottom split (only below the tab bar).
+      // Right takes priority so bottom-right corner stays as "row".
+      const rightThreshold = wsRect.left + wsRect.width * 0.65;
+      const bottomThreshold = wsRect.top + wsRect.height * 0.45;
+      const belowTabBar = !tabBarRect || e.clientY > tabBarRect.bottom + 8;
+      if (e.clientX >= rightThreshold) {
+        zone = "row";
+      } else if (belowTabBar && e.clientY >= bottomThreshold) {
+        zone = "col";
+      }
+    }
+
+    if (zone !== splitZoneRef.current) {
+      splitZoneRef.current = zone;
+      setActiveSplitZone(zone);
+      onSplitZoneChange?.(zone);
+    }
+
+    if (zone !== null) {
+      dragActiveRef.current = { draggingIdx: activeDragIdx, dropIdx: -1 };
+      setDropIdx(null);
+      return;
+    }
+
+    const newDrop = computeDropIdx(e.clientX);
+    dragActiveRef.current = { draggingIdx: activeDragIdx, dropIdx: newDrop };
+    setDropIdx(newDrop);
   };
 
   const handlePointerUp = () => {
     const active = dragActiveRef.current;
-    if (active !== null && onReorder) {
+    const start = dragStartRef.current;
+    const zone = splitZoneRef.current;
+
+    if (zone !== null && start !== null && onDragToSplit) {
+      onDragToSplit(start.tabId, zone);
+    } else if (active !== null && active.dropIdx >= 0 && onReorder) {
       onReorder(active.draggingIdx, active.dropIdx);
+    } else if (start !== null && active === null) {
+      // Pure click (no drag movement) — select the tab.
+      // Radix's mousedown activation is blocked so we handle selection here.
+      onSelect(start.tabId);
     }
+
+    splitZoneRef.current = null;
+    onSplitZoneChange?.(null);
     dragStartRef.current = null;
     dragActiveRef.current = null;
     setDraggingIdx(null);
     setDropIdx(null);
+    setDragPos(null);
+    setActiveSplitZone(null);
   };
 
+  const draggedTab = draggingIdx !== null ? tabs[draggingIdx] : null;
+
   return (
+    <>
     <div
       ref={scrollRef}
       className={cn(
-        "min-w-0 shrink overflow-x-auto rounded-full bg-background/65 p-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-        draggingIdx !== null && "cursor-grabbing select-none",
+        "min-w-0 shrink overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        draggingIdx !== null && (activeSplitZone ? "cursor-copy select-none" : "cursor-grabbing select-none"),
       )}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -235,10 +298,12 @@ export function TabBar({
                         data-tab-id={t.id}
                         title={`${tooltipFor(t, label)}${indexHint}`}
                         onDoubleClick={() => isPreview && onPin(t.id)}
+                        onMouseDown={(e) => e.preventDefault()}
                         className={cn(
-                          "group relative h-7! flex-none! shrink-0 justify-between! gap-1.5! rounded-full! border-0! text-xs! font-semibold text-muted-foreground transition-all",
-                          "data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-md",
-                          "hover:bg-muted hover:text-foreground",
+                          "group relative h-7! flex-none! shrink-0 justify-between! gap-1.5! rounded-sm! border-0! text-xs! font-semibold transition-all",
+                          t.id === activeId
+                            ? "bg-sidebar-primary! text-sidebar-primary-foreground!"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground",
                           compact
                             ? "px-1.5!"
                             : tabs.length === 1
@@ -278,14 +343,20 @@ export function TabBar({
                           {t.kind === "editor" && t.dirty ? (
                             <span
                               aria-label="Unsaved changes"
-                              className="size-1.5 shrink-0 rounded-full bg-foreground/70"
+                              className={cn(
+                                "size-1.5 shrink-0 rounded-full",
+                                t.id === activeId ? "bg-sidebar-primary-foreground/70" : "bg-foreground/70",
+                              )}
                             />
                           ) : null}
                         </span>
                         {tabIndex <= 9 && !compact && (
                           <span
                             aria-hidden
-                            className="ml-0.5 shrink-0 font-mono text-[9px] leading-none text-muted-foreground/40"
+                            className={cn(
+                              "ml-0.5 shrink-0 font-mono text-[9px] leading-none",
+                              t.id === activeId ? "text-sidebar-primary-foreground/40" : "text-muted-foreground/40",
+                            )}
                           >
                             {MOD_KEY}{tabIndex}
                           </span>
@@ -415,6 +486,30 @@ export function TabBar({
         </DropdownMenu>
       </div>
     </div>
+    {draggedTab !== null && dragPos !== null && createPortal(
+      <div
+        className={cn(
+          "pointer-events-none fixed z-[9999] flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold shadow-lg",
+          activeSplitZone
+            ? "border-2 border-primary bg-primary/15 text-foreground"
+            : "border border-border/80 bg-card text-foreground",
+        )}
+        style={{ left: dragPos.x + 14, top: dragPos.y + 12 }}
+      >
+        <TabIcon tab={draggedTab} />
+        <span className="max-w-[7rem] truncate">
+          {labelFor(draggedTab, terminalLabels)}
+        </span>
+        {activeSplitZone === "row" && (
+          <span className="shrink-0 text-primary opacity-80">→ side</span>
+        )}
+        {activeSplitZone === "col" && (
+          <span className="shrink-0 text-primary opacity-80">↓ below</span>
+        )}
+      </div>,
+      document.body,
+    )}
+    </>
   );
 }
 
