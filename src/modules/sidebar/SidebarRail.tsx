@@ -1,39 +1,41 @@
 import { cn } from "@/lib/utils";
-import { DatabaseIcon, FolderTreeIcon } from "@hugeicons/core-free-icons";
+import { FolderOpenIcon, Orbit01Icon, SlidersHorizontalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { SidebarViewId } from "./types";
 
-export const SIDEBAR_RAIL_HEIGHT = 36;
+export const SIDEBAR_RAIL_HEIGHT = 34;
 
 type RailItem = {
   id: SidebarViewId;
   label: string;
   icon: Parameters<typeof HugeiconsIcon>[0]["icon"];
-  badge?: number;
 };
 
 type Props = {
   activeView: SidebarViewId;
   onSelectView: (view: SidebarViewId) => void;
+  settingsOpen?: boolean;
+  onToggleSettings?: () => void;
 };
 
 export function SidebarRail({
   activeView,
   onSelectView,
+  settingsOpen = false,
+  onToggleSettings,
 }: Props) {
   const items: RailItem[] = [
-    { id: "sessions", label: "Sessions", icon: DatabaseIcon },
-    { id: "explorer", label: "Files", icon: FolderTreeIcon },
+    { id: "sessions", label: "Sessions", icon: Orbit01Icon },
+    { id: "explorer", label: "Files", icon: FolderOpenIcon },
   ];
 
   return (
     <div
       style={{ height: SIDEBAR_RAIL_HEIGHT }}
-      className="flex shrink-0 items-stretch gap-1 border-t border-sidebar-border bg-sidebar px-1.5 py-1"
+      className="flex shrink-0 items-center gap-0.5 border-t border-border bg-sidebar px-1.5"
     >
       {items.map((item) => {
         const isActive = item.id === activeView;
-        const showBadge = !!item.badge && item.badge > 0;
         return (
           <button
             key={item.id}
@@ -42,28 +44,46 @@ export function SidebarRail({
             aria-pressed={isActive}
             onClick={() => onSelectView(item.id)}
             className={cn(
-              "group relative flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-sm text-[11px] font-semibold outline-none transition-colors duration-150",
-              "focus-visible:ring-2 focus-visible:ring-sidebar-ring/40",
+              "flex cursor-pointer items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold outline-none transition-colors duration-150",
+              "focus-visible:ring-2 focus-visible:ring-ring/40",
               isActive
                 ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
             )}
           >
             <HugeiconsIcon
               icon={item.icon}
-              size={14}
+              size={13}
               strokeWidth={isActive ? 2 : 1.75}
               className="shrink-0 transition-[stroke-width] duration-150"
             />
             <span>{item.label}</span>
-            {showBadge ? (
-              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-sm border border-sidebar-border bg-sidebar px-1 text-[9px] font-semibold leading-none tabular-nums text-sidebar-foreground/80">
-                {item.badge! > 99 ? "99+" : item.badge}
-              </span>
-            ) : null}
           </button>
         );
       })}
+      {onToggleSettings && (
+        <button
+          type="button"
+          aria-label="Settings"
+          aria-pressed={settingsOpen}
+          onClick={onToggleSettings}
+          className={cn(
+            "ml-auto flex cursor-pointer items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium outline-none transition-colors duration-150",
+            "focus-visible:ring-2 focus-visible:ring-ring/40",
+            settingsOpen
+              ? "bg-sidebar-primary text-sidebar-primary-foreground"
+              : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+          )}
+        >
+          <HugeiconsIcon
+            icon={SlidersHorizontalIcon}
+            size={13}
+            strokeWidth={settingsOpen ? 2 : 1.75}
+            className="shrink-0 transition-[stroke-width] duration-150"
+          />
+          <span>Settings</span>
+        </button>
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 
@@ -84,6 +85,21 @@ export function useDocument({ path, onDirtyChange }: Options) {
     setReloadCounter((n) => n + 1);
     return true;
   }, []);
+
+  // Reload from disk when the file is modified externally (e.g. a `git checkout`
+  // or another process writing the file). No-op if the buffer has unsaved edits.
+  useEffect(() => {
+    const normPath = path.replace(/\\/g, "/");
+    const unlistenPromise = listen<string[]>("fs:changed", (event) => {
+      const changed = event.payload;
+      if (changed.some((p) => p.replace(/\\/g, "/") === normPath)) {
+        reload();
+      }
+    });
+    return () => {
+      void unlistenPromise.then((unlisten) => unlisten());
+    };
+  }, [path, reload]);
 
   const onChange = useCallback((next: string) => {
     bufferRef.current = next;

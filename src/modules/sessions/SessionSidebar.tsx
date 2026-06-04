@@ -2,6 +2,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
   Clock01Icon,
+  Copy01Icon,
   DatabaseIcon,
   FolderSearchIcon,
   Refresh01Icon,
@@ -84,6 +85,7 @@ function rowFromSearch(result: SearchResult): SessionSummary & { snippet?: strin
 export function SessionSidebar({ contextPath, repoRoot, onOpenSession }: Props) {
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query.trim());
+  const [view, setView] = useState<"recent" | "all">("recent");
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -94,6 +96,7 @@ export function SessionSidebar({ contextPath, repoRoot, onOpenSession }: Props) 
   const autoScanCursorRef = useRef(new Date().toISOString());
   const scopePath = contextPath ?? repoRoot;
   const scopePaths = useMemo(() => (scopePath ? [scopePath] : undefined), [scopePath]);
+  const effectivePaths = view === "recent" ? scopePaths : undefined;
   const contextLabel = useMemo(
     () => basename(scopePath),
     [scopePath],
@@ -103,9 +106,9 @@ export function SessionSidebar({ contextPath, repoRoot, onOpenSession }: Props) 
   const loadDashboard = useCallback(async () => {
     try {
       const [nextSessions, nextStats, nextActivity] = await Promise.all([
-        getSessions({ limit: 80, paths: scopePaths }),
-        getStats(scopePaths),
-        getActivityHeatmap(84, scopePaths),
+        getSessions({ limit: 80, paths: effectivePaths }),
+        getStats(effectivePaths),
+        getActivityHeatmap(84, effectivePaths),
       ]);
       setSessions(nextSessions);
       setStats(nextStats);
@@ -116,7 +119,7 @@ export function SessionSidebar({ contextPath, repoRoot, onOpenSession }: Props) 
     } finally {
       setLoading(false);
     }
-  }, [scopePaths]);
+  }, [effectivePaths]);
 
   const runScan = useCallback(async () => {
     setIndexing(true);
@@ -154,7 +157,7 @@ export function SessionSidebar({ contextPath, repoRoot, onOpenSession }: Props) 
     setSearchResults([]);
     setStats(null);
     setActivity([]);
-  }, [contextKey]);
+  }, [contextKey, view]);
 
   useEffect(() => {
     void loadDashboard();
@@ -178,7 +181,7 @@ export function SessionSidebar({ contextPath, repoRoot, onOpenSession }: Props) 
 
     let cancelled = false;
     const timeout = window.setTimeout(() => {
-      void searchSessions({ query: deferredQuery, limit: 80, paths: scopePaths })
+      void searchSessions({ query: deferredQuery, limit: 80, paths: effectivePaths })
         .then((results) => {
           if (!cancelled) setSearchResults(results);
         })
@@ -191,7 +194,7 @@ export function SessionSidebar({ contextPath, repoRoot, onOpenSession }: Props) 
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [deferredQuery, scopePaths]);
+  }, [deferredQuery, effectivePaths]);
 
   const rows = useMemo(
     () => (deferredQuery ? searchResults.map(rowFromSearch) : sessions),
@@ -267,16 +270,17 @@ export function SessionSidebar({ contextPath, repoRoot, onOpenSession }: Props) 
         </div>
 
         <div className="mt-2 grid grid-cols-2 gap-1.5">
-          {[
-            { label: "Recent", icon: Clock01Icon, active: true },
-            { label: "Indexed", icon: DatabaseIcon, active: false },
-          ].map((item) => (
+          {([
+            { label: contextLabel, icon: Clock01Icon, value: "recent" as const },
+            { label: "All", icon: DatabaseIcon, value: "all" as const },
+          ] as const).map((item) => (
             <button
               key={item.label}
               type="button"
+              onClick={() => setView(item.value)}
               className={cn(
                 "flex h-7 items-center justify-center gap-1.5 rounded-md border text-[11px] font-medium transition-colors",
-                item.active
+                view === item.value
                   ? "border-border/60 bg-foreground/6 text-foreground"
                   : "border-border/35 text-muted-foreground hover:bg-foreground/4 hover:text-foreground",
               )}
@@ -363,6 +367,13 @@ function SessionRow({
 }) {
   const title = session.title || "Untitled session";
   const repo = session.repo_name || basename(session.repo_path ?? session.workspace);
+  const shortId = session.id.slice(0, 8);
+
+  const copyId = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    void navigator.clipboard.writeText(session.id);
+  };
+
   return (
     <button
       type="button"
@@ -394,6 +405,15 @@ function SessionRow({
         {session.file_count > 0 && (
           <span className="ml-auto shrink-0">{session.file_count} files</span>
         )}
+        <button
+          type="button"
+          onClick={copyId}
+          title={`Copy session ID: ${session.id}`}
+          className="ml-auto flex shrink-0 items-center gap-1 rounded px-1 py-0.5 font-mono text-[9px] text-muted-foreground/50 opacity-0 transition-opacity hover:bg-foreground/6 hover:text-muted-foreground group-hover:opacity-100"
+        >
+          <HugeiconsIcon icon={Copy01Icon} size={8} strokeWidth={1.8} />
+          {shortId}
+        </button>
       </div>
     </button>
   );

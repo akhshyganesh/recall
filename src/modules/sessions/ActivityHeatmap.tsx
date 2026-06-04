@@ -113,7 +113,7 @@ export function ActivityHeatmap({ activity }: { activity: ActivityPoint[] }) {
           return (
             <span
               key={`month-${weekIndex}`}
-              className="h-3 truncate text-[8.5px] leading-3 text-muted-foreground"
+              className="h-3 overflow-visible whitespace-nowrap text-[9px] leading-3 text-muted-foreground"
             >
               {showLabel ? monthLabel(firstOfMonth?.date ?? week[0].date) : ""}
             </span>

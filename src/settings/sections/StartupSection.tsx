@@ -1,10 +1,6 @@
 import { Switch } from "@/components/ui/switch";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import {
-  setAutostart,
-  setAutoUpdates,
-  setRestoreWindowState,
-} from "@/modules/settings/store";
+import { setAutostart } from "@/modules/settings/store";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { useEffect } from "react";
 import { SectionHeader } from "../components/SectionHeader";
@@ -12,8 +8,6 @@ import { SettingRow } from "../components/SettingRow";
 
 export function StartupSection() {
   const autostart = usePreferencesStore((s) => s.autostart);
-  const autoUpdates = usePreferencesStore((s) => s.autoUpdates);
-  const restoreWindowState = usePreferencesStore((s) => s.restoreWindowState);
 
   useEffect(() => {
     let alive = true;
@@ -44,7 +38,7 @@ export function StartupSection() {
     <div className="flex flex-col gap-6">
       <SectionHeader
         title="Startup"
-        description="Launch behavior and window restore preferences."
+        description="Launch behavior."
       />
 
       <div className="flex flex-col gap-2">
@@ -55,26 +49,6 @@ export function StartupSection() {
           <Switch
             checked={autostart}
             onCheckedChange={(value) => void onToggleAutostart(value)}
-          />
-        </SettingRow>
-
-        <SettingRow
-          title="Install updates automatically"
-          description="Download and apply new Recall releases automatically on supported platforms. Linux will still surface the manual release flow."
-        >
-          <Switch
-            checked={autoUpdates}
-            onCheckedChange={(value) => void setAutoUpdates(value)}
-          />
-        </SettingRow>
-
-        <SettingRow
-          title="Restore window position & size"
-          description="Reopen the main window where you left it. Applies on next launch."
-        >
-          <Switch
-            checked={restoreWindowState}
-            onCheckedChange={(value) => void setRestoreWindowState(value)}
           />
         </SettingRow>
       </div>

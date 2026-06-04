@@ -6,7 +6,6 @@ import { getName, getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { arch, platform } from "@tauri-apps/plugin-os";
 import { useEffect, useState } from "react";
-import { SectionHeader } from "../components/SectionHeader";
 
 const REPO_URL = "https://github.com/akhshyganesh/recall";
 const RELEASES_URL = "https://github.com/akhshyganesh/recall/releases";
@@ -67,9 +66,7 @@ export function AboutSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      <SectionHeader title="About" description="" />
-
-      <div className="flex items-center gap-4 rounded-sm border border-border/60 bg-card/60 p-5">
+      <div className="flex items-center gap-4 rounded-xl border border-border/50 bg-card/40 p-5">
         <img src="/logo.png" alt="" className="size-12" draggable={false} />
         <div className="flex min-w-0 flex-col">
           <span className="text-[15px] font-semibold tracking-tight">
@@ -121,7 +118,7 @@ export function AboutSection() {
       </dl>
 
       <div className="flex flex-col gap-1.5">
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-1.5">
           <Button
             size="sm"
             onClick={onUpdateClick}

@@ -37,7 +37,7 @@ function MediaPane({ tab }: { tab: MediaTab }) {
   const src = useMemo(() => convertFileSrc(tab.path), [tab.path]);
 
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden rounded-md border border-border/60 bg-background">
+    <div className="flex h-full w-full flex-col overflow-hidden bg-background">
       <div className="flex min-h-0 flex-1 items-center justify-center bg-foreground/[0.025] p-4">
         {tab.mediaKind === "image" ? (
           <img

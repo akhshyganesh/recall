@@ -43,6 +43,10 @@ pub struct Session {
     pub killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
     pub writer: Arc<Mutex<Box<dyn Write + Send>>>,
     pub master: Mutex<Box<dyn MasterPty + Send>>,
+    /// PID of the shell process spawned into this PTY (Unix only, used to
+    /// detect whether a foreground child is running via tcgetpgrp).
+    #[cfg(unix)]
+    pub shell_pid: Option<u32>,
 }
 
 impl Drop for Session {
@@ -109,6 +113,9 @@ pub fn spawn(
     let mut child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
     drop(pair.slave);
 
+    #[cfg(unix)]
+    let shell_pid = child.process_id();
+
     // Kill the child if any of the pipe setup below fails so the spawned shell
     // can't outlive an aborted pty_open.
     let mut guard = ChildKillGuard::new(child.clone_killer());
@@ -137,6 +144,8 @@ pub fn spawn(
         killer: Mutex::new(killer),
         writer: writer.clone(),
         master: Mutex::new(pair.master),
+        #[cfg(unix)]
+        shell_pid,
     });
 
     let pending: Arc<(Mutex<Vec<u8>>, Condvar)> =
