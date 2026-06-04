@@ -32,7 +32,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { EditorTab, MediaTab, Tab, TerminalTab } from "./lib/useTabs";
+import type { EditorTab, GitDiffTab, MediaTab, Tab, TerminalTab } from "./lib/useTabs";
 
 type Props = {
   tabs: Tab[];
@@ -268,7 +268,8 @@ export function TabBar({
               tabs.forEach((t, i) => {
                 const isPreview =
                   (t.kind === "editor" && (t as EditorTab).preview) ||
-                  (t.kind === "media" && (t as MediaTab).preview);
+                  (t.kind === "media" && (t as MediaTab).preview) ||
+                  (t.kind === "git-diff" && (t as GitDiffTab).preview);
                 const label = labelFor(t, terminalLabels);
                 const isDragging = draggingIdx === i;
                 const showDropBefore =

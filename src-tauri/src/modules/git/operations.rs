@@ -480,6 +480,38 @@ fn diff_inner(
     })
 }
 
+// Like diff_inner but accepts a pre-validated relative path, skipping resolve_within_repo.
+// Used by diff_content after it has already resolved (or fallen back on) the path.
+fn diff_for_rel_path(
+    repo_root: &ResolvedGitDirectory,
+    rel_path: &str,
+    staged: bool,
+) -> Result<GitDiffResult> {
+    let mut args: Vec<OsString> = vec!["diff".into(), "--no-ext-diff".into()];
+    if staged {
+        args.push("--cached".into());
+    }
+    if !rel_path.is_empty() {
+        args.push("--".into());
+        args.push(rel_path.into());
+    }
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        args,
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git diff failed")?;
+    let diff_text = match String::from_utf8(output.stdout) {
+        Ok(text) => text,
+        Err(e) => String::from_utf8_lossy(&e.into_bytes()).into_owned(),
+    };
+    Ok(GitDiffResult {
+        diff_text,
+        truncated: output.truncated,
+    })
+}
+
 pub fn diff_content(
     registry: &WorkspaceRegistry,
     repo_root: &str,
@@ -490,13 +522,32 @@ pub fn diff_content(
 ) -> Result<GitDiffContentResult> {
     let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
     ensure_git_available(&repo_root.workspace)?;
-    let worktree_path = resolve_within_repo(&repo_root.local_path, path)?;
-    let rel_path = pathspec(&repo_root.local_path, &worktree_path);
+
+    // Resolve the path to a canonical absolute path. When the parent directory
+    // was also deleted (e.g. a whole folder was removed), canonicalize_parent
+    // fails with an IO error. Fall back to a simple join; is_safe_pathspec was
+    // already verified inside resolve_within_repo before any I/O was attempted.
+    let (worktree_path, rel_path) = match resolve_within_repo(&repo_root.local_path, path) {
+        Ok(p) => {
+            let rel = pathspec(&repo_root.local_path, &p);
+            (p, rel)
+        }
+        Err(GitError::Io(_)) => {
+            let rel = path.replace('\\', "/");
+            let abs = repo_root.local_path.join(path);
+            (abs, rel)
+        }
+        Err(e) => return Err(e),
+    };
 
     let original_rel = match original_path {
         Some(orig) if !orig.is_empty() => {
-            let resolved = resolve_within_repo(&repo_root.local_path, orig)?;
-            Some(pathspec(&repo_root.local_path, &resolved))
+            let rel = match resolve_within_repo(&repo_root.local_path, orig) {
+                Ok(p) => pathspec(&repo_root.local_path, &p),
+                Err(GitError::Io(_)) => orig.replace('\\', "/"),
+                Err(e) => return Err(e),
+            };
+            Some(rel)
         }
         _ => None,
     };
@@ -524,7 +575,7 @@ pub fn diff_content(
     } else {
         read_text_file(&worktree_path)?
     };
-    let patch = diff_inner(&repo_root, Some(&rel_path), staged)?;
+    let patch = diff_for_rel_path(&repo_root, &rel_path, staged)?;
     let is_binary =
         matches!(original, TextSource::Binary) || matches!(modified, TextSource::Binary);
 

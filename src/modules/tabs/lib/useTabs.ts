@@ -83,6 +83,7 @@ export type GitDiffTab = {
   repoRoot: string;
   mode: "-" | "+";
   originalPath: string | null;
+  preview: boolean;
 };
 
 export type GitHistoryTab = {
@@ -304,7 +305,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
   const pinTab = useCallback((id: number) => {
     setTabs((curr) =>
       curr.map((t) =>
-        t.id === id && (t.kind === "editor" || t.kind === "media")
+        t.id === id && (t.kind === "editor" || t.kind === "media" || t.kind === "git-diff")
           ? { ...t, preview: false }
           : t,
       ),
@@ -439,44 +440,82 @@ export function useTabs(initial?: Partial<TerminalTab>) {
       mode: "-" | "+";
       originalPath?: string | null;
       title?: string;
+      /** Default false — single-click preview (italic, replaceable). Pass true for permanent opens. */
+      pin?: boolean;
     }) => {
-      const curr = tabsRef.current;
-      const existing = curr.find(
-        (t) =>
-          t.kind === "git-diff" &&
-          t.repoRoot === input.repoRoot &&
-          t.path === input.path &&
-          t.mode === input.mode,
-      );
+      const pin = input.pin ?? false;
       const computedTitle =
         input.title ?? `${basename(input.path)} (${input.mode})`;
       const originalPath = input.originalPath ?? null;
+      const curr = tabsRef.current;
 
-      if (existing) {
+      // A persistent tab for this key always wins.
+      const persistent = curr.find(
+        (t) =>
+          t.kind === "git-diff" &&
+          (t as GitDiffTab).repoRoot === input.repoRoot &&
+          (t as GitDiffTab).path === input.path &&
+          (t as GitDiffTab).mode === input.mode &&
+          !(t as GitDiffTab).preview,
+      );
+      if (persistent) {
         const nextTabs = curr.map((t) =>
-          t.id === existing.id
-            ? { ...t, title: computedTitle, originalPath }
+          t.id === persistent.id ? { ...t, title: computedTitle, originalPath } : t,
+        );
+        tabsRef.current = nextTabs;
+        setTabs(nextTabs);
+        setActiveId(persistent.id);
+        return persistent.id;
+      }
+
+      // Existing preview tab for the same key: update it in-place.
+      const existingPreview = curr.find(
+        (t) =>
+          t.kind === "git-diff" &&
+          (t as GitDiffTab).repoRoot === input.repoRoot &&
+          (t as GitDiffTab).path === input.path &&
+          (t as GitDiffTab).mode === input.mode &&
+          (t as GitDiffTab).preview,
+      );
+      if (existingPreview) {
+        const nextTabs = curr.map((t) =>
+          t.id === existingPreview.id
+            ? { ...t, title: computedTitle, originalPath, preview: !pin }
             : t,
         );
         tabsRef.current = nextTabs;
         setTabs(nextTabs);
-        setActiveId(existing.id);
-        return existing.id;
+        setActiveId(existingPreview.id);
+        return existingPreview.id;
       }
 
       const id = nextIdRef.current++;
-      const nextTabs = [
-        ...curr,
-        {
-          id,
-          kind: "git-diff",
-          title: computedTitle,
-          path: input.path,
-          repoRoot: input.repoRoot,
-          mode: input.mode,
-          originalPath,
-        } satisfies GitDiffTab,
-      ];
+      const tab: GitDiffTab = {
+        id,
+        kind: "git-diff",
+        title: computedTitle,
+        path: input.path,
+        repoRoot: input.repoRoot,
+        mode: input.mode,
+        originalPath,
+        preview: !pin,
+      };
+
+      let nextTabs: Tab[];
+      if (!pin) {
+        // Replace the current preview git-diff slot, or append.
+        const previewIdx = curr.findIndex(
+          (t) => t.kind === "git-diff" && (t as GitDiffTab).preview,
+        );
+        nextTabs = previewIdx === -1 ? [...curr, tab] : (() => {
+          const n = [...curr];
+          n[previewIdx] = tab;
+          return n;
+        })();
+      } else {
+        nextTabs = [...curr, tab];
+      }
+
       tabsRef.current = nextTabs;
       setTabs(nextTabs);
       setActiveId(id);
