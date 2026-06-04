@@ -236,8 +236,8 @@ export function TabBar({
                         title={`${tooltipFor(t, label)}${indexHint}`}
                         onDoubleClick={() => isPreview && onPin(t.id)}
                         className={cn(
-                          "group relative h-7 shrink-0 justify-between gap-1.5 rounded-full border-0 text-xs font-semibold text-muted-foreground transition-all",
-                          "data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-foreground/20",
+                          "group relative h-7! flex-none! shrink-0 justify-between! gap-1.5! rounded-full! border-0! text-xs! font-semibold text-muted-foreground transition-all",
+                          "data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-md",
                           "hover:bg-muted hover:text-foreground",
                           compact
                             ? "px-1.5!"
@@ -250,8 +250,8 @@ export function TabBar({
                       >
                         <span
                           className={cn(
-                            "flex items-center gap-1.5 truncate",
-                            compact ? "max-w-48" : "max-w-80",
+                            "flex min-w-0 items-center gap-1.5 truncate",
+                            compact ? "max-w-32" : "max-w-52",
                           )}
                         >
                           <TabIcon tab={t} />
@@ -377,7 +377,7 @@ export function TabBar({
               <HugeiconsIcon icon={PlusSignIcon} size={14} strokeWidth={2} />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="min-w-44">
+          <DropdownMenuContent align="start" className="w-max">
             <DropdownMenuItem onSelect={() => onNew()}>
               <HugeiconsIcon
                 icon={ComputerTerminal02Icon}

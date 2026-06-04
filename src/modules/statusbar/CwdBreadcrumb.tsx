@@ -31,6 +31,8 @@ type Props = {
   filePath?: string | null;
   home: string | null;
   onCd: (path: string) => void;
+  /** Show only the leaf segment — prevents wrapping in space-constrained containers. */
+  compact?: boolean;
 };
 
 function dirname(path: string): string {
@@ -44,7 +46,62 @@ function basename(path: string): string {
   return i === -1 ? path : path.slice(i + 1);
 }
 
-export function CwdBreadcrumb({ cwd, filePath, home, onCd }: Props) {
+export function CwdBreadcrumb({ cwd, filePath, home, onCd, compact }: Props) {
+  // Compact mode: shows immediate parent → current on a single line.
+  // Parent truncates to fit; current (the interactive leaf) is always fully visible.
+  if (compact) {
+    if (filePath) {
+      const dir = dirname(filePath);
+      const name = basename(filePath);
+      const segments = segmentsFromCwd(dir, home);
+      const parent = segments[segments.length - 1] ?? null;
+      return (
+        <Breadcrumb>
+          <BreadcrumbList className="flex-nowrap gap-1 text-xs">
+            {parent ? (
+              <BreadcrumbSegment
+                label={parent.label}
+                isHome={parent.isHome}
+                truncate
+                onClick={() => onCd(parent.fullPath)}
+              />
+            ) : null}
+            <BreadcrumbItem>
+              <BreadcrumbPage className="shrink-0 text-foreground">{name}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      );
+    }
+    if (!cwd) {
+      return <span className="text-xs text-muted-foreground/70">no directory</span>;
+    }
+    const segments = segmentsFromCwd(cwd, home);
+    const current = segments[segments.length - 1];
+    const parent = segments.length >= 2 ? segments[segments.length - 2] : null;
+    return (
+      <Breadcrumb>
+        <BreadcrumbList className="flex-nowrap gap-1 text-xs">
+          {parent ? (
+            <BreadcrumbSegment
+              label={parent.label}
+              isHome={parent.isHome}
+              truncate
+              onClick={() => onCd(parent.fullPath)}
+            />
+          ) : null}
+          <BreadcrumbItem>
+            <CurrentSegmentDropdown
+              label={current.label}
+              path={current.fullPath}
+              onCd={onCd}
+            />
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+    );
+  }
+
   // File mode: dir segments navigate; filename is the terminal leaf.
   if (filePath) {
     const dir = dirname(filePath);
@@ -54,7 +111,7 @@ export function CwdBreadcrumb({ cwd, filePath, home, onCd }: Props) {
     const middle = segments.slice(1);
     return (
       <Breadcrumb>
-        <BreadcrumbList className="gap-1 text-xs sm:gap-1.5">
+        <BreadcrumbList className="flex-nowrap gap-1 text-xs sm:gap-1.5">
           {first ? (
             <BreadcrumbSegment
               label={first.label}
@@ -66,10 +123,7 @@ export function CwdBreadcrumb({ cwd, filePath, home, onCd }: Props) {
             <CollapsedSegments segments={middle} onCd={onCd} />
           ) : null}
           {middle.map((s) => (
-            <span
-              key={s.fullPath}
-              className="contents max-md:hidden"
-            >
+            <span key={s.fullPath} className="contents max-md:hidden">
               <BreadcrumbSegment
                 label={s.label}
                 isHome={s.isHome}
@@ -99,7 +153,7 @@ export function CwdBreadcrumb({ cwd, filePath, home, onCd }: Props) {
   const middleParents = parents.slice(1);
   return (
     <Breadcrumb>
-      <BreadcrumbList className="gap-1 text-xs sm:gap-1.5">
+      <BreadcrumbList className="flex-nowrap gap-1 text-xs sm:gap-1.5">
         {firstParent ? (
           <BreadcrumbSegment
             label={firstParent.label}
@@ -134,20 +188,22 @@ export function CwdBreadcrumb({ cwd, filePath, home, onCd }: Props) {
 function BreadcrumbSegment({
   label,
   isHome,
+  truncate,
   onClick,
 }: {
   label: string;
   isHome: boolean;
+  truncate?: boolean;
   onClick: () => void;
 }) {
   return (
     <>
-      <BreadcrumbItem>
+      <BreadcrumbItem className={truncate ? "min-w-0 shrink" : undefined}>
         <BreadcrumbLink asChild>
           <button
             type="button"
             onClick={onClick}
-            className="cursor-pointer"
+            className={truncate ? "min-w-0 cursor-pointer" : "cursor-pointer"}
           >
             <Badge
               variant="outline"
@@ -156,16 +212,18 @@ function BreadcrumbSegment({
               {isHome ? (
                 <HugeiconsIcon
                   icon={Home03Icon}
-                  className="size-3"
+                  className="size-3 shrink-0"
                   strokeWidth={1.75}
                 />
               ) : null}
-              {isHome ? "Home" : label}
+              <span className={truncate ? "max-w-20 truncate" : undefined}>
+                {isHome ? "Home" : label}
+              </span>
             </Badge>
           </button>
         </BreadcrumbLink>
       </BreadcrumbItem>
-      <BreadcrumbSeparator className="[&>svg]:size-3" />
+      <BreadcrumbSeparator className="shrink-0 [&>svg]:size-3" />
     </>
   );
 }

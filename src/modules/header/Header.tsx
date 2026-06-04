@@ -152,7 +152,7 @@ export function Header({
           <HugeiconsIcon icon={GridViewIcon} size={16} strokeWidth={1.75} />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-44">
+      <DropdownMenuContent align="end" className="w-max">
         <DropdownMenuItem onSelect={() => onSplit("row")}>
           <HugeiconsIcon
             icon={LayoutTwoColumnIcon}
@@ -261,13 +261,14 @@ export function Header({
             compact={compact}
           />
           <div data-tauri-drag-region className="h-full min-w-2 flex-1" />
-          {/* Breadcrumb: visible on wider screens, tucked between tabs and actions */}
-          <div className="hidden max-w-52 items-center overflow-hidden lg:flex">
+          {/* Breadcrumb: parent → current, single line */}
+          <div className="hidden min-w-0 max-w-56 shrink items-center overflow-hidden lg:flex">
             <CwdBreadcrumb
               cwd={cwd}
               filePath={filePath}
               home={home}
               onCd={onCd}
+              compact
             />
           </div>
           <WorkspaceEnvSelector onSelect={onWorkspaceChange} />
