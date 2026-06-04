@@ -1409,7 +1409,6 @@ export default function App() {
             onNew={openNewTab}
             onNewPreview={() => openPreviewTab("")}
             onNewEditor={() => setNewEditorOpen(true)}
-            onNewGitGraph={openGitGraphFromContext}
             onClose={handleClose}
             onRenameTab={handleRenameTab}
             onPin={pinTab}

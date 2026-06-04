@@ -20,7 +20,6 @@ import {
   Cancel01Icon,
   Clock01Icon,
   ComputerTerminal02Icon,
-  GitBranchIcon,
   GitCompareIcon,
   Globe02Icon,
   LayoutTwoColumnIcon,
@@ -41,7 +40,6 @@ type Props = {
   onNew: () => void;
   onNewPreview: () => void;
   onNewEditor: () => void;
-  onNewGitGraph: () => void;
   onClose: (id: number) => void;
   onRename: (id: number, title: string) => void;
   /** Pin (promote) a preview tab to persistent on double-click. */
@@ -66,7 +64,6 @@ export function TabBar({
   onNew,
   onNewPreview,
   onNewEditor,
-  onNewGitGraph,
   onClose,
   onRename,
   onPin,
@@ -503,10 +500,7 @@ export function TabBar({
                 {fmtShortcut(MOD_KEY, SHIFT_KEY, "P")}
               </span>
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => onNewGitGraph()}>
-              <HugeiconsIcon icon={GitBranchIcon} size={14} strokeWidth={1.75} />
-              <span className="flex-1">Git Graph</span>
-            </DropdownMenuItem>
+
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
