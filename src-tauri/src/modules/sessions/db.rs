@@ -5,8 +5,7 @@ use std::sync::Mutex;
 
 use crate::modules::sessions::connectors::SUPPORTED_AGENT_SLUGS;
 use crate::modules::sessions::models::{
-    ActivityPoint, DistinctAgent, FileChange, Message, SearchResult, Session, SessionSummary,
-    Stats,
+    ActivityPoint, DistinctAgent, FileChange, Message, SearchResult, Session, SessionSummary, Stats,
 };
 
 const SESSION_PATH_EXPR: &str = "COALESCE(NULLIF(repo_path, ''), NULLIF(workspace, ''))";
@@ -504,7 +503,12 @@ impl Database {
         param_values.push(Box::new(query.to_string()));
 
         append_multi_value_filter(&mut sql, "s.tool", tool_filters, &mut param_values);
-        append_multi_value_filter(&mut sql, "s.agent_slug", agent_slug_filters, &mut param_values);
+        append_multi_value_filter(
+            &mut sql,
+            "s.agent_slug",
+            agent_slug_filters,
+            &mut param_values,
+        );
         append_path_scope_filter(
             &mut sql,
             SESSION_PATH_EXPR_WITH_ALIAS,
