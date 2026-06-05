@@ -60,7 +60,6 @@ import {
   useSourceControl,
 } from "@/modules/source-control";
 import {
-  MAX_PANES_PER_TAB,
   useTabs,
   useWorkspaceCwd,
   type MediaKind,
@@ -1409,7 +1408,6 @@ export default function App() {
             onNew={openNewTab}
             onNewPreview={() => openPreviewTab("")}
             onNewEditor={() => setNewEditorOpen(true)}
-            onNewGitGraph={openGitGraphFromContext}
             onClose={handleClose}
             onRenameTab={handleRenameTab}
             onPin={pinTab}

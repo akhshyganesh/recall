@@ -5,7 +5,7 @@ use std::sync::Mutex;
 
 use crate::modules::sessions::connectors::SUPPORTED_AGENT_SLUGS;
 use crate::modules::sessions::models::{
-    ActivityPoint, FileChange, Message, SearchResult, Session, SessionSummary, Stats,
+    ActivityPoint, DistinctAgent, FileChange, Message, SearchResult, Session, SessionSummary, Stats,
 };
 
 const SESSION_PATH_EXPR: &str = "COALESCE(NULLIF(repo_path, ''), NULLIF(workspace, ''))";
@@ -266,9 +266,11 @@ impl Database {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn get_session_summaries(
         &self,
         tool_filter: Option<&str>,
+        agent_slug_filter: Option<&str>,
         path_filters: Option<&[String]>,
         date_from: Option<&str>,
         date_to: Option<&str>,
@@ -277,7 +279,7 @@ impl Database {
     ) -> Result<Vec<SessionSummary>, String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         let mut sql = String::from(
-            "SELECT s.id, s.tool, s.agent_slug, s.title, s.repo_name, s.repo_path, s.started_at, s.ended_at, s.message_count, s.file_count, s.model, s.workspace,
+            "SELECT s.id, s.tool, s.agent_slug, s.external_id, s.title, s.repo_name, s.repo_path, s.started_at, s.ended_at, s.message_count, s.file_count, s.model, s.workspace,
                     CASE WHEN f.session_id IS NOT NULL THEN 1 ELSE 0 END as is_favorite
              FROM sessions s
              LEFT JOIN favorites f ON s.id = f.session_id
@@ -289,6 +291,10 @@ impl Database {
         if let Some(tool) = tool_filter {
             sql.push_str(&format!(" AND s.tool = ?{}", param_values.len() + 1));
             param_values.push(Box::new(tool.to_string()));
+        }
+        if let Some(slug) = agent_slug_filter {
+            sql.push_str(&format!(" AND s.agent_slug = ?{}", param_values.len() + 1));
+            param_values.push(Box::new(slug.to_string()));
         }
         append_path_scope_filter(
             &mut sql,
@@ -323,16 +329,17 @@ impl Database {
                     id: row.get(0)?,
                     tool: row.get(1)?,
                     agent_slug: row.get(2)?,
-                    title: row.get(3)?,
-                    repo_name: row.get(4)?,
-                    repo_path: row.get(5)?,
-                    started_at: row.get(6)?,
-                    ended_at: row.get(7)?,
-                    message_count: row.get(8)?,
-                    file_count: row.get(9)?,
-                    model: row.get(10)?,
-                    workspace: row.get(11)?,
-                    is_favorite: row.get(12)?,
+                    external_id: row.get(3)?,
+                    title: row.get(4)?,
+                    repo_name: row.get(5)?,
+                    repo_path: row.get(6)?,
+                    started_at: row.get(7)?,
+                    ended_at: row.get(8)?,
+                    message_count: row.get(9)?,
+                    file_count: row.get(10)?,
+                    model: row.get(11)?,
+                    workspace: row.get(12)?,
+                    is_favorite: row.get(13)?,
                 })
             })
             .map_err(|e| e.to_string())?;
@@ -352,7 +359,7 @@ impl Database {
     ) -> Result<Vec<SessionSummary>, String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         let mut stmt = conn.prepare(&format!(
-            "SELECT s.id, s.tool, s.agent_slug, s.title, s.repo_name, s.repo_path, s.started_at, s.ended_at, s.message_count, s.file_count, s.model, s.workspace,
+            "SELECT s.id, s.tool, s.agent_slug, s.external_id, s.title, s.repo_name, s.repo_path, s.started_at, s.ended_at, s.message_count, s.file_count, s.model, s.workspace,
                     CASE WHEN f.session_id IS NOT NULL THEN 1 ELSE 0 END as is_favorite
              FROM sessions s
              LEFT JOIN favorites f ON s.id = f.session_id
@@ -369,16 +376,17 @@ impl Database {
                     id: row.get(0)?,
                     tool: row.get(1)?,
                     agent_slug: row.get(2)?,
-                    title: row.get(3)?,
-                    repo_name: row.get(4)?,
-                    repo_path: row.get(5)?,
-                    started_at: row.get(6)?,
-                    ended_at: row.get(7)?,
-                    message_count: row.get(8)?,
-                    file_count: row.get(9)?,
-                    model: row.get(10)?,
-                    workspace: row.get(11)?,
-                    is_favorite: row.get(12)?,
+                    external_id: row.get(3)?,
+                    title: row.get(4)?,
+                    repo_name: row.get(5)?,
+                    repo_path: row.get(6)?,
+                    started_at: row.get(7)?,
+                    ended_at: row.get(8)?,
+                    message_count: row.get(9)?,
+                    file_count: row.get(10)?,
+                    model: row.get(11)?,
+                    workspace: row.get(12)?,
+                    is_favorite: row.get(13)?,
                 })
             })
             .map_err(|e| e.to_string())?;
@@ -473,10 +481,12 @@ impl Database {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn search(
         &self,
         query: &str,
         tool_filters: Option<&[String]>,
+        agent_slug_filters: Option<&[String]>,
         path_filters: Option<&[String]>,
         date_from: Option<&str>,
         date_to: Option<&str>,
@@ -495,6 +505,12 @@ impl Database {
         param_values.push(Box::new(query.to_string()));
 
         append_multi_value_filter(&mut sql, "s.tool", tool_filters, &mut param_values);
+        append_multi_value_filter(
+            &mut sql,
+            "s.agent_slug",
+            agent_slug_filters,
+            &mut param_values,
+        );
         append_path_scope_filter(
             &mut sql,
             SESSION_PATH_EXPR_WITH_ALIAS,
@@ -577,7 +593,7 @@ impl Database {
     ) -> Result<Vec<SessionSummary>, String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         let mut stmt = conn.prepare(&format!(
-            "SELECT s.id, s.tool, s.agent_slug, s.title, s.repo_name, s.repo_path, s.started_at, s.ended_at, s.message_count, s.file_count, s.model, s.workspace, 1 as is_favorite
+            "SELECT s.id, s.tool, s.agent_slug, s.external_id, s.title, s.repo_name, s.repo_path, s.started_at, s.ended_at, s.message_count, s.file_count, s.model, s.workspace, 1 as is_favorite
              FROM sessions s
              JOIN favorites f ON s.id = f.session_id
              WHERE {}
@@ -592,16 +608,17 @@ impl Database {
                     id: row.get(0)?,
                     tool: row.get(1)?,
                     agent_slug: row.get(2)?,
-                    title: row.get(3)?,
-                    repo_name: row.get(4)?,
-                    repo_path: row.get(5)?,
-                    started_at: row.get(6)?,
-                    ended_at: row.get(7)?,
-                    message_count: row.get(8)?,
-                    file_count: row.get(9)?,
-                    model: row.get(10)?,
-                    workspace: row.get(11)?,
-                    is_favorite: row.get(12)?,
+                    external_id: row.get(3)?,
+                    title: row.get(4)?,
+                    repo_name: row.get(5)?,
+                    repo_path: row.get(6)?,
+                    started_at: row.get(7)?,
+                    ended_at: row.get(8)?,
+                    message_count: row.get(9)?,
+                    file_count: row.get(10)?,
+                    model: row.get(11)?,
+                    workspace: row.get(12)?,
+                    is_favorite: row.get(13)?,
                 })
             })
             .map_err(|e| e.to_string())?;
@@ -611,6 +628,30 @@ impl Database {
             results.push(row.map_err(|e| e.to_string())?);
         }
         Ok(results)
+    }
+
+    pub fn get_distinct_agents(&self) -> Result<Vec<DistinctAgent>, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let mut stmt = conn
+            .prepare(&format!(
+                "SELECT agent_slug, tool, COUNT(*) as count FROM sessions WHERE {} GROUP BY agent_slug ORDER BY count DESC",
+                supported_agent_filter("agent_slug")
+            ))
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(DistinctAgent {
+                    agent_slug: row.get(0)?,
+                    tool: row.get(1)?,
+                    count: row.get(2)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+        let mut agents = Vec::new();
+        for row in rows {
+            agents.push(row.map_err(|e| e.to_string())?);
+        }
+        Ok(agents)
     }
 
     pub fn get_tools(&self) -> Result<Vec<String>, String> {

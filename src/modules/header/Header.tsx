@@ -22,7 +22,6 @@ type Props = {
   onNew: () => void;
   onNewPreview: () => void;
   onNewEditor: () => void;
-  onNewGitGraph: () => void;
   onClose: (id: number) => void;
   onRenameTab: (id: number, title: string) => void;
   /** Promote a preview (transient) tab to persistent. */
@@ -51,7 +50,6 @@ export function Header({
   onNew,
   onNewPreview,
   onNewEditor,
-  onNewGitGraph,
   onClose,
   onRenameTab,
   onPin,
@@ -123,7 +121,6 @@ export function Header({
             onNew={onNew}
             onNewPreview={onNewPreview}
             onNewEditor={onNewEditor}
-            onNewGitGraph={onNewGitGraph}
             onClose={onClose}
             onRename={onRenameTab}
             onPin={onPin}

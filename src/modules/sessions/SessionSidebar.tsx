@@ -13,16 +13,19 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import { ActivityHeatmap } from "./ActivityHeatmap";
 import {
   getActivityHeatmap,
+  getDistinctAgents,
   getSessions,
   getStats,
   scanAll,
   scanIncremental,
   searchSessions,
   type ActivityPoint,
+  type DistinctAgent,
   type SearchResult,
   type SessionSummary,
   type Stats,
 } from "./api";
+import { getToolTheme } from "./toolStyle";
 
 const AUTO_INCREMENTAL_SCAN_MS = 2 * 60 * 1000;
 
@@ -68,6 +71,7 @@ function rowFromSearch(result: SearchResult): SessionSummary & { snippet?: strin
     id: result.id,
     tool: result.tool,
     agent_slug: result.agent_slug,
+    external_id: null,
     title: result.title,
     repo_name: result.repo_name,
     repo_path: result.repo_path,
@@ -86,6 +90,8 @@ export function SessionSidebar({ contextPath, repoRoot, onOpenSession }: Props) 
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query.trim());
   const [view, setView] = useState<"recent" | "all">("recent");
+  const [activeSlug, setActiveSlug] = useState<string | null>(null);
+  const [agents, setAgents] = useState<DistinctAgent[]>([]);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -105,21 +111,23 @@ export function SessionSidebar({ contextPath, repoRoot, onOpenSession }: Props) 
 
   const loadDashboard = useCallback(async () => {
     try {
-      const [nextSessions, nextStats, nextActivity] = await Promise.all([
-        getSessions({ limit: 80, paths: effectivePaths }),
+      const [nextSessions, nextStats, nextActivity, nextAgents] = await Promise.all([
+        getSessions({ limit: 80, paths: effectivePaths, agentSlug: activeSlug ?? undefined }),
         getStats(effectivePaths),
         getActivityHeatmap(84, effectivePaths),
+        getDistinctAgents(),
       ]);
       setSessions(nextSessions);
       setStats(nextStats);
       setActivity(nextActivity);
+      setAgents(nextAgents);
       setError(null);
     } catch (err) {
       setError(String(err));
     } finally {
       setLoading(false);
     }
-  }, [effectivePaths]);
+  }, [effectivePaths, activeSlug]);
 
   const runScan = useCallback(async () => {
     setIndexing(true);
@@ -157,6 +165,7 @@ export function SessionSidebar({ contextPath, repoRoot, onOpenSession }: Props) 
     setSearchResults([]);
     setStats(null);
     setActivity([]);
+    setActiveSlug(null);
   }, [contextKey, view]);
 
   useEffect(() => {
@@ -181,7 +190,7 @@ export function SessionSidebar({ contextPath, repoRoot, onOpenSession }: Props) 
 
     let cancelled = false;
     const timeout = window.setTimeout(() => {
-      void searchSessions({ query: deferredQuery, limit: 80, paths: effectivePaths })
+      void searchSessions({ query: deferredQuery, limit: 80, paths: effectivePaths, agentSlugs: activeSlug ? [activeSlug] : undefined })
         .then((results) => {
           if (!cancelled) setSearchResults(results);
         })
@@ -194,7 +203,7 @@ export function SessionSidebar({ contextPath, repoRoot, onOpenSession }: Props) 
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [deferredQuery, effectivePaths]);
+  }, [deferredQuery, effectivePaths, activeSlug]);
 
   const rows = useMemo(
     () => (deferredQuery ? searchResults.map(rowFromSearch) : sessions),
@@ -291,6 +300,45 @@ export function SessionSidebar({ contextPath, repoRoot, onOpenSession }: Props) 
           ))}
         </div>
 
+        {agents.length > 1 && (
+          <div className="no-scrollbar mt-2 flex gap-1 overflow-x-auto">
+            <button
+              type="button"
+              onClick={() => setActiveSlug(null)}
+              className={cn(
+                "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-medium transition-colors",
+                activeSlug === null
+                  ? "border-border/60 bg-foreground/8 text-foreground"
+                  : "border-border/30 text-muted-foreground hover:bg-foreground/4 hover:text-foreground",
+              )}
+            >
+              All
+            </button>
+            {agents.map((agent) => {
+              const theme = getToolTheme(agent.tool);
+              const active = activeSlug === agent.agent_slug;
+              return (
+                <button
+                  key={agent.agent_slug}
+                  type="button"
+                  onClick={() => setActiveSlug(active ? null : agent.agent_slug)}
+                  className={cn(
+                    "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-medium transition-colors",
+                    active
+                      ? "border-border/60 bg-foreground/8 text-foreground"
+                      : "border-border/30 text-muted-foreground hover:bg-foreground/4 hover:text-foreground",
+                  )}
+                  style={active ? { borderColor: `rgba(${theme.rgb},0.5)`, color: `rgb(${theme.rgb})` } : undefined}
+                  title={`${agent.tool} — ${agent.count} sessions`}
+                >
+                  {theme.label}
+                  <span className="ml-1 opacity-50">{agent.count}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         <div className="mt-2">
           <ActivityHeatmap activity={activity} />
         </div>
@@ -367,11 +415,14 @@ function SessionRow({
 }) {
   const title = session.title || "Untitled session";
   const repo = session.repo_name || basename(session.repo_path ?? session.workspace);
-  const shortId = session.id.slice(0, 8);
+  const displayId = session.external_id
+    ? session.external_id.slice(0, 12)
+    : session.id.slice(0, 8);
+  const fullId = session.external_id ?? session.id;
 
   const copyId = (e: React.MouseEvent) => {
     e.stopPropagation();
-    void navigator.clipboard.writeText(session.id);
+    void navigator.clipboard.writeText(fullId);
   };
 
   return (
@@ -402,17 +453,25 @@ function SessionRow({
       <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-muted-foreground/80">
         <HugeiconsIcon icon={Clock01Icon} size={10} strokeWidth={1.8} />
         <span className="truncate">{formatDate(session.started_at)}</span>
-        {session.file_count > 0 && (
+        {session.model && (
+          <span className="ml-auto shrink-0 max-w-[72px] truncate text-muted-foreground/60" title={session.model}>
+            {session.model.split("/").pop()}
+          </span>
+        )}
+        {!session.model && session.file_count > 0 && (
           <span className="ml-auto shrink-0">{session.file_count} files</span>
         )}
         <button
           type="button"
           onClick={copyId}
-          title={`Copy session ID: ${session.id}`}
-          className="ml-auto flex shrink-0 items-center gap-1 rounded px-1 py-0.5 font-mono text-[9px] text-muted-foreground/50 opacity-0 transition-opacity hover:bg-foreground/6 hover:text-muted-foreground group-hover:opacity-100"
+          title={`Copy session ID: ${fullId}`}
+          className={cn(
+            "flex shrink-0 items-center gap-1 rounded px-1 py-0.5 font-mono text-[9px] text-muted-foreground/50 transition-opacity hover:bg-foreground/6 hover:text-muted-foreground",
+            session.model ? "opacity-0 group-hover:opacity-100" : "ml-auto opacity-0 group-hover:opacity-100",
+          )}
         >
           <HugeiconsIcon icon={Copy01Icon} size={8} strokeWidth={1.8} />
-          {shortId}
+          {displayId}
         </button>
       </div>
     </button>

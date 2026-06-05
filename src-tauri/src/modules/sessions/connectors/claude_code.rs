@@ -37,6 +37,7 @@ impl ClaudeCodeConnector {
         let mut session_id = None;
         let mut git_branch = None;
         let mut model = None;
+        let mut captured_summary: Option<String> = None;
 
         for line in content.lines() {
             let line = line.trim();
@@ -135,6 +136,14 @@ impl ClaudeCodeConnector {
                         });
                     }
                 }
+                "summary" => {
+                    if captured_summary.is_none() {
+                        captured_summary = val
+                            .get("summary")
+                            .and_then(|s| s.as_str())
+                            .map(|s| s.to_string());
+                    }
+                }
                 _ => {
                     // Check if it has message content despite unknown type
                     if val.get("role").is_some() || val.get("content").is_some() {
@@ -172,11 +181,14 @@ impl ClaudeCodeConnector {
             msg.idx = i;
         }
 
-        // Derive title from first user message
-        let title = messages
-            .iter()
-            .find(|m| m.role == "user")
-            .map(|m| first_line(&m.content, 100))
+        // Prefer summary event, then first user message, then workspace dir
+        let title = captured_summary
+            .or_else(|| {
+                messages
+                    .iter()
+                    .find(|m| m.role == "user")
+                    .map(|m| first_line(&m.content, 100))
+            })
             .or_else(|| {
                 workspace.as_ref().map(|w| {
                     Path::new(w)
@@ -194,8 +206,10 @@ impl ClaudeCodeConnector {
             .and_then(|m| m.modified().ok())
             .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339());
 
-        // External ID: project-relative path under projects/
-        let external_id = path.to_string_lossy().to_string();
+        // Use the tool's own sessionId when available; fall back to file path
+        let external_id = session_id
+            .clone()
+            .unwrap_or_else(|| path.to_string_lossy().to_string());
 
         let mut metadata = serde_json::json!({});
         if let Some(ref sid) = session_id {

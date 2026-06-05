@@ -82,6 +82,7 @@ pub fn run() {
             sessions::commands::toggle_favorite,
             sessions::commands::get_favorites,
             sessions::commands::get_tools,
+            sessions::commands::get_distinct_agents,
             sessions::commands::get_search_paths,
             sessions::commands::get_stats,
             sessions::commands::get_activity_heatmap,

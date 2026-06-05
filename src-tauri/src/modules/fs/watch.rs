@@ -181,10 +181,7 @@ pub fn fs_watch_add(
 }
 
 #[tauri::command]
-pub fn fs_watch_remove(
-    state: tauri::State<'_, WatchState>,
-    path: String,
-) -> Result<(), String> {
+pub fn fs_watch_remove(state: tauri::State<'_, WatchState>, path: String) -> Result<(), String> {
     let mut inner = state.inner.lock().unwrap();
 
     let canon = match std::fs::canonicalize(&path) {

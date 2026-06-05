@@ -14,7 +14,8 @@ use ts_rs::TS;
 use crate::modules::sessions::exports::build_export;
 use crate::modules::sessions::indexer::Indexer;
 use crate::modules::sessions::models::{
-    ActivityPoint, ExportData, McpStatus, SearchResult, Session, SessionSummary, Stats,
+    ActivityPoint, DistinctAgent, ExportData, McpStatus, SearchResult, Session, SessionSummary,
+    Stats,
 };
 use crate::modules::sessions::{persist_scanned_sessions, with_db, AppState};
 
@@ -102,10 +103,12 @@ pub async fn scan_incremental(
 
 // --- Session reads ---------------------------------------------------------
 
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub fn get_sessions(
     state: State<AppState>,
     tool: Option<String>,
+    agent_slug: Option<String>,
     paths: Option<Vec<String>>,
     date_from: Option<String>,
     date_to: Option<String>,
@@ -115,6 +118,7 @@ pub fn get_sessions(
     with_db(&state, |db| {
         db.get_session_summaries(
             tool.as_deref(),
+            agent_slug.as_deref(),
             paths.as_deref(),
             date_from.as_deref(),
             date_to.as_deref(),
@@ -125,15 +129,22 @@ pub fn get_sessions(
 }
 
 #[tauri::command]
+pub fn get_distinct_agents(state: State<AppState>) -> AppResult<Vec<DistinctAgent>> {
+    with_db(&state, |db| db.get_distinct_agents())
+}
+
+#[tauri::command]
 pub fn get_session(state: State<AppState>, id: String) -> AppResult<Option<Session>> {
     with_db(&state, |db| db.get_session(&id))
 }
 
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub fn search_sessions(
     state: State<AppState>,
     query: String,
     tools: Option<Vec<String>>,
+    agent_slugs: Option<Vec<String>>,
     paths: Option<Vec<String>>,
     date_from: Option<String>,
     date_to: Option<String>,
@@ -143,6 +154,7 @@ pub fn search_sessions(
         db.search(
             &query,
             tools.as_deref(),
+            agent_slugs.as_deref(),
             paths.as_deref(),
             date_from.as_deref(),
             date_to.as_deref(),

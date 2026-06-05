@@ -16,6 +16,7 @@ export type SessionSummary = {
   id: string;
   tool: string;
   agent_slug: string;
+  external_id: string | null;
   title: string | null;
   repo_name: string | null;
   repo_path: string | null;
@@ -26,6 +27,12 @@ export type SessionSummary = {
   model: string | null;
   workspace: string | null;
   is_favorite: boolean;
+};
+
+export type DistinctAgent = {
+  agent_slug: string;
+  tool: string;
+  count: number;
 };
 
 export type Message = {
@@ -99,6 +106,7 @@ export async function scanIncremental(sinceTs?: string | null): Promise<number> 
 
 export async function getSessions(params: {
   tool?: string;
+  agentSlug?: string;
   paths?: string[];
   dateFrom?: string;
   dateTo?: string;
@@ -107,12 +115,17 @@ export async function getSessions(params: {
 } = {}): Promise<SessionSummary[]> {
   return invoke("get_sessions", {
     tool: params.tool ?? null,
+    agentSlug: params.agentSlug ?? null,
     paths: params.paths && params.paths.length > 0 ? params.paths : null,
     dateFrom: params.dateFrom ?? null,
     dateTo: params.dateTo ?? null,
     limit: params.limit ?? 50,
     offset: params.offset ?? 0,
   });
+}
+
+export async function getDistinctAgents(): Promise<DistinctAgent[]> {
+  return invoke("get_distinct_agents");
 }
 
 export async function getSession(id: string): Promise<Session | null> {
@@ -122,6 +135,7 @@ export async function getSession(id: string): Promise<Session | null> {
 export async function searchSessions(params: {
   query: string;
   tools?: string[];
+  agentSlugs?: string[];
   paths?: string[];
   dateFrom?: string;
   dateTo?: string;
@@ -130,6 +144,7 @@ export async function searchSessions(params: {
   return invoke("search_sessions", {
     query: params.query,
     tools: params.tools && params.tools.length > 0 ? params.tools : null,
+    agentSlugs: params.agentSlugs && params.agentSlugs.length > 0 ? params.agentSlugs : null,
     paths: params.paths && params.paths.length > 0 ? params.paths : null,
     dateFrom: params.dateFrom ?? null,
     dateTo: params.dateTo ?? null,

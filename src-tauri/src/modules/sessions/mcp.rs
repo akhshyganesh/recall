@@ -228,6 +228,7 @@ impl RecallSessionsMcpServer {
             let paths = args.path.as_ref().map(|path| vec![path.clone()]);
             db.get_session_summaries(
                 args.tool.as_deref(),
+                None,
                 paths.as_deref(),
                 args.date_from.as_deref(),
                 args.date_to.as_deref(),
@@ -248,6 +249,7 @@ impl RecallSessionsMcpServer {
             db.search(
                 &args.query,
                 tools.as_deref(),
+                None,
                 paths.as_deref(),
                 args.date_from.as_deref(),
                 args.date_to.as_deref(),
@@ -293,6 +295,7 @@ impl RecallSessionsMcpServer {
             let same_project_seed = if let Some(path) = project_path.as_ref() {
                 db.get_session_summaries(
                     None,
+                    None,
                     Some(std::slice::from_ref(path)),
                     None,
                     None,
@@ -318,6 +321,7 @@ impl RecallSessionsMcpServer {
             let same_tool = db
                 .get_session_summaries(
                     Some(anchor.tool.as_str()),
+                    None,
                     None,
                     None,
                     None,
