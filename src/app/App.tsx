@@ -54,6 +54,10 @@ import {
   type ShortcutHandlers,
   type ShortcutId,
 } from "@/modules/shortcuts";
+import {
+  loadInstalledExtensions,
+  useExtensionRegistry,
+} from "@/modules/extensions";
 import { SidebarRail, type SidebarViewId } from "@/modules/sidebar";
 import {
   SourceControlPanel,
@@ -90,6 +94,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { PanelImperativeHandle } from "react-resizable-panels";
 import { SettingsPanel } from "@/settings/SettingsApp";
+import { ExtensionsSection } from "@/settings/sections/ExtensionsSection";
 import {
   closeRightPanel,
   createRightPanelState,
@@ -99,6 +104,12 @@ import {
   type RightPanelState,
   type RightPanelViewId,
 } from "./rightPanelState";
+
+function ExtensionSidebarPanel({ viewId }: { viewId: string }) {
+  const panel = useExtensionRegistry((s) => s.sidebarPanels.find((p) => p.id === viewId));
+  if (!panel) return null;
+  return <>{panel.render()}</>;
+}
 
 function dirname(path: string | null): string | null {
   if (!path) return null;
@@ -175,7 +186,7 @@ function readSidebarWidth(): number {
 function readSidebarView(): SidebarViewId {
   try {
     const stored = window.localStorage.getItem(SIDEBAR_VIEW_STORAGE_KEY);
-    if (stored === "sessions" || stored === "explorer") return stored;
+    if (stored === "sessions" || stored === "explorer" || stored === "extensions") return stored;
   } catch {
     // ignore
   }
@@ -473,6 +484,9 @@ export default function App() {
       .catch(() => setLaunchCwd(null))
       .finally(() => setLaunchCwdResolved(true));
   }, []);
+
+  // Load community extensions once on startup (non-blocking; failures are isolated).
+  useEffect(() => { void loadInstalledExtensions(); }, []);
 
   const [newEditorOpen, setNewEditorOpen] = useState(false);
   const initPrefs = usePreferencesStore((s) => s.init);
@@ -1466,7 +1480,7 @@ export default function App() {
                         repoRoot={sourceControl.repo?.repoRoot ?? null}
                         onOpenSession={handleOpenSession}
                       />
-                    ) : (
+                    ) : sidebarView === "explorer" ? (
                       <FileExplorer
                         ref={explorerRef}
                         rootPath={explorerRoot}
@@ -1476,6 +1490,12 @@ export default function App() {
                         onRevealInTerminal={cdInNewTab}
                         onOpenMarkdownPreview={openMarkdownPreview}
                       />
+                    ) : sidebarView === "extensions" ? (
+                      <div className="flex h-full flex-col overflow-hidden">
+                        <ExtensionsSection />
+                      </div>
+                    ) : (
+                      <ExtensionSidebarPanel viewId={sidebarView} />
                     )}
                   </div>
                 </div>
@@ -1646,7 +1666,7 @@ export default function App() {
           <UpdaterDialog />
 
           <Dialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen}>
-            <DialogContent showCloseButton={false} className="gap-0 overflow-hidden rounded-xl border border-border/40 p-0 max-w-[680px] h-[600px]">
+            <DialogContent showCloseButton={false} className="gap-0 overflow-hidden rounded-xl border border-border/40 p-0 w-[960px] sm:max-w-[960px] h-[700px]">
               <DialogTitle className="sr-only">Settings</DialogTitle>
               <SettingsPanel
                 embedded

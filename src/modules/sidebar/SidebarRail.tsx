@@ -1,15 +1,27 @@
 import { cn } from "@/lib/utils";
-import { FolderOpenIcon, Orbit01Icon, SlidersHorizontalIcon } from "@hugeicons/core-free-icons";
+import { useExtensionSidebarPanels } from "@/modules/extensions/registry";
+import { FolderOpenIcon, Orbit01Icon, PackageIcon, SlidersHorizontalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import type { ReactNode } from "react";
 import type { SidebarViewId } from "./types";
 
 export const SIDEBAR_RAIL_HEIGHT = 34;
 
-type RailItem = {
+type CoreRailItem = {
+  kind: "core";
   id: SidebarViewId;
   label: string;
   icon: Parameters<typeof HugeiconsIcon>[0]["icon"];
 };
+
+type ExtRailItem = {
+  kind: "ext";
+  id: SidebarViewId;
+  label: string;
+  icon: ReactNode;
+};
+
+type RailItem = CoreRailItem | ExtRailItem;
 
 type Props = {
   activeView: SidebarViewId;
@@ -24,10 +36,22 @@ export function SidebarRail({
   settingsOpen = false,
   onToggleSettings,
 }: Props) {
-  const items: RailItem[] = [
-    { id: "sessions", label: "Sessions", icon: Orbit01Icon },
-    { id: "explorer", label: "Files", icon: FolderOpenIcon },
+  const extPanels = useExtensionSidebarPanels();
+
+  const coreItems: CoreRailItem[] = [
+    { kind: "core", id: "sessions", label: "Sessions", icon: Orbit01Icon },
+    { kind: "core", id: "explorer", label: "Files", icon: FolderOpenIcon },
+    { kind: "core", id: "extensions", label: "Extensions", icon: PackageIcon },
   ];
+
+  const extItems: ExtRailItem[] = extPanels.map((p) => ({
+    kind: "ext",
+    id: p.id,
+    label: p.label,
+    icon: p.icon,
+  }));
+
+  const items: RailItem[] = [...coreItems, ...extItems];
 
   return (
     <div
@@ -51,12 +75,18 @@ export function SidebarRail({
                 : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
             )}
           >
-            <HugeiconsIcon
-              icon={item.icon}
-              size={13}
-              strokeWidth={isActive ? 2 : 1.75}
-              className="shrink-0 transition-[stroke-width] duration-150"
-            />
+            {item.kind === "core" ? (
+              <HugeiconsIcon
+                icon={item.icon}
+                size={13}
+                strokeWidth={isActive ? 2 : 1.75}
+                className="shrink-0 transition-[stroke-width] duration-150"
+              />
+            ) : (
+              <span className="flex h-[13px] w-[13px] shrink-0 items-center justify-center">
+                {item.icon}
+              </span>
+            )}
             <span>{item.label}</span>
           </button>
         );
