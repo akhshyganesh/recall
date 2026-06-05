@@ -60,7 +60,6 @@ import {
   useSourceControl,
 } from "@/modules/source-control";
 import {
-  MAX_PANES_PER_TAB,
   useTabs,
   useWorkspaceCwd,
   type MediaKind,
