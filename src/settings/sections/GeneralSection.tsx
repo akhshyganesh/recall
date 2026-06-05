@@ -25,6 +25,87 @@ const APPEARANCE: {
   { id: "dark", label: "Dark", icon: Moon02Icon },
 ];
 
+const ACCENT_PRESETS: { label: string; hue: number }[] = [
+  { label: "Amber", hue: 55 },
+  { label: "Orange", hue: 30 },
+  { label: "Red", hue: 10 },
+  { label: "Pink", hue: 340 },
+  { label: "Violet", hue: 280 },
+  { label: "Blue", hue: 220 },
+  { label: "Cyan", hue: 190 },
+  { label: "Green", hue: 140 },
+];
+
+function AccentColorPicker() {
+  const { accentHue, setAccentHue, resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+
+  function swatchColor(hue: number): string {
+    return isDark ? `oklch(0.76 0.16 ${hue})` : `oklch(0.58 0.18 ${hue})`;
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Preset swatches */}
+      <div className="flex flex-wrap gap-2">
+        {ACCENT_PRESETS.map((p) => {
+          const isActive = Math.abs(accentHue - p.hue) < 5;
+          return (
+            <button
+              key={p.hue}
+              type="button"
+              title={p.label}
+              onClick={() => setAccentHue(p.hue)}
+              className={cn(
+                "size-6 rounded-full border-2 transition-all hover:scale-110",
+                isActive
+                  ? "border-foreground/60 shadow-sm"
+                  : "border-transparent hover:border-foreground/30",
+              )}
+              style={{ background: swatchColor(p.hue) }}
+            />
+          );
+        })}
+      </div>
+      {/* Hue slider */}
+      <div className="flex items-center gap-3">
+        <div className="relative h-5 flex-1">
+          {/* Gradient track */}
+          <div
+            className="pointer-events-none absolute inset-x-0 my-auto h-2 rounded-full"
+            style={{
+              top: "calc(50% - 4px)",
+              background:
+                "linear-gradient(to right, oklch(0.65 0.18 0), oklch(0.65 0.18 45), oklch(0.65 0.18 90), oklch(0.65 0.18 135), oklch(0.65 0.18 180), oklch(0.65 0.18 225), oklch(0.65 0.18 270), oklch(0.65 0.18 315), oklch(0.65 0.18 360))",
+            }}
+          />
+          {/* Thumb */}
+          <div
+            className="pointer-events-none absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background shadow-sm ring-1 ring-black/10"
+            style={{
+              left: `${(accentHue / 359) * 100}%`,
+              background: swatchColor(accentHue),
+            }}
+          />
+          {/* Invisible range input for interaction */}
+          <input
+            type="range"
+            min={0}
+            max={359}
+            step={1}
+            value={accentHue}
+            onChange={(e) => setAccentHue(Number(e.target.value))}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          />
+        </div>
+        <span className="w-9 text-right font-mono text-[11px] text-muted-foreground/60">
+          {accentHue}°
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function GeneralSection() {
   const { theme, setTheme } = useTheme();
   const showHidden = usePreferencesStore((s) => s.showHidden);
@@ -78,6 +159,15 @@ export function GeneralSection() {
                 {o.label}
               </button>
             ))}
+          </div>
+        </SettingRow>
+        <SettingRow
+          title="Accent color"
+          description="Primary color used for buttons and highlights."
+          className="flex-col items-start gap-2"
+        >
+          <div className="w-full">
+            <AccentColorPicker />
           </div>
         </SettingRow>
       </SettingsCard>

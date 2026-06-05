@@ -41,7 +41,7 @@ const VALID_TABS = new Set<string>(TABS.map((t) => t.id));
 
 function normalizeTab(tab: string | null | undefined): SettingsTab {
   if (tab === "sessions-mcp" || tab === "mcp" || tab === "integrations") return "integrations";
-  if (tab === "startup") return "general";
+  if (tab === "startup" || tab === "extensions") return "general";
   if (tab && VALID_TABS.has(tab)) return tab as SettingsTab;
   return "general";
 }
@@ -177,7 +177,7 @@ export function SettingsPanel({
       </div>
 
       {/* Section content */}
-      <div className="min-h-0 flex-1 overflow-y-auto pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <ActiveSection />
       </div>
     </div>

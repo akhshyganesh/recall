@@ -44,6 +44,8 @@ export type Preferences = {
   terminalScrollback: number;
   zoomLevel: number;
   shortcuts: Record<ShortcutId, KeyBinding[]>;
+  /** OKLCH hue angle (0–360). Controls --primary, --ring, --sidebar-primary. */
+  accentHue: number;
 };
 
 const STORE_PATH = "recall-settings.json";
@@ -61,6 +63,7 @@ const KEY_TERMINAL_FONT_SIZE = "terminalFontSize";
 const KEY_TERMINAL_SCROLLBACK = "terminalScrollback";
 const KEY_ZOOM_LEVEL = "zoomLevel";
 const KEY_SHORTCUTS = "shortcuts";
+const KEY_ACCENT_HUE = "accentHue";
 
 export const TERMINAL_FONT_SIZE_DEFAULT = 14;
 export const TERMINAL_FONT_SIZE_MIN = 8;
@@ -91,6 +94,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalScrollback: TERMINAL_SCROLLBACK_DEFAULT,
   zoomLevel: 1.0,
   shortcuts: {} as Record<ShortcutId, KeyBinding[]>,
+  accentHue: 55,
 };
 
 const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
@@ -143,6 +147,7 @@ export async function loadPreferences(): Promise<Preferences> {
         DEFAULT_PREFERENCES.terminalScrollback,
     ),
     zoomLevel: get<number>(KEY_ZOOM_LEVEL) ?? DEFAULT_PREFERENCES.zoomLevel,
+    accentHue: get<number>(KEY_ACCENT_HUE) ?? DEFAULT_PREFERENCES.accentHue,
     shortcuts:
       get<Record<ShortcutId, KeyBinding[]>>(KEY_SHORTCUTS) ??
       DEFAULT_PREFERENCES.shortcuts,
@@ -212,6 +217,11 @@ export async function setZoomLevel(value: number): Promise<void> {
   await writePref(KEY_ZOOM_LEVEL, value);
 }
 
+export async function setAccentHue(value: number): Promise<void> {
+  const hue = Math.round(((value % 360) + 360) % 360);
+  await writePref(KEY_ACCENT_HUE, hue);
+}
+
 export async function setShortcuts(
   value: Record<ShortcutId, KeyBinding[]> | {},
 ): Promise<void> {
@@ -244,6 +254,7 @@ export async function onPreferencesChange(
     [KEY_TERMINAL_SCROLLBACK]: "terminalScrollback",
     [KEY_ZOOM_LEVEL]: "zoomLevel",
     [KEY_SHORTCUTS]: "shortcuts",
+    [KEY_ACCENT_HUE]: "accentHue",
   };
   // Same-process writes still fire onChange immediately; cross-window writes
   // arrive via the Tauri event emitted by writePref().

@@ -70,7 +70,7 @@ export function ShortcutsSection() {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 pt-4">
       <div className="flex items-center justify-between gap-3">
         <div className="relative flex-1 max-w-md">
         <HugeiconsIcon
