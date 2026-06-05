@@ -103,6 +103,7 @@ pub async fn scan_incremental(
 
 // --- Session reads ---------------------------------------------------------
 
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub fn get_sessions(
     state: State<AppState>,
@@ -137,6 +138,7 @@ pub fn get_session(state: State<AppState>, id: String) -> AppResult<Option<Sessi
     with_db(&state, |db| db.get_session(&id))
 }
 
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub fn search_sessions(
     state: State<AppState>,

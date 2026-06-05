@@ -266,6 +266,7 @@ impl Database {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn get_session_summaries(
         &self,
         tool_filter: Option<&str>,
@@ -480,6 +481,7 @@ impl Database {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn search(
         &self,
         query: &str,
