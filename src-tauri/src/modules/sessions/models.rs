@@ -75,6 +75,7 @@ pub struct SessionSummary {
     pub id: String,
     pub tool: String,
     pub agent_slug: String,
+    pub external_id: Option<String>,
     pub title: Option<String>,
     pub repo_name: Option<String>,
     pub repo_path: Option<String>,
@@ -87,6 +88,15 @@ pub struct SessionSummary {
     pub model: Option<String>,
     pub workspace: Option<String>,
     pub is_favorite: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../gen/bindings/")]
+pub struct DistinctAgent {
+    pub agent_slug: String,
+    pub tool: String,
+    #[ts(type = "number")]
+    pub count: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

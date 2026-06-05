@@ -4,6 +4,7 @@ const TOOL_THEME_BY_MATCH = [
   ["antigravity", { label: "Antigravity", rgb: "78, 201, 176" }],
   ["claude", { label: "Claude Code", rgb: "206, 145, 120" }],
   ["codex", { label: "Codex", rgb: "197, 134, 192" }],
+  ["pi", { label: "Pi", rgb: "129, 199, 132" }],
 ] as const;
 
 export function getToolTheme(tool: string): { label: string; rgb: string } {
