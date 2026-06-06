@@ -1241,10 +1241,6 @@ export default function App() {
             onCwd={handleTerminalCwd}
             onExit={handleLeafExit}
             onFocusLeaf={handleFocusLeaf}
-            branchLabel={branchLabel}
-            stagedCount={stagedChangeCount}
-            changedCount={changedFileCount}
-            onOpenSourceControl={sourceControl.hasRepo ? toggleSourceControl : undefined}
           />
         </div>
       );
@@ -1306,10 +1302,6 @@ export default function App() {
           onCwd={handleTerminalCwd}
           onExit={handleLeafExit}
           onFocusLeaf={handleFocusLeaf}
-          branchLabel={branchLabel}
-          stagedCount={stagedChangeCount}
-          changedCount={changedFileCount}
-          onOpenSourceControl={sourceControl.hasRepo ? toggleSourceControl : undefined}
         />
       </div>
       <div
@@ -1631,6 +1623,11 @@ export default function App() {
               onSelectView={cycleSidebarView}
               settingsOpen={settingsDialogOpen}
               onToggleSettings={toggleSidebarSettings}
+              cwd={activeTerminalLeafCwd}
+              branchLabel={branchLabel}
+              stagedCount={stagedChangeCount}
+              changedCount={changedFileCount}
+              onOpenSourceControl={sourceControl.hasRepo ? toggleSourceControl : undefined}
             />
           )}
 
