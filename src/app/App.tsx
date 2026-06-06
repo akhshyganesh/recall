@@ -29,7 +29,8 @@ import {
 } from "@/modules/git-history";
 import { getLaunchDir } from "@/lib/launchDir";
 import { useZoom } from "@/lib/useZoom";
-import { FileExplorer, QuickOpen, type FileExplorerHandle } from "@/modules/explorer";
+import { FileExplorer, type FileExplorerHandle } from "@/modules/explorer";
+import { UnifiedPalette } from "@/modules/command-palette/UnifiedPalette";
 import {
   Header,
   type SearchInlineHandle,
@@ -916,7 +917,8 @@ export default function App() {
     handleClose(activeId);
   }, [activeId, closeActivePane, handleClose]);
 
-  const [quickOpenVisible, setQuickOpenVisible] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteInitialQuery, setPaletteInitialQuery] = useState("");
   const [rowSplitTabIds, setRowSplitTabIds] = useState<number[]>([]);
   const [colSplitTabIds, setColSplitTabIds] = useState<number[]>([]);
   const [splitDragZone, setSplitDragZone] = useState<"row" | "col" | null>(null);
@@ -1024,7 +1026,8 @@ export default function App() {
       "terminal.clear": () => {
         if (activeLeafId !== null) terminalRefs.current.get(activeLeafId)?.clear();
       },
-      "file.quickOpen": () => setQuickOpenVisible(true),
+      "file.quickOpen": () => { setPaletteInitialQuery(""); setPaletteOpen(true); },
+      "command.palette": () => { setPaletteInitialQuery(">"); setPaletteOpen(true); },
       "sidebar.toggle": toggleSidebar,
       "explorer.focus": toggleExplorerFocus,
       "view.zoomIn": zoomIn,
@@ -1677,11 +1680,16 @@ export default function App() {
             </DialogContent>
           </Dialog>
 
-          <QuickOpen
-            open={quickOpenVisible}
-            onOpenChange={setQuickOpenVisible}
+          <UnifiedPalette
+            open={paletteOpen}
+            onOpenChange={setPaletteOpen}
             rootPath={explorerRoot ?? home}
             onOpenFile={handleOpenFile}
+            initialQuery={paletteInitialQuery}
+            onRunCommand={(id) => {
+              const h = shortcutHandlers[id];
+              if (h) h(new KeyboardEvent("keydown"));
+            }}
           />
 
           <AlertDialog
