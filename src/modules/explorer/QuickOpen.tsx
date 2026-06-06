@@ -5,14 +5,19 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandSeparator,
 } from "@/components/ui/command";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { currentWorkspaceEnv } from "@/modules/workspace";
-import { Folder01Icon } from "@hugeicons/core-free-icons";
+import { File01Icon, Folder01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { fileIconUrl } from "./lib/iconResolver";
+
+function isAbsolutePath(q: string): boolean {
+  return q.startsWith("/") || /^[A-Za-z]:[/\\]/.test(q);
+}
 
 type SearchHit = {
   path: string;
@@ -100,8 +105,35 @@ export function QuickOpen({ open, onOpenChange, rootPath, onOpenFile }: Props) {
         onValueChange={setQuery}
       />
       <CommandList>
-        {query.trim().length > 0 && results.length === 0 && (
+        {query.trim().length > 0 && results.length === 0 && !isAbsolutePath(query.trim()) && (
           <CommandEmpty>No files found.</CommandEmpty>
+        )}
+        {isAbsolutePath(query.trim()) && (
+          <>
+            <CommandGroup heading="Direct path">
+              <CommandItem
+                key="__direct_path__"
+                value={query.trim()}
+                onSelect={() => {
+                  onOpenFile(query.trim());
+                  onOpenChange(false);
+                }}
+                className="gap-2"
+              >
+                <HugeiconsIcon
+                  icon={File01Icon}
+                  size={14}
+                  strokeWidth={1.75}
+                  className="shrink-0 text-muted-foreground"
+                />
+                <span className="truncate font-medium">Open</span>
+                <span className="ml-1 min-w-0 truncate text-[11px] text-muted-foreground font-mono">
+                  {query.trim()}
+                </span>
+              </CommandItem>
+            </CommandGroup>
+            {results.length > 0 && <CommandSeparator />}
+          </>
         )}
         {results.length > 0 && (
           <CommandGroup heading={truncated ? "Results (partial)" : "Files"}>
