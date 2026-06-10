@@ -1,13 +1,36 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import { execSync } from "child_process";
 import path from "path";
+import type { Plugin } from "vite";
 import { defineConfig } from "vite";
+
+// Builds every package under packages/ once before Vite starts.
+// Adding a new extension package there is enough — no changes needed here.
+function buildExtensionPackages(): Plugin {
+  let built = false;
+  return {
+    name: "build-extension-packages",
+    configResolved() {
+      if (built) return;
+      built = true;
+      try {
+        execSync("pnpm --filter './packages/*' build", {
+          stdio: "inherit",
+          cwd: __dirname,
+        });
+      } catch {
+        // non-zero exit already printed to stderr — don't swallow it silently
+      }
+    },
+  };
+}
 
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(async ({ mode }) => ({
-  plugins: [react(), tailwindcss()],
+  plugins: [buildExtensionPackages(), react(), tailwindcss()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

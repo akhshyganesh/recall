@@ -47,6 +47,13 @@ export interface FileHandlerDef {
   tabKind: string;
 }
 
+// ── Background components ─────────────────────────────────────────────────────
+
+export interface BackgroundDef {
+  id: string;
+  render: () => ReactNode;
+}
+
 // ── Public API handed to every extension on activate ─────────────────────────
 
 export interface RecallAPI {
@@ -67,6 +74,20 @@ export interface RecallAPI {
 
   /** Map file extensions to a tab kind so the explorer can open them. Returns cleanup. */
   registerFileHandler(def: FileHandlerDef): () => void;
+
+  /**
+   * Register a persistent React component that stays mounted app-wide.
+   * Use for overlays, portals, and global event listeners.
+   * Returns a cleanup function.
+   */
+  registerBackground(id: string, render: () => ReactNode): () => void;
+
+  /**
+   * Open a custom tab managed by this extension.
+   * The kind is automatically namespaced as `${extId}:${kind}`.
+   * A matching `registerTabRenderer` must exist for the tab to render.
+   */
+  openTab(kind: string, title: string, data?: unknown): void;
 }
 
 // ── Extension manifest ────────────────────────────────────────────────────────

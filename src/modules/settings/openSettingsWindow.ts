@@ -8,8 +8,8 @@ export type SettingsTab =
 
 export const SETTINGS_TAB_LABELS: Record<SettingsTab, string> = {
   general: "General",
-  editor: "Editor",
   terminal: "Terminal",
+  editor: "Editor",
   integrations: "Integrations",
   shortcuts: "Shortcuts",
   about: "About",
@@ -18,14 +18,14 @@ export const SETTINGS_TAB_LABELS: Record<SettingsTab, string> = {
 export const SETTINGS_TAB_REQUEST_EVENT = "recall:open-settings-tab";
 
 type SettingsTabRequest = {
-  tab: SettingsTab;
+  tab: SettingsTab | string;
 };
 
-export function settingsTabTitle(tab: SettingsTab = "general"): string {
-  return SETTINGS_TAB_LABELS[tab];
+export function settingsTabTitle(tab: SettingsTab | string = "general"): string {
+  return SETTINGS_TAB_LABELS[tab as SettingsTab] ?? tab;
 }
 
-export function requestSettingsTab(tab: SettingsTab = "general"): void {
+export function requestSettingsTab(tab: SettingsTab | string = "general"): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(
     new CustomEvent<SettingsTabRequest>(SETTINGS_TAB_REQUEST_EVENT, {
@@ -35,7 +35,7 @@ export function requestSettingsTab(tab: SettingsTab = "general"): void {
 }
 
 export function listenSettingsTabRequests(
-  onRequest: (tab: SettingsTab) => void,
+  onRequest: (tab: SettingsTab | string) => void,
 ): () => void {
   if (typeof window === "undefined") return () => {};
   const listener = (event: Event) => {
@@ -46,6 +46,6 @@ export function listenSettingsTabRequests(
   return () => window.removeEventListener(SETTINGS_TAB_REQUEST_EVENT, listener);
 }
 
-export async function openSettingsWindow(tab?: SettingsTab): Promise<void> {
+export async function openSettingsWindow(tab?: SettingsTab | string): Promise<void> {
   requestSettingsTab(tab);
 }

@@ -6,6 +6,7 @@ export type {
   CommandDef,
   SettingsSectionDef,
   FileHandlerDef,
+  BackgroundDef,
 } from "./types";
 
 export {
@@ -15,6 +16,7 @@ export {
   useExtensionSidebarPanels,
   useExtensionSettingsSections,
   useExtensionCommands,
+  useExtensionBackgrounds,
   findTabRenderer,
   resolveExtensionTabKind,
 } from "./registry";

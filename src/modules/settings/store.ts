@@ -47,6 +47,8 @@ export type Preferences = {
   shortcuts: Record<ShortcutId, KeyBinding[]>;
   /** OKLCH hue angle (0–360). Controls --primary, --ring, --sidebar-primary. */
   accentHue: number;
+  /** OpenRouter API key for AI features. */
+  openRouterApiKey: string;
 };
 
 const STORE_PATH = "recall-settings.json";
@@ -66,6 +68,7 @@ const KEY_TERMINAL_SCROLLBACK = "terminalScrollback";
 const KEY_ZOOM_LEVEL = "zoomLevel";
 const KEY_SHORTCUTS = "shortcuts";
 const KEY_ACCENT_HUE = "accentHue";
+const KEY_OPEN_ROUTER_API_KEY = "openRouterApiKey";
 
 export const TERMINAL_FONT_SIZE_DEFAULT = 14;
 export const TERMINAL_FONT_SIZE_MIN = 8;
@@ -82,6 +85,12 @@ export const TERMINAL_SCROLLBACK_PRESETS = [
   500, 1000, 2000, 5000, 10_000, 25_000,
 ] as const;
 
+// webkit2gtk on Linux maps GPU memory into RSS, making each WebGL context
+// cost 20-40 MB more than on macOS. Default off so new Linux installs stay
+// lean; existing users who already saved a preference are unaffected.
+const IS_LINUX =
+  typeof navigator !== "undefined" && /Linux/.test(navigator.userAgent);
+
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
   editorTheme: "atomone",
@@ -90,7 +99,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sessionsMcpEnabled: false,
   vimMode: false,
   showHidden: false,
-  terminalWebglEnabled: true,
+  terminalWebglEnabled: !IS_LINUX,
   terminalFontFamily: "",
   terminalLetterSpacing: 0,
   terminalFontSize: TERMINAL_FONT_SIZE_DEFAULT,
@@ -98,6 +107,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   zoomLevel: 1.0,
   shortcuts: {} as Record<ShortcutId, KeyBinding[]>,
   accentHue: 55,
+  openRouterApiKey: "",
 };
 
 const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
@@ -153,6 +163,7 @@ export async function loadPreferences(): Promise<Preferences> {
     ),
     zoomLevel: get<number>(KEY_ZOOM_LEVEL) ?? DEFAULT_PREFERENCES.zoomLevel,
     accentHue: get<number>(KEY_ACCENT_HUE) ?? DEFAULT_PREFERENCES.accentHue,
+    openRouterApiKey: get<string>(KEY_OPEN_ROUTER_API_KEY) ?? DEFAULT_PREFERENCES.openRouterApiKey,
     shortcuts:
       get<Record<ShortcutId, KeyBinding[]>>(KEY_SHORTCUTS) ??
       DEFAULT_PREFERENCES.shortcuts,
@@ -231,6 +242,10 @@ export async function setAccentHue(value: number): Promise<void> {
   await writePref(KEY_ACCENT_HUE, hue);
 }
 
+export async function setOpenRouterApiKey(value: string): Promise<void> {
+  await writePref(KEY_OPEN_ROUTER_API_KEY, value.trim());
+}
+
 export async function setShortcuts(
   value: Record<ShortcutId, KeyBinding[]> | {},
 ): Promise<void> {
@@ -265,6 +280,7 @@ export async function onPreferencesChange(
     [KEY_ZOOM_LEVEL]: "zoomLevel",
     [KEY_SHORTCUTS]: "shortcuts",
     [KEY_ACCENT_HUE]: "accentHue",
+    [KEY_OPEN_ROUTER_API_KEY]: "openRouterApiKey",
   };
   // Same-process writes still fire onChange immediately; cross-window writes
   // arrive via the Tauri event emitted by writePref().

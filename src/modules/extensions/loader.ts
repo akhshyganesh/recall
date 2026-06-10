@@ -7,8 +7,8 @@ import {
   registerBuiltinInStore,
 } from "./store";
 import type { RecallExtension } from "./types";
+import { aiAssistantExtension } from "@/extensions/ai-assistant";
 import { scratchPadExtension } from "./builtin/scratch-pad";
-import { snippetsExtension } from "./builtin/snippets";
 import { todoExtension } from "./builtin/todo";
 
 interface PluginsEntry {
@@ -38,22 +38,25 @@ async function readTextFileSafe(path: string): Promise<string | null> {
   }
 }
 
-let loaded = false;
+// Built-in extensions are registered at module load time so they are always
+// present before the first React render — and re-registered if Vite HMR
+// recreates the Zustand registry store during development.
+// loadExtension's own extensionIds guard prevents double-activation.
+for (const ext of [aiAssistantExtension, todoExtension, scratchPadExtension]) {
+  registerBuiltinInStore(ext);
+  if (!isBuiltinDisabled(ext.id)) loadExtension(ext);
+}
+
+let externalPluginsLoaded = false;
 
 /**
- * Call once at app startup.  Reads `<appDataDir>/plugins.json`, hydrates the
- * persistent extension store, then dynamically imports each enabled extension.
+ * Call once at app startup.  Hydrates the persistent extension store and
+ * dynamically imports each enabled external plugin from plugins.json.
  * Failures are isolated — a broken plugin cannot prevent the app from launching.
  */
 export async function loadInstalledExtensions(): Promise<void> {
-  if (loaded) return;
-  loaded = true;
-
-  // Built-in extensions: register in the UI store, activate unless disabled.
-  for (const ext of [todoExtension, snippetsExtension, scratchPadExtension]) {
-    registerBuiltinInStore(ext);
-    if (!isBuiltinDisabled(ext.id)) loadExtension(ext);
-  }
+  if (externalPluginsLoaded) return;
+  externalPluginsLoaded = true;
 
   // Hydrate the settings UI store regardless of whether loading succeeds.
   void hydrateExtensionStore();
