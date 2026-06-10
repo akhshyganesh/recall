@@ -82,6 +82,7 @@ export function TabBar({
   const [renameValue, setRenameValue] = useState("");
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
   const [dropIdx, setDropIdx] = useState<number | null>(null);
+  const [dragDeltaX, setDragDeltaX] = useState(0);
   // Visual state: ghost cursor position and active split zone for cursor + badge rendering.
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
   const [activeSplitZone, setActiveSplitZone] = useState<"row" | "col" | null>(null);
@@ -89,6 +90,9 @@ export function TabBar({
   const dragStartRef = useRef<{ x: number; y: number; idx: number; tabId: number } | null>(null);
   const dragActiveRef = useRef<{ draggingIdx: number; dropIdx: number } | null>(null);
   const splitZoneRef = useRef<"row" | "col" | null>(null);
+  // Snapshotted tab midpoints and dragged tab width captured at drag-start.
+  const originalMids = useRef<number[]>([]);
+  const draggedTabWidth = useRef(0);
   const terminalLabels = useMemo(() => buildTerminalLabels(tabs), [tabs]);
 
   // Horizontal wheel scroll without holding shift.
@@ -148,13 +152,24 @@ export function TabBar({
     closeRename();
   };
 
-  const computeDropIdx = (clientX: number): number => {
-    const tabEls = Array.from(scrollRef.current?.querySelectorAll("[data-tab-id]") ?? []);
-    for (let j = 0; j < tabEls.length; j++) {
-      const rect = tabEls[j].getBoundingClientRect();
-      if (clientX < rect.left + rect.width / 2) return j;
+  // Uses originalMids (snapshotted at drag start) so the insert index calculation
+  // stays stable while items are mid-animation.
+  const computeDropIdx = (clientX: number, dragIdx: number): number => {
+    const without = originalMids.current.filter((_, i) => i !== dragIdx);
+    for (let j = 0; j < without.length; j++) {
+      if (clientX < without[j]) return j;
     }
-    return tabEls.length;
+    return without.length;
+  };
+
+  // Compute translateX for a non-dragged tab — same logic as SidebarRail.
+  // Items to the right of dragIndex slide left to fill the gap, items at/after
+  // insertIndex slide right to open the drop slot. The effects combine.
+  const shiftForTab = (i: number, dragIndex: number, insertIndex: number, w: number): number => {
+    const adj = i > dragIndex ? i - 1 : i;
+    const fill = i > dragIndex ? -w : 0;
+    const open = adj >= insertIndex ? w : 0;
+    return fill + open;
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -175,10 +190,19 @@ export function TabBar({
 
     if (draggingIdx === null) {
       if (Math.abs(e.clientX - start.x) <= 5 && Math.abs(e.clientY - start.y) <= 5) return;
+      // Snapshot midpoints and dragged tab width at the moment drag begins.
+      const tabEls = Array.from(scrollRef.current?.querySelectorAll("[data-tab-id]") ?? []);
+      originalMids.current = tabEls.map((el) => {
+        const r = el.getBoundingClientRect();
+        return r.left + r.width / 2;
+      });
+      draggedTabWidth.current =
+        tabEls[start.idx]?.getBoundingClientRect().width ?? 0;
       setDraggingIdx(start.idx);
       scrollRef.current?.setPointerCapture(e.pointerId);
     }
 
+    setDragDeltaX(e.clientX - start.x);
     setDragPos({ x: e.clientX, y: e.clientY });
 
     const activeDragIdx = draggingIdx ?? start.idx;
@@ -212,7 +236,7 @@ export function TabBar({
       return;
     }
 
-    const newDrop = computeDropIdx(e.clientX);
+    const newDrop = computeDropIdx(e.clientX, activeDragIdx);
     dragActiveRef.current = { draggingIdx: activeDragIdx, dropIdx: newDrop };
     setDropIdx(newDrop);
   };
@@ -238,6 +262,7 @@ export function TabBar({
     dragActiveRef.current = null;
     setDraggingIdx(null);
     setDropIdx(null);
+    setDragDeltaX(0);
     setDragPos(null);
     setActiveSplitZone(null);
   };
@@ -273,22 +298,13 @@ export function TabBar({
                   (t.kind === "git-diff" && (t as GitDiffTab).preview);
                 const label = labelFor(t, terminalLabels);
                 const isDragging = draggingIdx === i;
-                const showDropBefore =
-                  onReorder &&
-                  dropIdx === i &&
-                  draggingIdx !== null &&
-                  draggingIdx !== i &&
-                  draggingIdx !== i - 1;
 
-                if (showDropBefore) {
-                  items.push(
-                    <div
-                      key={`drop-${i}`}
-                      aria-hidden
-                      className="w-px shrink-0 self-stretch bg-primary/60 my-1"
-                    />,
-                  );
-                }
+                const translateX =
+                  draggingIdx !== null && dropIdx !== null && !activeSplitZone
+                    ? isDragging
+                      ? dragDeltaX
+                      : shiftForTab(i, draggingIdx, dropIdx, draggedTabWidth.current)
+                    : 0;
 
                 const tabIndex = i + 1;
                 const indexHint = tabIndex <= 9 ? ` (⌘${tabIndex})` : "";
@@ -301,8 +317,14 @@ export function TabBar({
                         title={`${tooltipFor(t, label)}${indexHint}`}
                         onDoubleClick={() => isPreview && onPin(t.id)}
                         onMouseDown={(e) => e.preventDefault()}
+                        style={{
+                          transform: `translateX(${translateX}px)`,
+                          transition: isDragging ? "none" : draggingIdx !== null ? "transform 160ms ease" : undefined,
+                          zIndex: isDragging ? 10 : undefined,
+                          position: "relative",
+                        }}
                         className={cn(
-                          "group relative h-full! flex-none! shrink-0 justify-between! gap-1.5! rounded-none! border-x-0! border-t-0! border-b-2! text-[11.5px]! font-medium! transition-colors! duration-100!",
+                          "group h-full! flex-none! shrink-0 justify-between! gap-1.5! rounded-none! border-x-0! border-t-0! border-b-2! text-[11.5px]! font-medium! transition-colors! duration-100!",
                           t.id === activeId
                             ? "border-b-primary! text-foreground! bg-transparent!"
                             : "border-b-transparent! text-muted-foreground/65 hover:text-muted-foreground! hover:bg-sidebar-accent/40!",
@@ -312,7 +334,7 @@ export function TabBar({
                               ? "px-2.5!"
                               : "ps-2.5! pe-1.5!",
                           onReorder && "cursor-grab",
-                          isDragging && "opacity-40 cursor-grabbing",
+                          isDragging && "opacity-50 cursor-grabbing",
                         )}
                       >
                         <span
@@ -438,22 +460,6 @@ export function TabBar({
                   </ContextMenu>,
                 );
               });
-
-              // Drop indicator after the last tab
-              if (
-                onReorder &&
-                dropIdx === tabs.length &&
-                draggingIdx !== null &&
-                draggingIdx !== tabs.length - 1
-              ) {
-                items.push(
-                  <div
-                    key="drop-end"
-                    aria-hidden
-                    className="w-px shrink-0 self-stretch bg-primary/60 my-1"
-                  />,
-                );
-              }
 
               return items;
             })()}
