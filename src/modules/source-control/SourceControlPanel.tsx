@@ -67,7 +67,7 @@ type Props = {
 };
 
 const SOURCE_CONTROL_TOOLTIP_CLASS =
-  "border border-border/70 bg-zinc-950 text-zinc-100 shadow-lg shadow-black/30 dark:border-border/60 dark:bg-zinc-950 dark:text-zinc-100";
+  "border border-border/60 bg-popover text-popover-foreground shadow-lg shadow-black/20";
 
 const ROW_HEIGHTS = {
   banner: 32,
