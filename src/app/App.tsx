@@ -59,6 +59,7 @@ import {
   loadInstalledExtensions,
   useExtensionRegistry,
 } from "@/modules/extensions";
+import { WorkspaceContext } from "@/modules/extensions/WorkspaceContext";
 import { SidebarRail, type SidebarViewId } from "@/modules/sidebar";
 import {
   SourceControlPanel,
@@ -106,10 +107,14 @@ import {
   type RightPanelViewId,
 } from "./rightPanelState";
 
-function ExtensionSidebarPanel({ viewId }: { viewId: string }) {
+function ExtensionSidebarPanel({ viewId, workspacePath }: { viewId: string; workspacePath: string | null }) {
   const panel = useExtensionRegistry((s) => s.sidebarPanels.find((p) => p.id === viewId));
   if (!panel) return null;
-  return <>{panel.render()}</>;
+  return (
+    <WorkspaceContext.Provider value={{ workspacePath }}>
+      {panel.render()}
+    </WorkspaceContext.Provider>
+  );
 }
 
 function dirname(path: string | null): string | null {
@@ -1490,7 +1495,7 @@ export default function App() {
                         <ExtensionsSection />
                       </div>
                     ) : (
-                      <ExtensionSidebarPanel viewId={sidebarView} />
+                      <ExtensionSidebarPanel viewId={sidebarView} workspacePath={activeTerminalLeafCwd ?? explorerRoot ?? null} />
                     )}
                   </div>
                 </div>

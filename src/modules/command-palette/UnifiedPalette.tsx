@@ -210,7 +210,7 @@ export function UnifiedPalette({
             />
           </div>
 
-          <CommandList className="max-h-[340px] py-0.5">
+          <CommandList className="max-h-[340px] pb-0">
             {showEmpty && (
               <CommandEmpty className="py-5 text-xs">
                 {isCommandMode ? "No commands found." : "No files found."}

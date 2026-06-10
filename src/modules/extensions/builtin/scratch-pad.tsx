@@ -1,12 +1,17 @@
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import type { RecallExtension } from "../types";
+import { useScopedStorageKey, useWorkspacePath } from "../WorkspaceContext";
+import { PanelShell } from "./PanelShell";
 
-const STORAGE_KEY = "recall.scratch-pad.v1";
+const BASE_KEY = "recall.scratch-pad.v1";
+const EXT_ID = "recall.scratch-pad";
 
 function ScratchPadPanel() {
+  const workspacePath = useWorkspacePath();
+  const storageKey = useScopedStorageKey(BASE_KEY, EXT_ID, workspacePath);
   const [text, setText] = useState(() => {
-    try { return localStorage.getItem(STORAGE_KEY) ?? ""; } catch { return ""; }
+    try { return localStorage.getItem(storageKey) ?? ""; } catch { return ""; }
   });
   const saveRef = useRef(0);
 
@@ -15,8 +20,13 @@ function ScratchPadPanel() {
     setText(val);
     if (saveRef.current) clearTimeout(saveRef.current);
     saveRef.current = window.setTimeout(() => {
-      try { localStorage.setItem(STORAGE_KEY, val); } catch {}
+      try { localStorage.setItem(storageKey, val); } catch {}
     }, 400);
+  };
+
+  const onScopeChange = (scope: "global" | "workspace") => {
+    const newKey = scope === "workspace" && workspacePath ? storageKey : BASE_KEY;
+    try { setText(localStorage.getItem(newKey) ?? ""); } catch { setText(""); }
   };
 
   useEffect(() => () => { if (saveRef.current) clearTimeout(saveRef.current); }, []);
@@ -25,19 +35,14 @@ function ScratchPadPanel() {
   const lineCount = text ? text.split("\n").length : 1;
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="border-b border-border/30 px-3 py-2">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
-          Scratch Pad
-        </span>
-      </div>
+    <PanelShell extensionId={EXT_ID} title="Scratch Pad" onScopeChange={onScopeChange}>
       <textarea
         value={text}
         onChange={onChange}
         placeholder="Start typing…"
         spellCheck={false}
         className={cn(
-          "min-h-0 flex-1 resize-none bg-transparent px-3 py-2.5",
+          "min-h-0 flex-1 resize-none bg-transparent px-3 py-2.5 h-full w-full",
           "font-mono text-[12px] leading-relaxed text-foreground",
           "placeholder:text-muted-foreground/30 outline-none",
         )}
@@ -51,7 +56,7 @@ function ScratchPadPanel() {
             type="button"
             onClick={() => {
               setText("");
-              try { localStorage.setItem(STORAGE_KEY, ""); } catch {}
+              try { localStorage.setItem(storageKey, ""); } catch {}
             }}
             className="text-[10px] text-muted-foreground/35 transition-colors hover:text-destructive/70"
           >
@@ -59,7 +64,7 @@ function ScratchPadPanel() {
           </button>
         )}
       </div>
-    </div>
+    </PanelShell>
   );
 }
 
@@ -74,7 +79,7 @@ const ScratchPadIcon = () => (
 );
 
 export const scratchPadExtension: RecallExtension = {
-  id: "recall.scratch-pad",
+  id: EXT_ID,
   name: "Scratch Pad",
   version: "1.0.0",
   description: "A persistent notepad in the sidebar. Auto-saves locally.",

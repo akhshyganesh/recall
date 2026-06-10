@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useTheme } from "@/modules/theme";
 import { unifiedMergeView } from "@codemirror/merge";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
@@ -47,43 +48,54 @@ const READONLY_EXT = [
   EditorState.readOnly.of(true),
   EditorView.editable.of(false),
 ];
-const DIFF_THEME = EditorView.theme({
-  "&.cm-merge-b .cm-changedText, .cm-changedText": {
-    background: "rgba(110, 200, 120, 0.20) !important",
-    borderRadius: "3px",
-    padding: "0 1px",
-  },
-  ".cm-deletedChunk .cm-deletedText, &.cm-merge-b .cm-deletedText": {
-    background: "rgba(220, 90, 90, 0.22) !important",
-    borderRadius: "3px",
-    padding: "0 1px",
-  },
-  "&.cm-merge-b .cm-changedLine, .cm-changedLine, .cm-inlineChangedLine": {
-    backgroundColor: "rgba(110, 200, 120, 0.05) !important",
-  },
-  ".cm-deletedChunk": {
-    backgroundColor: "rgba(220, 90, 90, 0.05) !important",
-    paddingTop: "1px",
-    paddingBottom: "1px",
-  },
-  "&.cm-merge-b .cm-changedLineGutter, .cm-changedLineGutter": {
-    background: "rgba(110, 200, 120, 0.55) !important",
-  },
-  ".cm-deletedLineGutter, &.cm-merge-a .cm-changedLineGutter": {
-    background: "rgba(220, 90, 90, 0.5) !important",
-  },
-  ".cm-changeGutter": {
-    width: "2px !important",
-    paddingLeft: "0 !important",
-  },
-  ".cm-collapsedLines": {
-    backgroundColor: "transparent",
-    color: "var(--muted-foreground, #9ca3af)",
-    fontSize: "10.5px",
-    padding: "2px 8px",
-    opacity: 0.7,
-  },
-});
+
+function buildDiffTheme(isDark: boolean) {
+  const addRgb = isDark ? "110, 200, 120" : "40, 140, 60";
+  const delRgb = isDark ? "220, 90, 90" : "200, 50, 50";
+  const addText  = isDark ? 0.20 : 0.22;
+  const delText  = isDark ? 0.22 : 0.24;
+  const addLine  = isDark ? 0.06 : 0.10;
+  const delLine  = isDark ? 0.06 : 0.10;
+  const addGutter = isDark ? 0.55 : 0.65;
+  const delGutter = isDark ? 0.50 : 0.60;
+  return EditorView.theme({
+    "&.cm-merge-b .cm-changedText, .cm-changedText": {
+      background: `rgba(${addRgb}, ${addText}) !important`,
+      borderRadius: "3px",
+      padding: "0 1px",
+    },
+    ".cm-deletedChunk .cm-deletedText, &.cm-merge-b .cm-deletedText": {
+      background: `rgba(${delRgb}, ${delText}) !important`,
+      borderRadius: "3px",
+      padding: "0 1px",
+    },
+    "&.cm-merge-b .cm-changedLine, .cm-changedLine, .cm-inlineChangedLine": {
+      backgroundColor: `rgba(${addRgb}, ${addLine}) !important`,
+    },
+    ".cm-deletedChunk": {
+      backgroundColor: `rgba(${delRgb}, ${delLine}) !important`,
+      paddingTop: "1px",
+      paddingBottom: "1px",
+    },
+    "&.cm-merge-b .cm-changedLineGutter, .cm-changedLineGutter": {
+      background: `rgba(${addRgb}, ${addGutter}) !important`,
+    },
+    ".cm-deletedLineGutter, &.cm-merge-a .cm-changedLineGutter": {
+      background: `rgba(${delRgb}, ${delGutter}) !important`,
+    },
+    ".cm-changeGutter": {
+      width: "2px !important",
+      paddingLeft: "0 !important",
+    },
+    ".cm-collapsedLines": {
+      backgroundColor: "transparent",
+      color: "var(--muted-foreground, #9ca3af)",
+      fontSize: "10.5px",
+      padding: "2px 8px",
+      opacity: 0.7,
+    },
+  });
+}
 
 function countDiffLines(patch: string): { added: number; removed: number } {
   let added = 0;
@@ -129,6 +141,8 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
   const cmRef = useRef<ReactCodeMirrorRef>(null);
   const editorThemeId = usePreferencesStore((s) => s.editorTheme);
   const themeExt = EDITOR_THEME_EXT[editorThemeId] ?? EDITOR_THEME_EXT.atomone;
+  const { resolvedTheme } = useTheme();
+  const diffTheme = useMemo(() => buildDiffTheme(resolvedTheme === "dark"), [resolvedTheme]);
   const [state, setState] = useState<LoadState>(() =>
     active ? loadStateFromCache(source) : { kind: "idle" },
   );
@@ -212,9 +226,9 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
         syntaxHighlightDeletions: true,
         collapseUnchanged: { margin: 3, minSize: 6 },
       }),
-      DIFF_THEME,
+      diffTheme,
     ],
-    [originalContent, initialLang],
+    [originalContent, initialLang, diffTheme],
   );
 
   // Resolve and apply syntax highlighting asynchronously when the language pack

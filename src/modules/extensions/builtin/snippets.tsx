@@ -1,8 +1,11 @@
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import type { RecallExtension } from "../types";
+import { useScopedStorageKey, useWorkspacePath } from "../WorkspaceContext";
+import { PanelShell } from "./PanelShell";
 
-const STORAGE_KEY = "recall.snippets.v1";
+const BASE_KEY = "recall.snippets.v1";
+const EXT_ID = "recall.snippets";
 
 interface Snippet {
   id: string;
@@ -10,27 +13,29 @@ interface Snippet {
   command: string;
 }
 
-function load(): Snippet[] {
+function load(key: string): Snippet[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     return raw ? (JSON.parse(raw) as Snippet[]) : [];
   } catch {
     return [];
   }
 }
 
-function persist(items: Snippet[]) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); } catch {}
+function persist(key: string, items: Snippet[]) {
+  try { localStorage.setItem(key, JSON.stringify(items)); } catch {}
 }
 
 function SnippetsPanel() {
-  const [snippets, setSnippets] = useState<Snippet[]>(load);
+  const workspacePath = useWorkspacePath();
+  const storageKey = useScopedStorageKey(BASE_KEY, EXT_ID, workspacePath);
+  const [snippets, setSnippets] = useState<Snippet[]>(() => load(storageKey));
   const [label, setLabel] = useState("");
   const [command, setCommand] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
-  const update = (next: Snippet[]) => { setSnippets(next); persist(next); };
+  const update = (next: Snippet[]) => { setSnippets(next); persist(storageKey, next); };
 
   const add = () => {
     const l = label.trim();
@@ -49,6 +54,11 @@ function SnippetsPanel() {
     setTimeout(() => setCopied((c) => (c === id ? null : c)), 1500);
   };
 
+  const onScopeChange = (scope: "global" | "workspace") => {
+    const newKey = scope === "workspace" && workspacePath ? storageKey : BASE_KEY;
+    setSnippets(load(newKey));
+  };
+
   const filtered = search.trim()
     ? snippets.filter(
         (s) =>
@@ -58,13 +68,7 @@ function SnippetsPanel() {
     : snippets;
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="border-b border-border/30 px-3 py-2">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
-          Snippets
-        </span>
-      </div>
-
+    <PanelShell extensionId={EXT_ID} title="Snippets" onScopeChange={onScopeChange}>
       {/* Add form */}
       <div className="flex flex-col gap-1.5 border-b border-border/30 px-2.5 py-2">
         <input
@@ -121,7 +125,7 @@ function SnippetsPanel() {
       )}
 
       {/* List */}
-      <div className="min-h-0 flex-1 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center gap-1.5 px-4 py-10 text-center">
             <SnippetEmptyIcon className="text-muted-foreground/20" />
@@ -171,7 +175,7 @@ function SnippetsPanel() {
           </div>
         )}
       </div>
-    </div>
+    </PanelShell>
   );
 }
 
@@ -192,7 +196,7 @@ const SnippetsRailIcon = () => (
 );
 
 export const snippetsExtension: RecallExtension = {
-  id: "recall.snippets",
+  id: EXT_ID,
   name: "Snippets",
   version: "1.0.0",
   description: "Save and copy frequently used shell commands.",
