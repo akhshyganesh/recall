@@ -13,14 +13,14 @@
 
 ---
 
-Recall is a fast, lightweight terminal workspace built on Tauri 2 + Rust and React 19. It pairs a native PTY backend with a modern UI — multi-tab terminals, an integrated code editor, contextual session history, and git-aware development context. Under 10 MB on disk and no telemetry.
+Recall is a fast, lightweight terminal workspace built on Tauri 2 + Rust and React 19. It pairs a native PTY backend with a modern UI — multi-tab terminals with split panes, an integrated code editor, source control, contextual AI session history, and git-aware development context. Under 10 MB on disk. No telemetry.
 
 ## Known macOS notice
 
 If macOS shows:
 
-- `“Recall” is damaged and can’t be opened. You should move it to the Bin.`
-- `Apple could not verify “Recall” is free of malware...`
+- `"Recall" is damaged and can't be opened. You should move it to the Bin.`
+- `Apple could not verify "Recall" is free of malware...`
 
 that means the downloaded app build was not notarized by Apple yet.
 
@@ -30,38 +30,57 @@ Known workaround from Terminal after moving the app into `/Applications`:
 xattr -dr com.apple.quarantine /Applications/Recall.app
 ```
 
-This is a known distribution issue for non-notarized macOS builds. The release workflow now supports Apple signing and notarization when the required Apple secrets are configured.
+This is a known distribution issue for non-notarized macOS builds. The release workflow supports Apple signing and notarization when the required Apple secrets are configured.
 
 ## Features
 
 **Terminal**
 - xterm.js + WebGL renderer, multi-tab with background streaming
-- Native PTY backend via `portable-pty` (zsh, bash, pwsh, …)
-- Shell integration (cwd reporting, prompt markers) via injected init scripts
+- Native PTY backend via `portable-pty` (zsh, bash, fish, pwsh, cmd, …)
+- Split panes with resizable layout
+- Shell integration (cwd tracking, prompt markers) via injected init scripts
 - Inline search, link detection, true-color
 
 **Editor**
-- CodeMirror 6 with language support for TS/JS, Rust, Python, HTML/CSS, JSON, Markdown
+- CodeMirror 6 with language support for TypeScript/JavaScript, Rust, Python, Go, HTML/CSS, JSON, Markdown, C/C++/Java/C#, PHP
 - Vim mode
 - Prebuilt themes: Tokyo Night, Nord, GitHub, Atom One, Aura, Copilot, Xcode
 
+**Source Control**
+- Git status panel — stage, unstage, commit, branch switching
+- Git history with commit graph and per-commit diffs
+- Per-file diff view
+- Direct links to commits on GitHub/GitLab
+
 **Session History**
-- Indexed local session history with search, activity heatmaps, and export to Markdown, JSON, or text
+- Indexes AI coding tool sessions: Claude Code, GitHub Copilot, Codex, and more
+- Search, activity heatmaps, export to Markdown, JSON, or text
+- Built-in MCP server so AI tools can query your session history
 
 **File Explorer**
 - Catppuccin icon theme (Material Icon Theme resolver)
 - Fuzzy search, keyboard navigation, inline rename, context actions
 
-**Web Preview**
-- Auto-detects local dev servers and opens them in a preview tab
+**Preview**
+- Web preview: auto-detects local dev servers and opens them in a sandboxed tab
+- Image, video, and audio viewers
+- Markdown renderer
+
+**Extensions**
+- Built-in extensions: Todo, Snippets, Scratch Pad
+- Extension API for custom sidebar panels, tab renderers, and commands
 
 **Quality**
-- Lightweight and fast (~7 MB bundle)
+- Lightweight (~8 MB bundle)
 - No telemetry, no account required
+- Auto-updater with signature verification
+- Command palette
+- Settings window with accent color picker
 
 ## Windows notes
 
-- **SmartScreen warning**: Windows will show "Windows protected your PC" on first launch because we (temporarily) don't have a code-signing certificate yet. Click **More info** → **Run anyway**. This is normal for unsigned open-source apps.
+- **SmartScreen warning**: Windows will show "Windows protected your PC" on first launch because we don't have a code-signing certificate yet. Click **More info** → **Run anyway**.
+- **Context menu**: the NSIS installer registers a "Open with Recall" entry in Windows Explorer.
 
 The default shell is detected in this order: `pwsh.exe` (PowerShell 7+) → `powershell.exe` (Windows PowerShell 5.1) → `cmd.exe`.
 
@@ -108,7 +127,7 @@ Tauri 2 · Rust · `portable-pty` · React 19 · TypeScript · xterm.js · CodeM
 
 ## Contributing
 
-Issues and PRs are welcome. Feel free to open issues, suggest features, or submit pull requests. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+Issues and PRs are welcome. Open an issue or discuss in [Discord](https://discord.gg/tyveTUyEp7) before starting anything non-trivial. For security issues, use GitHub's private security reporting — don't file them as public issues.
 
 ## Acknowledgments
 
