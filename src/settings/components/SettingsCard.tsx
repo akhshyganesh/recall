@@ -12,12 +12,12 @@ export function SettingsCard({ title, children, className }: Props) {
     <div className={cn("flex flex-col", className)}>
       {title && (
         <div className="px-4 pb-2 pt-5">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/50">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/55">
             {title}
           </span>
         </div>
       )}
-      <div className="flex flex-col divide-y divide-border/25">
+      <div className="flex flex-col divide-y divide-border/40">
         {children}
       </div>
     </div>

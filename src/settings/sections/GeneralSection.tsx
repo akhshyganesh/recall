@@ -59,7 +59,7 @@ function AccentColorPicker() {
               className={cn(
                 "size-6 rounded-full border-2 transition-all hover:scale-110",
                 isActive
-                  ? "border-foreground/60 shadow-sm"
+                  ? "border-primary"
                   : "border-transparent hover:border-foreground/30",
               )}
               style={{ background: swatchColor(p.hue) }}
@@ -81,7 +81,7 @@ function AccentColorPicker() {
           />
           {/* Thumb */}
           <div
-            className="pointer-events-none absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background shadow-sm ring-1 ring-black/10"
+            className="pointer-events-none absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background ring-1 ring-foreground/10"
             style={{
               left: `${(accentHue / 359) * 100}%`,
               background: swatchColor(accentHue),

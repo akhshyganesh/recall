@@ -266,7 +266,7 @@ export function SessionSidebar({ contextPath, repoRoot, onOpenSession }: Props) 
           ].map((item) => (
             <div
               key={item.label}
-              className="rounded-md border border-border/45 bg-background/55 p-2"
+              className="rounded-md border border-border/40 bg-card p-2"
             >
               <div className="text-[13px] font-semibold tabular-nums text-foreground">
                 {item.value.toLocaleString()}
@@ -387,7 +387,7 @@ function EmptyState({
   detail: string;
 }) {
   return (
-    <div className="rounded-md border border-border/45 bg-background/55 p-2.5">
+    <div className="rounded-md border border-border/40 bg-card p-2.5">
       <div className="flex items-start gap-2">
         <HugeiconsIcon
           icon={icon}
@@ -429,7 +429,7 @@ function SessionRow({
     <button
       type="button"
       onClick={onOpen}
-      className="group w-full rounded-md border border-border/35 bg-background/45 p-2 text-left transition-colors hover:border-border/65 hover:bg-foreground/4"
+      className="group w-full rounded-md border border-border/35 bg-card/70 p-2 text-left transition-colors hover:border-border/60 hover:bg-sidebar-accent/40"
       title={title}
     >
       <div className="flex items-start justify-between gap-2">

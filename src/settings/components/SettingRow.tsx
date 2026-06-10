@@ -14,7 +14,7 @@ export function SettingRow({ title, description, children, className }: Props) {
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-[12.5px] font-medium leading-tight">{title}</span>
         {description && (
-          <span className="text-[11px] leading-relaxed text-muted-foreground/75">
+          <span className="text-[11px] leading-relaxed text-muted-foreground/60">
             {description}
           </span>
         )}
