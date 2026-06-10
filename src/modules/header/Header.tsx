@@ -84,34 +84,34 @@ export function Header({
     <div
       ref={rootRef}
       className={cn(
-        "flex shrink-0 select-none flex-col border-b border-border/55 transition-colors",
-        unsplitDropActive && "border-b-primary/60 bg-primary/5",
+        "flex shrink-0 select-none flex-col border-b border-border/70 bg-background transition-colors duration-100",
+        unsplitDropActive && "border-b-primary/50 bg-primary/4",
       )}
     >
       {/* Combined header row */}
       <div
         data-tauri-drag-region
-        className={`flex h-9 items-center gap-2 bg-card/65 ${
-          IS_MAC ? "pr-2 pl-20" : "pr-0 pl-2"
-        }`}
+        className={cn(
+          "flex h-9 items-stretch gap-0 bg-background",
+          IS_MAC ? "pr-2 pl-20" : "pr-0 pl-1",
+        )}
       >
-        <div className="flex shrink-0 items-center">
+        <div className="flex shrink-0 items-center px-1">
           <Button
             onClick={onToggleSidebar}
             title="Toggle sidebar"
             variant="ghost"
             size="icon-sm"
-            className="shrink-0 rounded-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="size-7 shrink-0 rounded-sm text-muted-foreground/60 hover:bg-sidebar-accent/60 hover:text-foreground"
           >
-            <HugeiconsIcon icon={SidebarLeftIcon} size={18} strokeWidth={1.75} />
+            <HugeiconsIcon icon={SidebarLeftIcon} size={16} strokeWidth={1.75} />
           </Button>
         </div>
 
-        {!IS_MAC && <span className="mx-1 h-5 w-px shrink-0 bg-border" />}
-        {IS_MAC && <span className="mr-1 h-6 w-px shrink-0 bg-border" />}
+        <span className="mx-1 h-full w-px shrink-0 bg-border/50 self-stretch" />
 
         <div
-          className="flex min-w-0 flex-1 items-center gap-2"
+          className="flex min-w-0 flex-1 items-stretch"
           data-tauri-drag-region
         >
           <TabBar
@@ -134,14 +134,16 @@ export function Header({
             compact={compact}
           />
           <div data-tauri-drag-region className="h-full min-w-2 flex-1" />
-          <WorkspaceEnvSelector onSelect={onWorkspaceChange} />
+          <div className="flex items-center pr-1">
+            <WorkspaceEnvSelector onSelect={onWorkspaceChange} />
+          </div>
         </div>
 
         <SearchInline ref={searchRef} target={searchTarget} compact={compact} />
 
         {USE_CUSTOM_WINDOW_CONTROLS && (
           <>
-            <span className="ml-1 h-5 w-px shrink-0 bg-border" />
+            <span className="ml-1 h-5 w-px shrink-0 self-center bg-border/50" />
             <WindowControls />
           </>
         )}

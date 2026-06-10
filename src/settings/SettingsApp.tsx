@@ -109,7 +109,7 @@ export function SettingsPanel({
         <header
           data-tauri-drag-region
           className={cn(
-            "flex h-10 shrink-0 items-center gap-2.5 border-b border-border/30 bg-card/50",
+            "flex h-10 shrink-0 items-center gap-2.5 border-b border-border/60 bg-background",
             IS_MAC ? "pr-3 pl-22" : "pr-0 pl-4",
           )}
         >
@@ -151,7 +151,7 @@ export function SettingsPanel({
                 )}
               >
                 {isActive && (
-                  <span className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-foreground" />
+                  <span className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary" />
                 )}
                 <HugeiconsIcon
                   icon={tab.icon}

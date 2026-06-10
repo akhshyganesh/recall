@@ -9,138 +9,144 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-heading: 'JetBrains Mono', var(--font-sans);
-  --font-sans: 'JetBrains Mono', 'Inter Variable', monospace;
-    --color-sidebar-ring: var(--sidebar-ring);
-    --color-sidebar-border: var(--sidebar-border);
-    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-    --color-sidebar-accent: var(--sidebar-accent);
-    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-    --color-sidebar-primary: var(--sidebar-primary);
-    --color-sidebar-foreground: var(--sidebar-foreground);
-    --color-sidebar: var(--sidebar);
-    --color-chart-5: var(--chart-5);
-    --color-chart-4: var(--chart-4);
-    --color-chart-3: var(--chart-3);
-    --color-chart-2: var(--chart-2);
-    --color-chart-1: var(--chart-1);
-    --color-ring: var(--ring);
-    --color-input: var(--input);
-    --color-border: var(--border);
-    --color-destructive: var(--destructive);
-    --color-accent-foreground: var(--accent-foreground);
-    --color-accent: var(--accent);
-    --color-muted-foreground: var(--muted-foreground);
-    --color-muted: var(--muted);
-    --color-secondary-foreground: var(--secondary-foreground);
-    --color-secondary: var(--secondary);
-    --color-primary-foreground: var(--primary-foreground);
-    --color-primary: var(--primary);
-    --color-popover-foreground: var(--popover-foreground);
-    --color-popover: var(--popover);
-    --color-card-foreground: var(--card-foreground);
-    --color-card: var(--card);
-    --color-foreground: var(--foreground);
-    --color-background: var(--background);
-    --radius-sm: 0.375rem;
-    --radius-md: 0.5rem;
-    --radius-lg: 0.625rem;
-    --radius-xl: 0.75rem;
-    --radius-2xl: 0.875rem;
-    --radius-3xl: 1rem;
-    --radius-4xl: 1.25rem;
+  --font-heading: 'Inter Variable', system-ui, sans-serif;
+  --font-sans: 'Inter Variable', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.625rem;
+  --radius-2xl: 0.75rem;
+  --radius-3xl: 0.875rem;
+  --radius-4xl: 1rem;
 }
 
+/* ── Light mode ──────────────────────────────────────────────────────────── */
 :root {
-  --background: oklch(0.975 0 0);
-  --foreground: oklch(0.12 0 0);
-  --card: oklch(0.952 0 0);
-  --card-foreground: oklch(0.12 0 0);
-  --popover: oklch(0.965 0 0);
-  --popover-foreground: oklch(0.12 0 0);
-  --primary: oklch(0.58 0.18 55);
-  --primary-foreground: oklch(0.10 0 0);
-  --secondary: oklch(0.91 0 0);
-  --secondary-foreground: oklch(0.17 0 0);
-  --muted: oklch(0.91 0 0);
+  --background: oklch(0.982 0 0);
+  --foreground: oklch(0.11 0 0);
+  --card: oklch(0.960 0 0);
+  --card-foreground: oklch(0.11 0 0);
+  --popover: oklch(0.970 0 0);
+  --popover-foreground: oklch(0.11 0 0);
+  --primary: oklch(0.50 0.19 265);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.925 0 0);
+  --secondary-foreground: oklch(0.16 0 0);
+  --muted: oklch(0.925 0 0);
   --muted-foreground: oklch(0.46 0 0);
-  --accent: oklch(0.88 0 0);
-  --accent-foreground: oklch(0.12 0 0);
-  --destructive: oklch(0.56 0.205 28);
-  --border: oklch(0.82 0 0);
-  --input: oklch(0.89 0 0);
-  --ring: oklch(0.58 0.18 55);
-  --chart-1: oklch(0.24 0 0);
-  --chart-2: oklch(0.38 0 0);
-  --chart-3: oklch(0.52 0 0);
-  --chart-4: oklch(0.66 0 0);
-  --chart-5: oklch(0.8 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.945 0 0);
-  --sidebar-foreground: oklch(0.12 0 0);
-  --sidebar-primary: oklch(0.58 0.18 55);
+  --accent: oklch(0.905 0 0);
+  --accent-foreground: oklch(0.11 0 0);
+  --destructive: oklch(0.54 0.21 27);
+  --border: oklch(0.855 0 0);
+  --input: oklch(0.915 0 0);
+  --ring: oklch(0.50 0.19 265);
+  --chart-1: oklch(0.22 0 0);
+  --chart-2: oklch(0.36 0 0);
+  --chart-3: oklch(0.50 0 0);
+  --chart-4: oklch(0.64 0 0);
+  --chart-5: oklch(0.78 0 0);
+  --radius: 0.5rem;
+  --sidebar: oklch(0.955 0 0);
+  --sidebar-foreground: oklch(0.11 0 0);
+  --sidebar-primary: oklch(0.50 0.19 265);
   --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.87 0 0);
-  --sidebar-accent-foreground: oklch(0.12 0 0);
-  --sidebar-border: oklch(0.80 0 0);
-  --sidebar-ring: oklch(0.58 0.18 55);
+  --sidebar-accent: oklch(0.900 0 0);
+  --sidebar-accent-foreground: oklch(0.11 0 0);
+  --sidebar-border: oklch(0.845 0 0);
+  --sidebar-ring: oklch(0.50 0.19 265);
 }
 
+/* ── Dark mode ───────────────────────────────────────────────────────────── */
 .dark {
-  --background: oklch(0.095 0.008 265);
-  --foreground: oklch(0.94 0 0);
-  --card: oklch(0.14 0.006 265);
-  --card-foreground: oklch(0.94 0 0);
-  --popover: oklch(0.17 0.006 265);
-  --popover-foreground: oklch(0.94 0 0);
-  --primary: oklch(0.76 0.16 55);
-  --primary-foreground: oklch(0.05 0 0);
-  --secondary: oklch(0.24 0.007 265);
-  --secondary-foreground: oklch(0.91 0 0);
-  --muted: oklch(0.21 0.007 265);
-  --muted-foreground: oklch(0.58 0.01 265);
-  --accent: oklch(0.23 0.007 265);
-  --accent-foreground: oklch(0.94 0 0);
-  --destructive: oklch(0.68 0.18 27);
-  --border: oklch(0.30 0.008 265 / 65%);
-  --input: oklch(0.22 0.007 265);
-  --ring: oklch(0.76 0.16 55);
+  --background: oklch(0.082 0.005 260);
+  --foreground: oklch(0.93 0 0);
+  --card: oklch(0.128 0.006 260);
+  --card-foreground: oklch(0.93 0 0);
+  --popover: oklch(0.138 0.006 260);
+  --popover-foreground: oklch(0.93 0 0);
+  --primary: oklch(0.72 0.14 265);
+  --primary-foreground: oklch(0.04 0 0);
+  --secondary: oklch(0.185 0.006 260);
+  --secondary-foreground: oklch(0.93 0 0);
+  --muted: oklch(0.172 0.006 260);
+  --muted-foreground: oklch(0.505 0.005 260);
+  --accent: oklch(0.175 0.006 260);
+  --accent-foreground: oklch(0.93 0 0);
+  --destructive: oklch(0.65 0.19 27);
+  --border: oklch(0.215 0.005 260);
+  --input: oklch(0.182 0.006 260);
+  --ring: oklch(0.72 0.14 265);
   --chart-1: oklch(0.88 0 0);
   --chart-2: oklch(0.74 0 0);
   --chart-3: oklch(0.60 0 0);
   --chart-4: oklch(0.46 0 0);
   --chart-5: oklch(0.32 0 0);
-  --sidebar: oklch(0.12 0.008 265);
-  --sidebar-foreground: oklch(0.94 0 0);
-  --sidebar-primary: oklch(0.76 0.16 55);
-  --sidebar-primary-foreground: oklch(0.05 0 0);
-  --sidebar-accent: oklch(0.21 0.007 265);
-  --sidebar-accent-foreground: oklch(0.94 0 0);
-  --sidebar-border: oklch(0.28 0.008 265 / 65%);
-  --sidebar-ring: oklch(0.76 0.16 55);
+  --sidebar: oklch(0.100 0.005 260);
+  --sidebar-foreground: oklch(0.93 0 0);
+  --sidebar-primary: oklch(0.72 0.14 265);
+  --sidebar-primary-foreground: oklch(0.04 0 0);
+  --sidebar-accent: oklch(0.185 0.006 260);
+  --sidebar-accent-foreground: oklch(0.93 0 0);
+  --sidebar-border: oklch(0.232 0.005 260);
+  --sidebar-ring: oklch(0.72 0.14 265);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
+  }
   body {
     @apply bg-background text-foreground;
     margin: 0;
     overflow: hidden;
-    font-feature-settings: "zero" 1, "ss01" 1, "calt" 1;
-    letter-spacing: 0;
-    }
+    font-feature-settings: "calt" 1;
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
   html, body, #root {
     height: 100%;
-    }
+  }
   html {
     @apply font-sans;
-    }
+  }
 }
 
 ::selection {
-  background: color-mix(in oklch, var(--primary) 28%, transparent);
+  background: color-mix(in oklch, var(--primary) 22%, transparent);
   color: var(--foreground);
 }
 
@@ -154,9 +160,8 @@
   zoom: calc(1 / var(--app-zoom));
 }
 
-/* Custom window chrome (Linux/Windows): the OS gives us a transparent
- * borderless window, and we paint the rounded corners + border + shadow
- * ourselves so the app doesn't look naked on GNOME/KDE/Hyprland. */
+/* Custom window chrome (Linux/Windows): borderless transparent window with
+ * painted rounded corners, border, and no shadow. */
 html[data-chrome="borderless"],
 html[data-chrome="borderless"] body {
   background: transparent !important;
@@ -172,11 +177,10 @@ html[data-chrome="borderless"] #settings-root {
 
 /*
  * xterm.js overrides — kept outside @layer so they win against the addon's
- * own stylesheet (which is not in any layer and would otherwise override).
+ * own stylesheet which is not in any layer.
  *
- * Newer xterm renders scrollbars as real <div class="scrollbar vertical|horizontal">
- * children rather than relying on native overflow scrollbars. Both code paths exist
- * across versions, so we hide both.
+ * Newer xterm renders scrollbars as real <div class="scrollbar"> children
+ * rather than native overflow scrollbars. Hide both code paths.
  */
 .xterm .scrollbar,
 .xterm .scrollbar.vertical,
@@ -217,26 +221,25 @@ html[data-chrome="borderless"] #settings-root {
   display: none !important;
 }
 
-/* CodeMirror search highlights — override the barely-visible defaults */
+/* CodeMirror search highlights — indigo theme */
 .cm-searchMatch {
-  background: rgba(200, 155, 0, 0.32) !important;
-  outline: 1.5px solid rgba(210, 165, 0, 0.65) !important;
+  background: rgba(120, 100, 220, 0.22) !important;
+  outline: 1.5px solid rgba(140, 120, 240, 0.55) !important;
   border-radius: 2px;
 }
 .cm-searchMatch.cm-searchMatch-selected {
-  background: rgba(210, 120, 0, 0.58) !important;
-  outline: 2px solid rgba(255, 185, 0, 0.95) !important;
+  background: rgba(110, 90, 210, 0.48) !important;
+  outline: 2px solid rgba(150, 130, 255, 0.90) !important;
   border-radius: 2px;
 }
 :is(.dark *) .cm-searchMatch {
-  background: rgba(190, 145, 0, 0.42) !important;
-  outline: 1.5px solid rgba(220, 175, 0, 0.7) !important;
+  background: rgba(130, 110, 240, 0.28) !important;
+  outline: 1.5px solid rgba(160, 140, 255, 0.60) !important;
 }
 :is(.dark *) .cm-searchMatch.cm-searchMatch-selected {
-  background: rgba(215, 125, 0, 0.72) !important;
-  outline: 2px solid rgba(255, 195, 0, 1) !important;
+  background: rgba(120, 100, 230, 0.58) !important;
+  outline: 2px solid rgba(170, 150, 255, 0.95) !important;
 }
-
 
 .no-scrollbar {
   scrollbar-width: none !important;
@@ -260,11 +263,8 @@ html[data-chrome="borderless"] #settings-root {
   display: none !important;
 }
 
-/* Kill native scrollbars everywhere by default — Linux/Windows ship chunky
- * Chromium bars that break the chrome, and macOS WKWebView flashes its overlay
- * scrollbar briefly during layout transitions (pane split,
- * window resize) which looks like a glitch. Visible scroll affordances are
- * provided per-region via shadcn <ScrollArea>. */
+/* Kill native scrollbars everywhere by default — Linux/Windows Chromium bars
+ * and macOS WKWebView overlay flicker during layout transitions. */
 html,
 html *,
 html *::before,
@@ -278,14 +278,38 @@ html *::-webkit-scrollbar {
   display: none;
 }
 
+/* ── Animations ──────────────────────────────────────────────────────────── */
+
 @keyframes terminal-enter {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes ui-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ui-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 
@@ -315,8 +339,8 @@ html *::-webkit-scrollbar {
   overflow: hidden;
 }
 .recall-collapsible-content[data-state="open"] {
-  animation: recall-collapsible-down 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  animation: recall-collapsible-down 140ms cubic-bezier(0.2, 0, 0, 1);
 }
 .recall-collapsible-content[data-state="closed"] {
-  animation: recall-collapsible-up 160ms cubic-bezier(0.4, 0, 0.2, 1);
+  animation: recall-collapsible-up 120ms cubic-bezier(0.2, 0, 0, 1);
 }

@@ -250,7 +250,7 @@ export function TabBar({
     <div
       ref={scrollRef}
       className={cn(
-        "min-w-0 shrink overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        "flex min-w-0 shrink items-stretch overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         draggingIdx !== null && (activeSplitZone ? "cursor-copy select-none" : "cursor-grabbing select-none"),
       )}
       onPointerDown={handlePointerDown}
@@ -258,12 +258,13 @@ export function TabBar({
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
     >
-      <div className="flex w-max items-center gap-1">
+      <div className="flex h-full w-max items-stretch">
         <Tabs
           value={String(activeId)}
           onValueChange={(v) => onSelect(Number(v))}
+          className="h-full!"
         >
-          <TabsList className="h-7 w-max gap-0 bg-transparent p-0">
+          <TabsList className="h-full! w-max gap-0 bg-transparent p-0">
             {(() => {
               const items: ReactNode[] = [];
               tabs.forEach((t, i) => {
@@ -285,7 +286,7 @@ export function TabBar({
                     <div
                       key={`drop-${i}`}
                       aria-hidden
-                      className="w-0.5 shrink-0 self-stretch rounded-full bg-primary/70 my-0.5"
+                      className="w-px shrink-0 self-stretch bg-primary/60 my-1"
                     />,
                   );
                 }
@@ -302,15 +303,15 @@ export function TabBar({
                         onDoubleClick={() => isPreview && onPin(t.id)}
                         onMouseDown={(e) => e.preventDefault()}
                         className={cn(
-                          "group relative h-7! flex-none! shrink-0 justify-between! gap-1.5! rounded-none! border-0! text-xs! font-semibold transition-all",
+                          "group relative h-full! flex-none! shrink-0 justify-between! gap-1.5! rounded-none! border-x-0! border-t-0! border-b-2! text-[11.5px]! font-medium! transition-colors! duration-100!",
                           t.id === activeId
-                            ? "bg-sidebar-primary! text-sidebar-primary-foreground!"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                            ? "border-b-primary! text-foreground! bg-transparent!"
+                            : "border-b-transparent! text-muted-foreground/65 hover:text-muted-foreground! hover:bg-sidebar-accent/40!",
                           compact
-                            ? "px-1.5!"
+                            ? "px-2!"
                             : tabs.length === 1
-                              ? "px-2!"
-                              : "ps-2! pe-1!",
+                              ? "px-2.5!"
+                              : "ps-2.5! pe-1.5!",
                           onReorder && "cursor-grab",
                           isDragging && "opacity-40 cursor-grabbing",
                         )}
@@ -318,7 +319,7 @@ export function TabBar({
                         <span
                           className={cn(
                             "flex min-w-0 items-center gap-1.5 truncate",
-                            compact ? "max-w-32" : "max-w-52",
+                            compact ? "max-w-28" : "max-w-48",
                           )}
                         >
                           <TabIcon tab={t} />
@@ -335,10 +336,10 @@ export function TabBar({
                                 if (e.key === "Enter") commitRename();
                                 if (e.key === "Escape") cancelRename();
                               }}
-                              className="h-5 min-w-18 rounded-md border border-border/70 bg-background px-1.5 text-xs text-foreground outline-none"
+                              className="h-5 min-w-16 rounded border border-border/60 bg-background px-1.5 text-[11px] text-foreground outline-none"
                             />
                           ) : (
-                            <span className={cn("truncate", isPreview && "italic")}>
+                            <span className={cn("truncate", isPreview && "italic opacity-75")}>
                               {label}
                             </span>
                           )}
@@ -347,7 +348,7 @@ export function TabBar({
                               aria-label="Unsaved changes"
                               className={cn(
                                 "size-1.5 shrink-0 rounded-full",
-                                t.id === activeId ? "bg-sidebar-primary-foreground/70" : "bg-foreground/70",
+                                t.id === activeId ? "bg-primary/70" : "bg-muted-foreground/50",
                               )}
                             />
                           ) : null}
@@ -357,7 +358,7 @@ export function TabBar({
                             aria-hidden
                             className={cn(
                               "ml-0.5 shrink-0 font-mono text-[9px] leading-none",
-                              t.id === activeId ? "text-sidebar-primary-foreground/40" : "text-muted-foreground/40",
+                              t.id === activeId ? "text-muted-foreground/35" : "text-muted-foreground/25",
                             )}
                           >
                             {MOD_KEY}{tabIndex}
@@ -371,11 +372,11 @@ export function TabBar({
                               e.stopPropagation();
                               onClose(t.id);
                             }}
-                            className="rounded-full p-0.5 opacity-0 transition-opacity hover:bg-accent hover:opacity-100 group-hover:opacity-60"
+                            className="rounded-sm p-0.5 opacity-0 transition-opacity duration-100 hover:bg-accent hover:text-foreground hover:opacity-100 group-hover:opacity-50"
                           >
                             <HugeiconsIcon
                               icon={Cancel01Icon}
-                              size={11}
+                              size={10}
                               strokeWidth={2}
                             />
                           </span>
@@ -450,7 +451,7 @@ export function TabBar({
                   <div
                     key="drop-end"
                     aria-hidden
-                    className="w-0.5 shrink-0 self-stretch rounded-full bg-primary/70 my-0.5"
+                    className="w-px shrink-0 self-stretch bg-primary/60 my-1"
                   />,
                 );
               }
@@ -463,11 +464,11 @@ export function TabBar({
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
-              size="icon"
-              className="size-7 shrink-0 rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground aria-expanded:bg-foreground aria-expanded:text-background"
+              size="icon-sm"
+              className="self-center mx-0.5 shrink-0 rounded-sm text-muted-foreground/50 hover:bg-sidebar-accent/60 hover:text-muted-foreground aria-expanded:bg-sidebar-accent aria-expanded:text-foreground"
               title="New tab"
             >
-              <HugeiconsIcon icon={PlusSignIcon} size={14} strokeWidth={2} />
+              <HugeiconsIcon icon={PlusSignIcon} size={13} strokeWidth={2} />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-max">

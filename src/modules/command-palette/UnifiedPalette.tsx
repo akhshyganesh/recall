@@ -176,7 +176,7 @@ export function UnifiedPalette({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="top-[28%] translate-y-0 w-[620px] sm:max-w-[620px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl p-0 gap-0"
+        className="top-[28%] translate-y-0 w-[620px] sm:max-w-[620px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg p-0 gap-0"
       >
         <DialogHeader className="sr-only">
           <DialogTitle>Palette</DialogTitle>
@@ -210,7 +210,7 @@ export function UnifiedPalette({
             />
           </div>
 
-          <CommandList className="max-h-[340px] py-0.5">
+          <CommandList className="max-h-[340px] pb-0">
             {showEmpty && (
               <CommandEmpty className="py-5 text-xs">
                 {isCommandMode ? "No commands found." : "No files found."}

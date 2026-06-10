@@ -96,8 +96,28 @@ export function ActivityHeatmap({ activity }: { activity: ActivityPoint[] }) {
   const selected = hovered ?? [...weeks.flat()].reverse().find((cell) => cell.count > 0) ?? null;
   const weekdayLabels = ["M", "", "W", "", "F", "", "S"];
 
+  const monthLabels = useMemo(() => {
+    const labels: string[] = [];
+    let lastShown = "";
+    for (let i = 0; i < weeks.length; i++) {
+      const week = weeks[i];
+      const firstOfMonth = week.find((cell) => dayOfMonth(cell.date) <= DAYS_PER_WEEK);
+      const labelDate = i === 0 ? week[0].date : firstOfMonth?.date;
+      if (labelDate) {
+        const label = monthLabel(labelDate);
+        if (label !== lastShown) {
+          lastShown = label;
+          labels.push(label);
+          continue;
+        }
+      }
+      labels.push("");
+    }
+    return labels;
+  }, [weeks]);
+
   return (
-    <div className="rounded-md border border-border/45 bg-background/55 p-2.5">
+    <div className="rounded-md border border-border/40 bg-card p-2.5">
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="text-[11.5px] font-semibold text-foreground">Activity</span>
         <span className="text-[10.5px] text-muted-foreground">{activeDays} active days</span>
@@ -107,18 +127,14 @@ export function ActivityHeatmap({ activity }: { activity: ActivityPoint[] }) {
         style={{ gridTemplateColumns: `1rem repeat(${WEEK_COUNT}, minmax(0, 1fr))` }}
       >
         <span aria-hidden />
-        {weeks.map((week, weekIndex) => {
-          const firstOfMonth = week.find((cell) => dayOfMonth(cell.date) <= DAYS_PER_WEEK);
-          const showLabel = weekIndex === 0 || !!firstOfMonth;
-          return (
+        {weeks.map((_week, weekIndex) => (
             <span
               key={`month-${weekIndex}`}
               className="h-3 overflow-visible whitespace-nowrap text-[9px] leading-3 text-muted-foreground"
             >
-              {showLabel ? monthLabel(firstOfMonth?.date ?? week[0].date) : ""}
+              {monthLabels[weekIndex]}
             </span>
-          );
-        })}
+          ))}
         {Array.from({ length: DAYS_PER_WEEK }).map((_, dayIndex) => (
           <div key={`row-${dayIndex}`} className="contents">
             <span className="h-3 text-[8.5px] leading-3 text-muted-foreground/80">

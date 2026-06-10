@@ -1,8 +1,11 @@
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import type { RecallExtension } from "../types";
+import { useScopedStorageKey, useWorkspacePath } from "../WorkspaceContext";
+import { PanelShell } from "./PanelShell";
 
-const STORAGE_KEY = "recall.todo.v1";
+const BASE_KEY = "recall.todo.v1";
+const EXT_ID = "recall.todo";
 
 interface TodoItem {
   id: string;
@@ -10,24 +13,26 @@ interface TodoItem {
   done: boolean;
 }
 
-function loadItems(): TodoItem[] {
+function loadItems(key: string): TodoItem[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     return raw ? (JSON.parse(raw) as TodoItem[]) : [];
   } catch {
     return [];
   }
 }
 
-function persist(items: TodoItem[]) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); } catch {}
+function persistItems(key: string, items: TodoItem[]) {
+  try { localStorage.setItem(key, JSON.stringify(items)); } catch {}
 }
 
 function TodoPanel() {
-  const [items, setItems] = useState<TodoItem[]>(loadItems);
+  const workspacePath = useWorkspacePath();
+  const storageKey = useScopedStorageKey(BASE_KEY, EXT_ID, workspacePath);
+  const [items, setItems] = useState<TodoItem[]>(() => loadItems(storageKey));
   const [input, setInput] = useState("");
 
-  const update = (next: TodoItem[]) => { setItems(next); persist(next); };
+  const update = (next: TodoItem[]) => { setItems(next); persistItems(storageKey, next); };
 
   const add = () => {
     const text = input.trim();
@@ -40,20 +45,20 @@ function TodoPanel() {
     update(items.map((i) => (i.id === id ? { ...i, done: !i.done } : i)));
 
   const remove = (id: string) => update(items.filter((i) => i.id !== id));
-
   const clearDone = () => update(items.filter((i) => !i.done));
+
+  const onScopeChange = (scope: "global" | "workspace") => {
+    const newKey = scope === "workspace" && workspacePath
+      ? storageKey
+      : BASE_KEY;
+    setItems(loadItems(newKey));
+  };
 
   const pending = items.filter((i) => !i.done);
   const done = items.filter((i) => i.done);
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="border-b border-border/30 px-3 py-2">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
-          Todo
-        </span>
-      </div>
-
+    <PanelShell extensionId={EXT_ID} title="Todo" onScopeChange={onScopeChange}>
       {/* Input */}
       <div className="border-b border-border/30 px-2.5 py-2">
         <div className="flex gap-1.5">
@@ -82,7 +87,7 @@ function TodoPanel() {
       </div>
 
       {/* List */}
-      <div className="min-h-0 flex-1 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar">
         {items.length === 0 ? (
           <div className="flex flex-col items-center gap-1.5 px-4 py-10 text-center">
             <TodoIcon className="text-muted-foreground/20" />
@@ -120,7 +125,7 @@ function TodoPanel() {
           )}
         </div>
       )}
-    </div>
+    </PanelShell>
   );
 }
 
@@ -188,7 +193,7 @@ const TodoRailIcon = () => (
 );
 
 export const todoExtension: RecallExtension = {
-  id: "recall.todo",
+  id: EXT_ID,
   name: "Todo",
   version: "1.0.0",
   description: "A persistent task checklist in the sidebar.",

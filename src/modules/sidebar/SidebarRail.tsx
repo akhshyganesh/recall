@@ -12,7 +12,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import type { ReactNode } from "react";
 import type { SidebarViewId } from "./types";
 
-export const SIDEBAR_RAIL_HEIGHT = 34;
+export const SIDEBAR_RAIL_HEIGHT = 28;
 
 type CoreRailItem = {
   kind: "core";
@@ -82,7 +82,7 @@ export function SidebarRail({
   return (
     <div
       style={{ height: SIDEBAR_RAIL_HEIGHT }}
-      className="flex shrink-0 items-center gap-0.5 border-t border-border bg-sidebar px-1.5"
+      className="flex shrink-0 items-stretch border-t border-border/60 bg-sidebar px-1"
     >
       {items.map((item) => {
         const isActive = item.id === activeView;
@@ -94,22 +94,22 @@ export function SidebarRail({
             aria-pressed={isActive}
             onClick={() => onSelectView(item.id)}
             className={cn(
-              "flex cursor-pointer items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold outline-none transition-colors duration-150",
+              "relative flex cursor-pointer items-center gap-1.5 border-t-2 px-2.5 text-[11px] font-medium outline-none transition-colors duration-100",
               "focus-visible:ring-2 focus-visible:ring-ring/40",
               isActive
-                ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground/70 hover:text-muted-foreground hover:bg-sidebar-accent/60",
             )}
           >
             {item.kind === "core" ? (
               <HugeiconsIcon
                 icon={item.icon}
-                size={13}
-                strokeWidth={isActive ? 2 : 1.75}
-                className="shrink-0 transition-[stroke-width] duration-150"
+                size={12}
+                strokeWidth={isActive ? 2.25 : 1.75}
+                className="shrink-0 transition-[stroke-width] duration-100"
               />
             ) : (
-              <span className="flex h-[13px] w-[13px] shrink-0 items-center justify-center">
+              <span className="flex h-3 w-3 shrink-0 items-center justify-center">
                 {item.icon}
               </span>
             )}
@@ -117,26 +117,26 @@ export function SidebarRail({
           </button>
         );
       })}
-
-      <div className="ml-auto flex items-center gap-0.5">
+      <div className="ml-auto flex items-stretch">
         {showStatusInfo && (
           <button
             type="button"
             onClick={onOpenSourceControl}
             disabled={!onOpenSourceControl}
             className={cn(
-              "flex items-center gap-2 rounded px-2 py-1 text-[11px] text-muted-foreground outline-none transition-colors duration-150",
+              "flex items-center gap-2 border-t-2 border-transparent px-2.5 text-[10.5px] text-muted-foreground/60 outline-none transition-colors duration-100",
+              "font-mono tracking-tight",
               "focus-visible:ring-2 focus-visible:ring-ring/40",
               onOpenSourceControl
-                ? "cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                ? "cursor-pointer hover:bg-sidebar-accent/60 hover:text-muted-foreground"
                 : "cursor-default",
             )}
           >
             {hasCwd && (
-              <span className="flex max-w-[14rem] items-center gap-1 truncate">
+              <span className="flex max-w-[12rem] items-center gap-1 truncate">
                 <HugeiconsIcon
                   icon={Folder01Icon}
-                  size={12}
+                  size={11}
                   strokeWidth={1.75}
                   className="shrink-0"
                 />
@@ -147,16 +147,16 @@ export function SidebarRail({
               <span className="flex items-center gap-1">
                 <HugeiconsIcon
                   icon={GitBranchIcon}
-                  size={12}
+                  size={11}
                   strokeWidth={1.75}
                   className="shrink-0"
                 />
                 <span>{branchLabel}</span>
                 {stagedCount > 0 && (
-                  <span className="text-[10px] text-amber-500">{stagedCount}+</span>
+                  <span className="text-[9.5px] text-primary/80">{stagedCount}+</span>
                 )}
                 {unstagedCount > 0 && (
-                  <span className="text-[10px] text-muted-foreground/60">{unstagedCount}~</span>
+                  <span className="text-[9.5px] text-muted-foreground/50">{unstagedCount}~</span>
                 )}
               </span>
             )}
@@ -170,18 +170,18 @@ export function SidebarRail({
             aria-pressed={settingsOpen}
             onClick={onToggleSettings}
             className={cn(
-              "flex cursor-pointer items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium outline-none transition-colors duration-150",
+              "relative flex cursor-pointer items-center gap-1.5 border-t-2 px-2.5 text-[11px] font-medium outline-none transition-colors duration-100",
               "focus-visible:ring-2 focus-visible:ring-ring/40",
               settingsOpen
-                ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground/70 hover:text-muted-foreground hover:bg-sidebar-accent/60",
             )}
           >
             <HugeiconsIcon
               icon={SlidersHorizontalIcon}
-              size={13}
-              strokeWidth={settingsOpen ? 2 : 1.75}
-              className="shrink-0 transition-[stroke-width] duration-150"
+              size={12}
+              strokeWidth={settingsOpen ? 2.25 : 1.75}
+              className="shrink-0 transition-[stroke-width] duration-100"
             />
             <span>Settings</span>
           </button>
