@@ -1,5 +1,3 @@
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { KEY_SEP } from "@/lib/platform";
 import type { EditorPaneHandle } from "@/modules/editor";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -40,15 +38,12 @@ export type SearchInlineHandle = { focus: () => void };
 
 type Props = {
   target: SearchTarget;
-  /** When true, collapse to an icon-only button until the user opens it. */
   compact?: boolean;
 };
 
 export const SearchInline = forwardRef<SearchInlineHandle, Props>(
   function SearchInline({ target, compact }, ref) {
     const [q, setQ] = useState("");
-    // In compact mode the field is hidden behind an icon until activated.
-    // In normal mode the field is always present.
     const [openInCompact, setOpenInCompact] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const pendingFocusRef = useRef(false);
@@ -61,24 +56,20 @@ export const SearchInline = forwardRef<SearchInlineHandle, Props>(
 
     const userShortcuts = usePreferencesStore((s) => s.shortcuts);
 
-    const shortcutText = useMemo(() => {
+    const shortcutTokens = useMemo(() => {
       const s = SHORTCUTS.find((s) => s.id === "search.focus");
       if (!s) return "";
       const bindings = userShortcuts["search.focus"] || s.defaultBindings;
       if (!bindings || bindings.length === 0) return "";
-      const tokens = getBindingTokens(bindings[0]);
-      return tokens.join(KEY_SEP);
+      return getBindingTokens(bindings[0]).join(KEY_SEP);
     }, [userShortcuts]);
 
     const baseLabel = target?.kind === "git-history" ? "Git search" : "Search";
 
-    const placeholder = useMemo(() => {
-      return shortcutText ? `${baseLabel} (${shortcutText})` : baseLabel;
-    }, [baseLabel, shortcutText]);
-
-    const tooltipTitle = useMemo(() => {
-      return shortcutText ? `${baseLabel} (${shortcutText})` : baseLabel;
-    }, [baseLabel, shortcutText]);
+    const placeholder = useMemo(
+      () => (shortcutTokens ? `${baseLabel} (${shortcutTokens})` : baseLabel),
+      [baseLabel, shortcutTokens],
+    );
 
     const expanded = !compact || openInCompact;
 
@@ -102,17 +93,13 @@ export const SearchInline = forwardRef<SearchInlineHandle, Props>(
       target.focus();
     }, [target]);
 
-    // Target switched (terminal ↔ editor) or removed → drop highlights.
     useEffect(() => clearTarget, [clearTarget]);
 
     const applyIncremental = (next: string) => {
       if (!target) return;
       if (target.kind === "terminal") {
         if (next) {
-          target.addon.findNext(next, {
-            incremental: true,
-            decorations: TERM_DECORATIONS,
-          });
+          target.addon.findNext(next, { incremental: true, decorations: TERM_DECORATIONS });
         } else {
           target.addon.clearDecorations();
         }
@@ -131,84 +118,89 @@ export const SearchInline = forwardRef<SearchInlineHandle, Props>(
         if (forward) target.handle.findNext();
         else target.handle.findPrevious();
       }
-      // git-history: the list filters live; Enter has no next/prev semantics.
     };
+
+    const collapsedWidth = shortcutTokens ? 132 : 96;
 
     return (
       <div
-        style={{ width: expanded ? 192 : 28 }}
-        className="relative h-7 shrink-0 overflow-hidden transition-[width] duration-200 ease-in-out"
+        style={{ width: expanded ? 220 : compact ? collapsedWidth : 220 }}
+        className="relative h-7 shrink-0 self-center overflow-hidden transition-[width] duration-200 ease-in-out"
       >
         {expanded ? (
-          <div className="absolute inset-0 animate-in fade-in-0 duration-[120ms]">
-            <HugeiconsIcon
-              icon={Search01Icon}
-              size={13}
-              strokeWidth={1.75}
-              className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-muted-foreground"
-            />
-            <Input
-              ref={setInputRef}
-              value={q}
-              placeholder={placeholder}
-              className="h-7 w-full bg-muted/80 pr-7 pl-7 text-[13px]! placeholder:text-muted-foreground/70 focus-visible:ring-0"
-              onChange={(e) => {
-                const next = e.target.value;
-                setQ(next);
-                applyIncremental(next);
-              }}
-              onBlur={() => {
-                if (compact && !q) setOpenInCompact(false);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  findDirection(!e.shiftKey);
-                } else if (e.key === "Escape") {
-                  e.preventDefault();
-                  clearTarget();
-                  setQ("");
-                  if (compact) {
-                    setOpenInCompact(false);
-                  }
-                  restoreTargetFocus();
-                }
-              }}
-            />
-            {q && (
-              <button
-                type="button"
-                onClick={() => {
-                  setQ("");
-                  clearTarget();
-                  inputRef.current?.focus();
+          <div className="absolute inset-0 flex items-center animate-in fade-in-0 duration-[100ms]">
+            <div className="group flex h-full w-full items-center gap-1.5 rounded-full border border-border/50 bg-muted/35 pl-2.5 pr-1.5 transition-colors focus-within:border-primary/40 focus-within:bg-muted/55 focus-within:ring-1 focus-within:ring-primary/15">
+              <HugeiconsIcon
+                icon={Search01Icon}
+                size={12}
+                strokeWidth={1.75}
+                className="shrink-0 text-muted-foreground/55 transition-colors group-focus-within:text-primary/70"
+              />
+              <input
+                ref={setInputRef}
+                value={q}
+                placeholder={placeholder}
+                className="h-full min-w-0 flex-1 bg-transparent text-[12.5px] text-foreground outline-none placeholder:text-muted-foreground/45"
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setQ(next);
+                  applyIncremental(next);
                 }}
-                className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-                aria-label="Clear search"
-              >
-                <HugeiconsIcon
-                  icon={Cancel01Icon}
-                  size={11}
-                  strokeWidth={2}
-                />
-              </button>
-            )}
+                onBlur={() => {
+                  if (compact && !q) setOpenInCompact(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    findDirection(!e.shiftKey);
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    clearTarget();
+                    setQ("");
+                    if (compact) setOpenInCompact(false);
+                    restoreTargetFocus();
+                  }
+                }}
+              />
+              {q && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQ("");
+                    clearTarget();
+                    inputRef.current?.focus();
+                  }}
+                  className="flex size-4 shrink-0 items-center justify-center rounded-full bg-muted-foreground/18 text-muted-foreground/60 transition-colors hover:bg-muted-foreground/28 hover:text-foreground"
+                  aria-label="Clear search"
+                >
+                  <HugeiconsIcon icon={Cancel01Icon} size={9} strokeWidth={2.5} />
+                </button>
+              )}
+            </div>
           </div>
         ) : (
-          <div className="absolute inset-0 flex items-center justify-end animate-in fade-in-0 duration-[120ms]">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7 shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+          <div className="absolute inset-0 flex items-center animate-in fade-in-0 duration-[100ms]">
+            <button
+              type="button"
               onClick={focus}
-              title={tooltipTitle}
+              title={placeholder}
+              className="flex h-full w-full items-center gap-1.5 rounded-full border border-border/45 bg-muted/25 pl-2.5 pr-2 text-muted-foreground/60 transition-colors hover:border-border/65 hover:bg-muted/50 hover:text-muted-foreground"
             >
               <HugeiconsIcon
                 icon={Search01Icon}
-                size={15}
+                size={12}
                 strokeWidth={1.75}
+                className="shrink-0"
               />
-            </Button>
+              <span className="flex-1 truncate text-left text-[12px]">
+                {baseLabel}
+              </span>
+              {shortcutTokens && (
+                <span className="shrink-0 rounded border border-border/40 bg-background/40 px-1 py-px font-mono text-[9.5px] text-muted-foreground/45">
+                  {shortcutTokens}
+                </span>
+              )}
+            </button>
           </div>
         )}
       </div>
