@@ -5,8 +5,7 @@ use std::sync::Mutex;
 
 use crate::modules::sessions::connectors::SUPPORTED_AGENT_SLUGS;
 use crate::modules::sessions::models::{
-    ActivityPoint, DistinctAgent, FileChange, Message, SearchResult, Session, SessionSummary,
-    Stats,
+    ActivityPoint, DistinctAgent, FileChange, Message, SearchResult, Session, SessionSummary, Stats,
 };
 
 const SESSION_PATH_EXPR: &str = "COALESCE(NULLIF(repo_path, ''), NULLIF(workspace, ''))";
