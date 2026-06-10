@@ -1,6 +1,13 @@
 import { cn } from "@/lib/utils";
 import { useExtensionSidebarPanels } from "@/modules/extensions/registry";
-import { FolderOpenIcon, Orbit01Icon, PackageIcon, SlidersHorizontalIcon } from "@hugeicons/core-free-icons";
+import {
+  Folder01Icon,
+  FolderOpenIcon,
+  GitBranchIcon,
+  Orbit01Icon,
+  PackageIcon,
+  SlidersHorizontalIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { ReactNode } from "react";
 import type { SidebarViewId } from "./types";
@@ -28,13 +35,27 @@ type Props = {
   onSelectView: (view: SidebarViewId) => void;
   settingsOpen?: boolean;
   onToggleSettings?: () => void;
+  cwd?: string | null;
+  branchLabel?: string | null;
+  stagedCount?: number;
+  changedCount?: number;
+  onOpenSourceControl?: () => void;
 };
+
+function formatCwd(cwd: string): string {
+  return cwd.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? cwd;
+}
 
 export function SidebarRail({
   activeView,
   onSelectView,
   settingsOpen = false,
   onToggleSettings,
+  cwd,
+  branchLabel,
+  stagedCount = 0,
+  changedCount = 0,
+  onOpenSourceControl,
 }: Props) {
   const extPanels = useExtensionSidebarPanels();
 
@@ -52,6 +73,11 @@ export function SidebarRail({
   }));
 
   const items: RailItem[] = [...coreItems, ...extItems];
+
+  const unstagedCount = Math.max(0, changedCount - stagedCount);
+  const hasGitInfo = !!branchLabel;
+  const hasCwd = !!cwd;
+  const showStatusInfo = hasCwd || hasGitInfo;
 
   return (
     <div
@@ -91,29 +117,76 @@ export function SidebarRail({
           </button>
         );
       })}
-      {onToggleSettings && (
-        <button
-          type="button"
-          aria-label="Settings"
-          aria-pressed={settingsOpen}
-          onClick={onToggleSettings}
-          className={cn(
-            "ml-auto flex cursor-pointer items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium outline-none transition-colors duration-150",
-            "focus-visible:ring-2 focus-visible:ring-ring/40",
-            settingsOpen
-              ? "bg-sidebar-primary text-sidebar-primary-foreground"
-              : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-          )}
-        >
-          <HugeiconsIcon
-            icon={SlidersHorizontalIcon}
-            size={13}
-            strokeWidth={settingsOpen ? 2 : 1.75}
-            className="shrink-0 transition-[stroke-width] duration-150"
-          />
-          <span>Settings</span>
-        </button>
-      )}
+
+      <div className="ml-auto flex items-center gap-0.5">
+        {showStatusInfo && (
+          <button
+            type="button"
+            onClick={onOpenSourceControl}
+            disabled={!onOpenSourceControl}
+            className={cn(
+              "flex items-center gap-2 rounded px-2 py-1 text-[11px] text-muted-foreground outline-none transition-colors duration-150",
+              "focus-visible:ring-2 focus-visible:ring-ring/40",
+              onOpenSourceControl
+                ? "cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                : "cursor-default",
+            )}
+          >
+            {hasCwd && (
+              <span className="flex max-w-[14rem] items-center gap-1 truncate">
+                <HugeiconsIcon
+                  icon={Folder01Icon}
+                  size={12}
+                  strokeWidth={1.75}
+                  className="shrink-0"
+                />
+                <span className="truncate">{formatCwd(cwd!)}</span>
+              </span>
+            )}
+            {hasGitInfo && (
+              <span className="flex items-center gap-1">
+                <HugeiconsIcon
+                  icon={GitBranchIcon}
+                  size={12}
+                  strokeWidth={1.75}
+                  className="shrink-0"
+                />
+                <span>{branchLabel}</span>
+                {stagedCount > 0 && (
+                  <span className="text-[10px] text-amber-500">{stagedCount}+</span>
+                )}
+                {unstagedCount > 0 && (
+                  <span className="text-[10px] text-muted-foreground/60">{unstagedCount}~</span>
+                )}
+              </span>
+            )}
+          </button>
+        )}
+
+        {onToggleSettings && (
+          <button
+            type="button"
+            aria-label="Settings"
+            aria-pressed={settingsOpen}
+            onClick={onToggleSettings}
+            className={cn(
+              "flex cursor-pointer items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium outline-none transition-colors duration-150",
+              "focus-visible:ring-2 focus-visible:ring-ring/40",
+              settingsOpen
+                ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+            )}
+          >
+            <HugeiconsIcon
+              icon={SlidersHorizontalIcon}
+              size={13}
+              strokeWidth={settingsOpen ? 2 : 1.75}
+              className="shrink-0 transition-[stroke-width] duration-150"
+            />
+            <span>Settings</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 }
