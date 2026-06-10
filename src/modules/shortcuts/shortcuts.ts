@@ -31,7 +31,8 @@ export type ShortcutId =
   | "view.zen"
   | "editor.undo"
   | "editor.redo"
-  | "terminal.clear";
+  | "terminal.clear"
+  | "ai.nlCommand";
 
 export type ShortcutGroup =
   | "General"
@@ -75,6 +76,12 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Clear terminal",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, key: "k" }],
+  },
+  {
+    id: "ai.nlCommand",
+    label: "AI: Generate shell command",
+    group: "General",
+    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "k" }],
   },
   {
     id: "tab.new",

@@ -26,7 +26,6 @@ import {
   Orbit01Icon,
   PencilEdit02Icon,
   PlusSignIcon,
-  Settings01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -578,16 +577,6 @@ function TabIcon({ tab }: { tab: Tab }) {
       />
     );
   }
-  if (tab.kind === "settings") {
-    return (
-      <HugeiconsIcon
-        icon={Settings01Icon}
-        size={14}
-        strokeWidth={2}
-        className="shrink-0"
-      />
-    );
-  }
   return (
     <HugeiconsIcon
       icon={ComputerTerminal02Icon}
@@ -607,7 +596,6 @@ function labelFor(t: Tab, terminalLabels: Map<number, string>): string {
   if (t.kind === "git-diff") return t.title;
   if (t.kind === "git-history") return t.title;
   if (t.kind === "git-commit-file") return t.title;
-  if (t.kind === "settings") return t.title;
   return terminalLabels.get(t.id) ?? t.title;
 }
 

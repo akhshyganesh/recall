@@ -1,94 +1,258 @@
 import { cn } from "@/lib/utils";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type { RecallExtension } from "../types";
-import { useScopedStorageKey, useWorkspacePath } from "../WorkspaceContext";
-import { PanelShell } from "./PanelShell";
 
-const BASE_KEY = "recall.scratch-pad.v1";
 const EXT_ID = "recall.scratch-pad";
+const CATALOG_KEY = "recall.scratch-pad.catalog.v1";
+const CANVAS_KIND_PREFIX = `${EXT_ID}:canvas:`;
 
-function ScratchPadPanel() {
-  const workspacePath = useWorkspacePath();
-  const storageKey = useScopedStorageKey(BASE_KEY, EXT_ID, workspacePath);
-  const [text, setText] = useState(() => {
-    try { return localStorage.getItem(storageKey) ?? ""; } catch { return ""; }
-  });
-  const saveRef = useRef(0);
+type CatalogEntry = { id: string; name: string; updatedAt: number };
 
-  const onChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    setText(val);
-    if (saveRef.current) clearTimeout(saveRef.current);
-    saveRef.current = window.setTimeout(() => {
-      try { localStorage.setItem(storageKey, val); } catch {}
-    }, 400);
-  };
+// ── Catalog helpers ───────────────────────────────────────────────────────────
 
-  const onScopeChange = (scope: "global" | "workspace") => {
-    const newKey = scope === "workspace" && workspacePath ? storageKey : BASE_KEY;
-    try { setText(localStorage.getItem(newKey) ?? ""); } catch { setText(""); }
-  };
+function loadCatalog(): CatalogEntry[] {
+  try {
+    return JSON.parse(localStorage.getItem(CATALOG_KEY) ?? "[]") as CatalogEntry[];
+  } catch {
+    return [];
+  }
+}
 
-  useEffect(() => () => { if (saveRef.current) clearTimeout(saveRef.current); }, []);
+function saveCatalog(catalog: CatalogEntry[]): void {
+  try {
+    localStorage.setItem(CATALOG_KEY, JSON.stringify(catalog));
+  } catch {}
+}
 
-  const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
-  const lineCount = text ? text.split("\n").length : 1;
+function deleteCanvasData(id: string): void {
+  try {
+    localStorage.removeItem(`recall.scratch-pad.data.${id}`);
+  } catch {}
+}
 
-  return (
-    <PanelShell extensionId={EXT_ID} title="Scratch Pad" onScopeChange={onScopeChange}>
-      <textarea
-        value={text}
-        onChange={onChange}
-        placeholder="Start typing…"
-        spellCheck={false}
-        className={cn(
-          "min-h-0 flex-1 resize-none bg-transparent px-3 py-2.5 h-full w-full",
-          "font-mono text-[12px] leading-relaxed text-foreground",
-          "placeholder:text-muted-foreground/30 outline-none",
-        )}
-      />
-      <div className="flex items-center justify-between border-t border-border/30 px-3 py-1.5">
-        <span className="font-mono text-[10px] text-muted-foreground/35">
-          {wordCount}w · {lineCount}L
-        </span>
-        {text && (
-          <button
-            type="button"
-            onClick={() => {
-              setText("");
-              try { localStorage.setItem(storageKey, ""); } catch {}
-            }}
-            className="text-[10px] text-muted-foreground/35 transition-colors hover:text-destructive/70"
-          >
-            Clear
-          </button>
-        )}
-      </div>
-    </PanelShell>
+function openCanvas(id: string, name: string): void {
+  window.dispatchEvent(
+    new CustomEvent("recall:open-extension-tab", {
+      detail: { kind: `${CANVAS_KIND_PREFIX}${id}`, title: name, data: { id } },
+    }),
   );
 }
 
-const ScratchPadIcon = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
-    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-    <polyline points="14 2 14 8 20 8"/>
-    <line x1="8" y1="13" x2="16" y2="13"/>
-    <line x1="8" y1="17" x2="16" y2="17"/>
-    <line x1="8" y1="9" x2="10" y2="9"/>
+// ── Launcher (sidebar panel) ──────────────────────────────────────────────────
+
+function ScratchPadLauncher() {
+  const [catalog, setCatalog] = useState<CatalogEntry[]>(loadCatalog);
+  const [newName, setNewName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+
+  const handleCreate = () => {
+    const name = newName.trim() || "Untitled Canvas";
+    const id = crypto.randomUUID();
+    const entry: CatalogEntry = { id, name, updatedAt: Date.now() };
+    const next = [entry, ...catalog];
+    saveCatalog(next);
+    setCatalog(next);
+    setCreating(false);
+    setNewName("");
+    openCanvas(id, name);
+  };
+
+  const handleRename = (id: string) => {
+    const trimmed = renameValue.trim();
+    if (!trimmed) return;
+    const next = catalog.map((e) =>
+      e.id === id ? { ...e, name: trimmed, updatedAt: Date.now() } : e,
+    );
+    saveCatalog(next);
+    setCatalog(next);
+    setRenaming(null);
+  };
+
+  const handleDelete = (id: string) => {
+    const next = catalog.filter((e) => e.id !== id);
+    saveCatalog(next);
+    setCatalog(next);
+    deleteCanvasData(id);
+  };
+
+  return (
+    <div className="flex h-full flex-col overflow-hidden">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/40 px-3 py-2">
+        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+          Canvases
+        </span>
+        <button
+          type="button"
+          onClick={() => { setCreating(true); setNewName(""); }}
+          className="rounded-sm px-1.5 py-0.5 text-[10.5px] font-medium text-primary/80 transition-colors hover:bg-primary/10 hover:text-primary"
+        >
+          + New
+        </button>
+      </div>
+
+      {creating && (
+        <div className="shrink-0 border-b border-border/40 px-3 py-2">
+          <input
+            autoFocus
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleCreate();
+              if (e.key === "Escape") setCreating(false);
+            }}
+            placeholder="Canvas name…"
+            className="w-full rounded bg-background/60 border border-border/50 px-2 py-1 text-[11.5px] text-foreground outline-none focus:border-primary/50"
+          />
+          <div className="mt-1.5 flex gap-1.5">
+            <button
+              type="button"
+              onClick={handleCreate}
+              className="flex-1 rounded bg-primary/15 px-2 py-1 text-[10.5px] font-medium text-primary transition-colors hover:bg-primary/25"
+            >
+              Create
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreating(false)}
+              className="rounded px-2 py-1 text-[10.5px] text-muted-foreground/60 transition-colors hover:text-foreground"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="min-h-0 flex-1 overflow-y-auto py-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {catalog.length === 0 && !creating && (
+          <div className="px-3 pt-4 text-center text-[11px] text-muted-foreground/50">
+            No canvases yet.
+            <br />
+            Click <span className="text-primary/70">+ New</span> to create one.
+          </div>
+        )}
+        {catalog.map((entry) => (
+          <div
+            key={entry.id}
+            className="group flex items-center gap-1 px-2 py-0.5 hover:bg-accent/50"
+          >
+            {renaming === entry.id ? (
+              <input
+                autoFocus
+                type="text"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleRename(entry.id);
+                  if (e.key === "Escape") setRenaming(null);
+                }}
+                onBlur={() => handleRename(entry.id)}
+                className="min-w-0 flex-1 rounded bg-background/60 border border-primary/40 px-1.5 py-0.5 text-[11.5px] text-foreground outline-none"
+              />
+            ) : (
+              <button
+                type="button"
+                onDoubleClick={() => { setRenaming(entry.id); setRenameValue(entry.name); }}
+                onClick={() => openCanvas(entry.id, entry.name)}
+                className="min-w-0 flex-1 truncate rounded-sm px-1 py-1 text-left text-[11.5px] text-foreground/80 hover:text-foreground"
+                title={`${entry.name}\nDouble-click to rename`}
+              >
+                <CanvasIcon />
+                <span className="ml-1.5">{entry.name}</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => handleDelete(entry.id)}
+              className={cn(
+                "shrink-0 rounded px-1 py-0.5 text-[9.5px] text-muted-foreground/30 transition-colors hover:text-destructive/70",
+                renaming !== entry.id ? "opacity-0 group-hover:opacity-100" : "hidden",
+              )}
+              title="Delete canvas"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Canvas tab ────────────────────────────────────────────────────────────────
+
+import ScratchPadCanvas from "./ScratchPadCanvas";
+
+function ScratchPadTab({ canvasId }: { canvasId: string }) {
+  return (
+    <div style={{ position: "absolute", inset: 0 }}>
+      <ScratchPadCanvas storageKey={`recall.scratch-pad.data.${canvasId}`} />
+    </div>
+  );
+}
+
+// ── Icons ─────────────────────────────────────────────────────────────────────
+
+const PadIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" style={{ display: "inline", verticalAlign: "middle" }}>
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <circle cx="8.5" cy="8.5" r="1.5" />
+    <path d="m21 15-5-5L5 21" />
   </svg>
 );
+
+const CanvasIcon = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" style={{ display: "inline", verticalAlign: "middle", opacity: 0.5 }}>
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <circle cx="8.5" cy="8.5" r="1.5" />
+    <path d="m21 15-5-5L5 21" />
+  </svg>
+);
+
+// ── Extension manifest ────────────────────────────────────────────────────────
 
 export const scratchPadExtension: RecallExtension = {
   id: EXT_ID,
   name: "Scratch Pad",
-  version: "1.0.0",
-  description: "A persistent notepad in the sidebar. Auto-saves locally.",
+  version: "2.0.0",
+  description: "Named Excalidraw canvases, each in their own tab.",
   activate(api) {
-    return api.registerSidebarPanel({
+    const cleanupPanel = api.registerSidebarPanel({
       id: "panel",
       label: "Scratch Pad",
-      icon: <ScratchPadIcon />,
-      render: () => <ScratchPadPanel />,
+      icon: <PadIcon />,
+      render: () => <ScratchPadLauncher />,
     });
+
+    const cleanupTab = api.registerTabRenderer("canvas", {
+      canHandle: (kind) => kind.startsWith(CANVAS_KIND_PREFIX),
+      render: ({ data }) => {
+        const canvasId = (data as { id: string }).id;
+        return <ScratchPadTab canvasId={canvasId} />;
+      },
+    });
+
+    const cleanupCmd = api.registerCommand("open", {
+      label: "Open Scratch Pad",
+      handler: () => {
+        const catalog = loadCatalog();
+        if (catalog.length > 0) {
+          openCanvas(catalog[0].id, catalog[0].name);
+        } else {
+          const id = crypto.randomUUID();
+          const entry: CatalogEntry = { id, name: "Untitled Canvas", updatedAt: Date.now() };
+          saveCatalog([entry]);
+          openCanvas(id, entry.name);
+        }
+      },
+    });
+
+    return () => {
+      cleanupPanel();
+      cleanupTab();
+      cleanupCmd();
+    };
   },
 };

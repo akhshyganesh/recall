@@ -42,11 +42,7 @@ import {
   PreviewStack,
   type PreviewPaneHandle,
 } from "@/modules/preview";
-import {
-  listenSettingsTabRequests,
-  settingsTabTitle,
-  type SettingsTab,
-} from "@/modules/settings/openSettingsWindow";
+import { listenSettingsTabRequests } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setSessionsMcpEnabled as applySessionsMcpEnabled } from "@/modules/sessions/api";
 import { SessionHistoryStack, SessionSidebar } from "@/modules/sessions";
@@ -58,6 +54,7 @@ import {
 import {
   loadInstalledExtensions,
   useExtensionRegistry,
+  useExtensionBackgrounds,
 } from "@/modules/extensions";
 import { WorkspaceContext } from "@/modules/extensions/WorkspaceContext";
 import { SidebarRail, type SidebarViewId } from "@/modules/sidebar";
@@ -70,6 +67,7 @@ import {
   useWorkspaceCwd,
   type MediaKind,
   type Tab,
+  type ExtensionTab,
 } from "@/modules/tabs";
 import {
   disposeSession,
@@ -80,6 +78,7 @@ import {
   TerminalStack,
   type TerminalPaneHandle,
 } from "@/modules/terminal";
+import { findTabRenderer } from "@/modules/extensions/registry";
 import { ThemeProvider } from "@/modules/theme";
 import { UpdaterDialog } from "@/modules/updater";
 import {
@@ -92,7 +91,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { homeDir } from "@tauri-apps/api/path";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type { SearchAddon } from "@xterm/addon-search";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { PanelImperativeHandle } from "react-resizable-panels";
 import { SettingsPanel } from "@/settings/SettingsApp";
@@ -106,6 +105,10 @@ import {
   type RightPanelState,
   type RightPanelViewId,
 } from "./rightPanelState";
+
+function ExtensionBackground({ render }: { render: () => React.ReactNode }) {
+  return <>{render()}</>;
+}
 
 function ExtensionSidebarPanel({ viewId, workspacePath }: { viewId: string; workspacePath: string | null }) {
   const panel = useExtensionRegistry((s) => s.sidebarPanels.find((p) => p.id === viewId));
@@ -192,7 +195,14 @@ function readSidebarWidth(): number {
 function readSidebarView(): SidebarViewId {
   try {
     const stored = window.localStorage.getItem(SIDEBAR_VIEW_STORAGE_KEY);
-    if (stored === "sessions" || stored === "explorer" || stored === "extensions") return stored;
+    if (
+      stored === "sessions" ||
+      stored === "explorer" ||
+      stored === "extensions" ||
+      // Allow any stored extension panel ID (namespaced as "<extId>:<panelId>")
+      (stored && stored.includes(":"))
+    )
+      return stored;
   } catch {
     // ignore
   }
@@ -236,10 +246,10 @@ export default function App() {
     activeId,
     setActiveId,
     newTab,
-    openSettingsTab,
     openFileTab,
     openMediaTab,
     openSessionTab,
+    openExtensionTab,
     pinTab,
     newPreviewTab,
     newMarkdownTab,
@@ -296,7 +306,7 @@ export default function App() {
     createRightPanelState(readRightPanelView()),
   );
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
-  const [settingsDialogTab, setSettingsDialogTab] = useState<SettingsTab>("general");
+  const [settingsDialogTab, setSettingsDialogTab] = useState<string>("general");
   const persistSidebarView = useCallback((view: SidebarViewId) => {
     setSidebarViewState(view);
     try {
@@ -328,7 +338,7 @@ export default function App() {
     },
     [persistSidebarView, sidebarView],
   );
-  const openSidebarSettings = useCallback((tab: SettingsTab = "general") => {
+  const openSidebarSettings = useCallback((tab: string = "general") => {
     setSettingsDialogTab(tab);
     setSettingsDialogOpen(true);
   }, []);
@@ -494,6 +504,34 @@ export default function App() {
   // Load community extensions once on startup (non-blocking; failures are isolated).
   useEffect(() => { void loadInstalledExtensions(); }, []);
 
+  const extensionBackgrounds = useExtensionBackgrounds();
+
+  // Handle extension tab open requests.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { kind, title, data } = (e as CustomEvent<{ kind: string; title: string; data?: unknown }>).detail;
+      openExtensionTab(kind, title, data);
+    };
+    window.addEventListener("recall:open-extension-tab", handler);
+    return () => window.removeEventListener("recall:open-extension-tab", handler);
+  }, [openExtensionTab]);
+
+  // Handle terminal text insertion from extensions (e.g. NL shell overlay).
+  const activeLeafIdRef = useRef<number | null>(null);
+  useEffect(() => { activeLeafIdRef.current = activeLeafId; }, [activeLeafId]);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { text } = (e as CustomEvent<{ text: string }>).detail;
+      const leafId = activeLeafIdRef.current;
+      if (leafId !== null) {
+        terminalRefs.current.get(leafId)?.write(text);
+        terminalRefs.current.get(leafId)?.focus();
+      }
+    };
+    window.addEventListener("recall:terminal:insert-text", handler);
+    return () => window.removeEventListener("recall:terminal:insert-text", handler);
+  }, []);
+
   const [newEditorOpen, setNewEditorOpen] = useState(false);
   const initPrefs = usePreferencesStore((s) => s.init);
   const prefsHydrated = usePreferencesStore((s) => s.hydrated);
@@ -509,10 +547,9 @@ export default function App() {
     });
   }, [prefsHydrated, sessionsMcpEnabled]);
 
-  useEffect(() => listenSettingsTabRequests(openSettingsTab), [openSettingsTab]);
+  useEffect(() => listenSettingsTabRequests(openSidebarSettings), [openSidebarSettings]);
 
   const activeTab = tabs.find((t) => t.id === activeId);
-  const activeSettingsTab = activeTab?.kind === "settings" ? activeTab : null;
   const isTerminalTab = activeTab?.kind === "terminal";
   const isEditorTab = activeTab?.kind === "editor";
   const isPreviewTab = activeTab?.kind === "preview";
@@ -522,7 +559,9 @@ export default function App() {
   const isGitDiffTab =
     activeTab?.kind === "git-diff" || activeTab?.kind === "git-commit-file";
   const isGitHistoryTab = activeTab?.kind === "git-history";
-  const isSettingsTab = activeSettingsTab !== null;
+  const isExtensionTab =
+    !!activeTab &&
+    !["terminal","editor","preview","markdown","media","session","git-diff","git-commit-file","git-history"].includes(activeTab.kind);
 
   useEffect(() => {
     type FileWrittenPayload = { path: string; source?: string };
@@ -1031,6 +1070,14 @@ export default function App() {
       "terminal.clear": () => {
         if (activeLeafId !== null) terminalRefs.current.get(activeLeafId)?.clear();
       },
+      "ai.nlCommand": () => {
+        if (activeTab?.kind !== "terminal") return;
+        window.dispatchEvent(
+          new CustomEvent("recall:nl-command:trigger", {
+            detail: { cwd: activeTerminalLeafCwd },
+          }),
+        );
+      },
       "file.quickOpen": () => { setPaletteInitialQuery(""); setPaletteOpen(true); },
       "command.palette": () => { setPaletteInitialQuery(">"); setPaletteOpen(true); },
       "sidebar.toggle": toggleSidebar,
@@ -1045,6 +1092,8 @@ export default function App() {
     [
       activeId,
       activeLeafId,
+      activeTab,
+      activeTerminalLeafCwd,
       cycleTab,
       handleCloseTabOrPane,
       openNewTab,
@@ -1068,6 +1117,9 @@ export default function App() {
         return activeTab?.kind !== "editor";
       }
       if (id === "terminal.clear") {
+        return activeTab?.kind !== "terminal";
+      }
+      if (id === "ai.nlCommand") {
         return activeTab?.kind !== "terminal";
       }
       return false;
@@ -1257,7 +1309,6 @@ export default function App() {
     const isSecSession = secTab.kind === "session";
     const isSecGitDiff = secTab.kind === "git-diff" || secTab.kind === "git-commit-file";
     const isSecGitHistory = secTab.kind === "git-history";
-    const isSecSettings = secTab.kind === "settings";
     return (
       <div className="relative h-full min-h-0">
         <div className={cn("absolute inset-0", !isSecEditor && "invisible pointer-events-none")} aria-hidden={!isSecEditor}>
@@ -1280,11 +1331,6 @@ export default function App() {
         </div>
         <div className={cn("absolute inset-0", !isSecGitHistory && "invisible pointer-events-none")} aria-hidden={!isSecGitHistory}>
           <GitHistoryStack tabs={tabs} activeId={secTab.id} onOpenCommitFile={openCommitFileDiffTab} onSearchHandle={() => {}} />
-        </div>
-        <div className={cn("absolute inset-0", !isSecSettings && "invisible pointer-events-none")} aria-hidden={!isSecSettings}>
-          {isSecSettings && secTab.kind === "settings" ? (
-            <SettingsPanel embedded activeTab={secTab.settingsTab} onActiveTabChange={() => {}} />
-          ) : null}
         </div>
       </div>
     );
@@ -1388,26 +1434,20 @@ export default function App() {
           onSearchHandle={setGitHistoryHandle}
         />
       </div>
-      <div
-        className={cn(
-          "absolute inset-0",
-          !isSettingsTab && "invisible pointer-events-none",
-        )}
-        aria-hidden={!isSettingsTab}
-      >
-        {activeSettingsTab ? (
-          <SettingsPanel
-            embedded
-            activeTab={activeSettingsTab.settingsTab}
-            onActiveTabChange={(settingsTab) =>
-              updateTab(activeSettingsTab.id, {
-                title: settingsTabTitle(settingsTab),
-                settingsTab,
-              })
-            }
-          />
-        ) : null}
-      </div>
+      {/* Extension tabs */}
+      {isExtensionTab && activeTab && (() => {
+        const renderer = findTabRenderer(activeTab.kind);
+        if (!renderer) return (
+          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
+            No renderer for {activeTab.kind}
+          </div>
+        );
+        return (
+          <div className="absolute inset-0">
+            {renderer.render({ tabId: activeTab.id, data: (activeTab as ExtensionTab).data })}
+          </div>
+        );
+      })()}
     </div>
   );
 
@@ -1473,7 +1513,7 @@ export default function App() {
                 }}
               >
                 <div className="flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground">
-                  <div className="min-h-0 flex-1">
+                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                     {sidebarView === "sessions" ? (
                       <SessionSidebar
                         contextPath={sourceControlContextPath}
@@ -1773,6 +1813,10 @@ export default function App() {
           </AlertDialog>
         </div>
       </TooltipProvider>
+      {/* Extension background components (portals, overlays, global listeners) */}
+      {extensionBackgrounds.map((bg) => (
+        <ExtensionBackground key={bg.id} render={bg.render} />
+      ))}
     </ThemeProvider>
   );
 

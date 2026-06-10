@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  settingsTabTitle,
-  type SettingsTab as SettingsSection,
-} from "@/modules/settings/openSettingsWindow";
-import {
   findLeafCwd,
   hasLeaf,
   leafIds,
@@ -105,11 +101,16 @@ export type GitCommitFileDiffTab = {
   originalPath: string | null;
 };
 
-export type SettingsSurfaceTab = {
+export type ExtensionTab = {
   id: number;
-  kind: "settings";
+  /**
+   * Qualified kind, always namespaced with a colon: e.g. "recall.scratch-pad:canvas".
+   * The template literal type ensures TypeScript narrowing never confuses this
+   * with core tab kinds ("terminal", "editor", etc.) which have no colon.
+   */
+  kind: `${string}:${string}`;
   title: string;
-  settingsTab: SettingsSection;
+  data?: unknown;
 };
 
 export type Tab =
@@ -122,7 +123,7 @@ export type Tab =
   | GitDiffTab
   | GitHistoryTab
   | GitCommitFileDiffTab
-  | SettingsSurfaceTab;
+  | ExtensionTab;
 
 export type TabPatch = Partial<{
   title: string;
@@ -130,7 +131,6 @@ export type TabPatch = Partial<{
   path: string;
   dirty: boolean;
   url: string;
-  settingsTab: SettingsSection;
 }>;
 
 function basename(path: string): string {
@@ -186,33 +186,6 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     ]);
     setActiveId(tabId);
     return tabId;
-  }, []);
-
-  const openSettingsTab = useCallback((settingsTab: SettingsSection = "general") => {
-    let targetId: number | null = null;
-    const title = settingsTabTitle(settingsTab);
-    setTabs((curr) => {
-      const existing = curr.find((t) => t.kind === "settings");
-      if (existing) {
-        targetId = existing.id;
-        return curr.map((t) =>
-          t.id === existing.id ? { ...t, title, settingsTab } : t,
-        );
-      }
-      const tabId = nextIdRef.current++;
-      targetId = tabId;
-      return [
-        ...curr,
-        {
-          id: tabId,
-          kind: "settings",
-          title,
-          settingsTab,
-        },
-      ];
-    });
-    if (targetId !== null) setActiveId(targetId);
-    return targetId;
   }, []);
 
   /**
@@ -675,15 +648,6 @@ export function useTabs(initial?: Partial<TerminalTab>) {
             ...(patch.title !== undefined && { title: patch.title }),
           };
         }
-        if (x.kind === "settings") {
-          return {
-            ...x,
-            ...(patch.title !== undefined && { title: patch.title }),
-            ...(patch.settingsTab !== undefined && {
-              settingsTab: patch.settingsTab,
-            }),
-          };
-        }
         // editor tab: auto-promote from preview the moment the file becomes dirty.
         const autoPin =
           patch.dirty === true && (x as EditorTab).preview
@@ -888,15 +852,35 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     });
   }, []);
 
+  const openExtensionTab = useCallback(
+    (kind: string, title: string, data?: unknown) => {
+      const extKind = kind as `${string}:${string}`;
+      let targetId: number | null = null;
+      setTabs((curr) => {
+        const existing = curr.find((t) => t.kind === extKind);
+        if (existing) {
+          targetId = existing.id;
+          return curr;
+        }
+        const id = nextIdRef.current++;
+        targetId = id;
+        return [...curr, { id, kind: extKind, title, data } satisfies ExtensionTab];
+      });
+      if (targetId !== null) setActiveId(targetId);
+      return targetId as number | null;
+    },
+    [],
+  );
+
   return {
     tabs,
     activeId,
     setActiveId,
     newTab,
-    openSettingsTab,
     openFileTab,
     openMediaTab,
     openSessionTab,
+    openExtensionTab,
     pinTab,
     newPreviewTab,
     newMarkdownTab,

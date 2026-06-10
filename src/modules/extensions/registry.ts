@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type {
+  BackgroundDef,
   CommandDef,
   FileHandlerDef,
   RecallAPI,
@@ -22,6 +23,7 @@ interface ExtensionRegistryState {
   commands: Array<{ id: string; def: CommandDef }>;
   settingsSections: SettingsSectionDef[];
   fileHandlers: FileHandlerDef[];
+  backgrounds: BackgroundDef[];
 
   _addSidebarPanel: (def: SidebarPanelDef) => void;
   _removeSidebarPanel: (id: string) => void;
@@ -33,6 +35,8 @@ interface ExtensionRegistryState {
   _removeSettingsSection: (id: string) => void;
   _addFileHandler: (def: FileHandlerDef) => void;
   _removeFileHandler: (def: FileHandlerDef) => void;
+  _addBackground: (def: BackgroundDef) => void;
+  _removeBackground: (id: string) => void;
   _registerExtensionId: (id: string) => void;
   _unregisterExtensionId: (id: string) => void;
 }
@@ -44,6 +48,7 @@ export const useExtensionRegistry = create<ExtensionRegistryState>((set) => ({
   commands: [],
   settingsSections: [],
   fileHandlers: [],
+  backgrounds: [],
 
   _addSidebarPanel: (def) =>
     set((s) => ({ sidebarPanels: [...s.sidebarPanels, def] })),
@@ -69,6 +74,11 @@ export const useExtensionRegistry = create<ExtensionRegistryState>((set) => ({
     set((s) => ({ fileHandlers: [...s.fileHandlers, def] })),
   _removeFileHandler: (def) =>
     set((s) => ({ fileHandlers: s.fileHandlers.filter((h) => h !== def) })),
+
+  _addBackground: (def) =>
+    set((s) => ({ backgrounds: [...s.backgrounds, def] })),
+  _removeBackground: (id) =>
+    set((s) => ({ backgrounds: s.backgrounds.filter((b) => b.id !== id) })),
 
   _registerExtensionId: (id) =>
     set((s) => ({ extensionIds: [...s.extensionIds, id] })),
@@ -110,6 +120,21 @@ function buildApiForExtension(extId: string): RecallAPI {
     registerFileHandler(def) {
       store._addFileHandler(def);
       return () => useExtensionRegistry.getState()._removeFileHandler(def);
+    },
+
+    registerBackground(id, render) {
+      const qualifiedId = `${extId}:${id}`;
+      store._addBackground({ id: qualifiedId, render });
+      return () => useExtensionRegistry.getState()._removeBackground(qualifiedId);
+    },
+
+    openTab(kind, title, data) {
+      const qualifiedKind = `${extId}:${kind}`;
+      window.dispatchEvent(
+        new CustomEvent("recall:open-extension-tab", {
+          detail: { kind: qualifiedKind, title, data },
+        }),
+      );
     },
   };
 }
@@ -158,12 +183,16 @@ export function useExtensionCommands(): Array<{ id: string; def: CommandDef }> {
   return useExtensionRegistry((s) => s.commands);
 }
 
+export function useExtensionBackgrounds(): BackgroundDef[] {
+  return useExtensionRegistry((s) => s.backgrounds);
+}
+
 // ── Non-hook helpers ──────────────────────────────────────────────────────────
 
 export function findTabRenderer(kind: string): TabRendererDef | undefined {
   return useExtensionRegistry
     .getState()
-    .tabRenderers.find((r) => r.kind === kind)?.def;
+    .tabRenderers.find((r) => r.def.canHandle(kind))?.def;
 }
 
 export function resolveExtensionTabKind(path: string): string | null {

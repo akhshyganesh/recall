@@ -1,4 +1,5 @@
 import { detectMonoFontFamily } from "@/lib/fonts";
+import { IS_MAC } from "@/lib/platform";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { FitAddon } from "@xterm/addon-fit";
@@ -101,13 +102,13 @@ function buildXtermTheme(): ITheme {
   const muted = resolveCssVar("muted-foreground") ?? "#9a9a9a";
   const primary = resolveCssVar("primary") ?? fg;
   const destructive = resolveCssVar("destructive") ?? "#d16969";
-  const sel = resolveCssVar("accent") ?? card;
   return {
     background: bg,
     foreground: fg,
     cursor: primary,
     cursorAccent: bg,
-    selectionBackground: sel,
+    selectionBackground: primary + "40",
+    selectionInactiveBackground: primary + "25",
     black: card,
     red: destructive,
     green: primary,
@@ -208,6 +209,18 @@ function createSlot(): Slot {
     if (isShiftEnter(event)) {
       event.preventDefault();
       if (event.type === "keydown") bridge.writeToPty("\x1b\r");
+      return false;
+    }
+    if (
+      !IS_MAC &&
+      event.ctrlKey &&
+      event.shiftKey &&
+      event.key === "C" &&
+      event.type === "keydown"
+    ) {
+      event.preventDefault();
+      const selection = term.getSelection();
+      if (selection) navigator.clipboard.writeText(selection).catch(() => {});
       return false;
     }
     return true;

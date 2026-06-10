@@ -4,6 +4,7 @@ import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import type { SettingsTab } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useExtensionSettingsSections } from "@/modules/extensions/registry";
 import {
   Cancel01Icon,
   ComputerTerminal02Icon,
@@ -23,7 +24,7 @@ import { SessionsMcpSection } from "./sections/McpSection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
 import { TerminalSection } from "./sections/TerminalSection";
 
-const TABS: {
+const CORE_TABS: {
   id: SettingsTab;
   label: string;
   icon: Parameters<typeof HugeiconsIcon>[0]["icon"];
@@ -37,25 +38,26 @@ const TABS: {
   { id: "about", label: "About", icon: InformationCircleIcon, component: AboutSection },
 ];
 
-const VALID_TABS = new Set<string>(TABS.map((t) => t.id));
+const VALID_CORE_TABS = new Set<string>(CORE_TABS.map((t) => t.id));
 
-function normalizeTab(tab: string | null | undefined): SettingsTab {
+function normalizeTab(tab: string | null | undefined, extSectionIds: Set<string>): string {
   if (tab === "sessions-mcp" || tab === "mcp" || tab === "integrations") return "integrations";
   if (tab === "startup" || tab === "extensions") return "general";
-  if (tab && VALID_TABS.has(tab)) return tab as SettingsTab;
+  if (tab && VALID_CORE_TABS.has(tab)) return tab;
+  if (tab && extSectionIds.has(tab)) return tab;
   return "general";
 }
 
-function readInitialTab(): SettingsTab {
+function readInitialTab(): string {
   if (typeof window === "undefined") return "general";
   const url = new URL(window.location.href);
-  return normalizeTab(url.searchParams.get("tab"));
+  return url.searchParams.get("tab") ?? "general";
 }
 
 type SettingsPanelProps = {
-  initialTab?: SettingsTab;
-  activeTab?: SettingsTab;
-  onActiveTabChange?: (tab: SettingsTab) => void;
+  initialTab?: string;
+  activeTab?: string;
+  onActiveTabChange?: (tab: string) => void;
   embedded?: boolean;
   onClose?: () => void;
 };
@@ -67,13 +69,13 @@ export function SettingsPanel({
   embedded = false,
   onClose,
 }: SettingsPanelProps) {
-  const [internalActive, setInternalActive] = useState<SettingsTab>(initialTab);
+  const [internalActive, setInternalActive] = useState<string>(initialTab);
   const init = usePreferencesStore((s) => s.init);
+  const extSections = useExtensionSettingsSections();
+  const extSectionIds = new Set(extSections.map((s) => s.id));
   const active = activeTab ?? internalActive;
-  const activeTabMeta = TABS.find((t) => t.id === active) ?? TABS[0];
-  const ActiveSection = activeTabMeta.component;
 
-  const setActive = (tab: SettingsTab) => {
+  const setActive = (tab: string) => {
     if (activeTab === undefined) setInternalActive(tab);
     onActiveTabChange?.(tab);
   };
@@ -90,12 +92,17 @@ export function SettingsPanel({
     if (embedded) return;
     const unlistenPromise = getCurrentWebviewWindow().listen<string>(
       "recall:settings-tab",
-      (e) => setActive(normalizeTab(e.payload)),
+      (e) => setActive(normalizeTab(e.payload, extSectionIds)),
     );
     return () => {
       void unlistenPromise.then((un) => un());
     };
-  }, [embedded]);
+  }, [embedded, extSectionIds]);
+
+  // Find active content
+  const coreTab = CORE_TABS.find((t) => t.id === active);
+  const extSection = extSections.find((s) => s.id === active);
+  const ActiveContent = coreTab ? coreTab.component : null;
 
   return (
     <div
@@ -136,7 +143,7 @@ export function SettingsPanel({
       {/* Tab strip + close */}
       <div className="flex shrink-0 items-stretch border-b border-border/30">
         <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {TABS.map((tab) => {
+          {CORE_TABS.map((tab) => {
             const isActive = active === tab.id;
             return (
               <button
@@ -163,6 +170,28 @@ export function SettingsPanel({
               </button>
             );
           })}
+          {extSections.map((sec) => {
+            const isActive = active === sec.id;
+            return (
+              <button
+                key={sec.id}
+                type="button"
+                onClick={() => setActive(sec.id)}
+                className={cn(
+                  "relative flex shrink-0 items-center gap-1.5 px-3 py-2.5 text-[11.5px] font-medium transition-colors",
+                  isActive
+                    ? "text-foreground"
+                    : "text-muted-foreground/70 hover:text-foreground",
+                )}
+              >
+                {isActive && (
+                  <span className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary" />
+                )}
+                <span className="flex shrink-0 items-center">{sec.icon}</span>
+                <span>{sec.label}</span>
+              </button>
+            );
+          })}
         </div>
         {onClose && (
           <button
@@ -178,12 +207,16 @@ export function SettingsPanel({
 
       {/* Section content */}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <ActiveSection />
+        {ActiveContent ? (
+          <ActiveContent />
+        ) : extSection ? (
+          <>{extSection.render()}</>
+        ) : null}
       </div>
     </div>
   );
 }
 
 export function SettingsApp() {
-  return <SettingsPanel initialTab={readInitialTab()} />;
+  return <SettingsPanel initialTab={normalizeTab(readInitialTab(), new Set())} />;
 }
