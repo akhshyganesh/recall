@@ -9,8 +9,8 @@ You are the build agent for the **Recall** monorepo. Given a task, you implement
 
 ## Context
 
-- Monorepo: Tauri 2 (Rust backend) + React 19 (frontend), npm workspaces
-- CI checks: `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test --lib`, `npm run typecheck`, `npm run build`, ts-rs type sync
+- Stack: Tauri 2 (Rust backend) + React 19 (frontend), pnpm workspaces
+- CI checks: `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test --lib`, `pnpm run typecheck`, `pnpm run build`, ts-rs type sync
 - All checks must pass before a PR can be merged
 
 ## Workflow
@@ -18,8 +18,8 @@ You are the build agent for the **Recall** monorepo. Given a task, you implement
 ### 1. Implement
 
 - Read relevant files, understand the code, then make changes.
-- **Rust changes**: run `cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --all`, then `cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings`, then `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --lib`. Fix any issues.
-- **Frontend changes**: run `npm run typecheck`. Fix any issues.
+- **Rust changes**: run `cargo fmt --manifest-path src-tauri/Cargo.toml --all`, then `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`, then `cargo test --manifest-path src-tauri/Cargo.toml --lib`. Fix any issues.
+- **Frontend changes**: run `pnpm run typecheck`. Fix any issues.
 - Verify everything compiles cleanly before committing.
 
 ### 2. Branch & PR
