@@ -2,7 +2,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { ThemePref } from "@/modules/settings/store";
-import { setShowHidden, setAutostart } from "@/modules/settings/store";
+import { setShowHidden, setAutostart, setCheckForUpdates } from "@/modules/settings/store";
 import { useTheme } from "@/modules/theme";
 import {
   ComputerIcon,
@@ -110,6 +110,7 @@ export function GeneralSection() {
   const { theme, setTheme } = useTheme();
   const showHidden = usePreferencesStore((s) => s.showHidden);
   const autostart = usePreferencesStore((s) => s.autostart);
+  const checkForUpdates = usePreferencesStore((s) => s.checkForUpdates);
 
   useEffect(() => {
     let alive = true;
@@ -192,6 +193,15 @@ export function GeneralSection() {
           <Switch
             checked={autostart}
             onCheckedChange={(value) => void onToggleAutostart(value)}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Check for updates on launch"
+          description="Look for a new version each time Recall opens."
+        >
+          <Switch
+            checked={checkForUpdates}
+            onCheckedChange={(v) => void setCheckForUpdates(v)}
           />
         </SettingRow>
       </SettingsCard>

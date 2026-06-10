@@ -34,6 +34,7 @@ export type Preferences = {
   theme: ThemePref;
   editorTheme: EditorThemeId;
   autostart: boolean;
+  checkForUpdates: boolean;
   sessionsMcpEnabled: boolean;
   vimMode: boolean;
   showHidden: boolean;
@@ -52,6 +53,7 @@ const STORE_PATH = "recall-settings.json";
 const KEY_THEME = "theme";
 const KEY_EDITOR_THEME = "editorTheme";
 const KEY_AUTOSTART = "autostart";
+const KEY_CHECK_FOR_UPDATES = "checkForUpdates";
 const KEY_SESSIONS_MCP_ENABLED = "sessionsMcpEnabled";
 const KEY_VIM_MODE = "vimMode";
 const KEY_SHOW_HIDDEN = "showHidden";
@@ -84,6 +86,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
   editorTheme: "atomone",
   autostart: false,
+  checkForUpdates: true,
   sessionsMcpEnabled: false,
   vimMode: false,
   showHidden: false,
@@ -122,6 +125,8 @@ export async function loadPreferences(): Promise<Preferences> {
     editorTheme:
       get<EditorThemeId>(KEY_EDITOR_THEME) ?? DEFAULT_PREFERENCES.editorTheme,
     autostart: get<boolean>(KEY_AUTOSTART) ?? DEFAULT_PREFERENCES.autostart,
+    checkForUpdates:
+      get<boolean>(KEY_CHECK_FOR_UPDATES) ?? DEFAULT_PREFERENCES.checkForUpdates,
     sessionsMcpEnabled:
       get<boolean>(KEY_SESSIONS_MCP_ENABLED) ??
       DEFAULT_PREFERENCES.sessionsMcpEnabled,
@@ -164,6 +169,10 @@ export async function setEditorTheme(value: EditorThemeId): Promise<void> {
 
 export async function setAutostart(value: boolean): Promise<void> {
   await writePref(KEY_AUTOSTART, value);
+}
+
+export async function setCheckForUpdates(value: boolean): Promise<void> {
+  await writePref(KEY_CHECK_FOR_UPDATES, value);
 }
 
 export async function setSessionsMcpEnabled(value: boolean): Promise<void> {
@@ -244,6 +253,7 @@ export async function onPreferencesChange(
     [KEY_THEME]: "theme",
     [KEY_EDITOR_THEME]: "editorTheme",
     [KEY_AUTOSTART]: "autostart",
+    [KEY_CHECK_FOR_UPDATES]: "checkForUpdates",
     [KEY_SESSIONS_MCP_ENABLED]: "sessionsMcpEnabled",
     [KEY_VIM_MODE]: "vimMode",
     [KEY_SHOW_HIDDEN]: "showHidden",

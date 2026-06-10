@@ -5,9 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { IS_LINUX } from "@/lib/platform";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 
-const LAST_CHECK_KEY = "recall:updater:last-check";
 const PENDING_RELAUNCH_KEY = "recall:updater:pending-relaunch";
-const CHECK_INTERVAL_MS = 30 * 60 * 1000;
 const GITHUB_LATEST_RELEASE =
   "https://api.github.com/repos/akhshyganesh/recall/releases/latest";
 
@@ -73,11 +71,6 @@ async function checkLinuxRelease(): Promise<ManualUpdateInfo | null> {
   };
 }
 
-interface Options {
-  /** Skip the time-based throttle on automatic startup checks. */
-  manual?: boolean;
-}
-
 interface HookOptions {
   /** When false, the hook does not run an automatic check on mount. */
   autoCheck?: boolean;
@@ -86,6 +79,7 @@ interface HookOptions {
 export function useUpdater({ autoCheck = true }: HookOptions = {}) {
   const [status, setStatus] = useState<UpdaterStatus>({ kind: "idle" });
   const prefsHydrated = usePreferencesStore((s) => s.hydrated);
+  const checkForUpdates = usePreferencesStore((s) => s.checkForUpdates);
 
   const installUpdate = useCallback(async (update: Update) => {
     let total: number | null = null;
@@ -113,31 +107,18 @@ export function useUpdater({ autoCheck = true }: HookOptions = {}) {
     }
   }, []);
 
-  const runCheck = useCallback(async ({ manual }: Options = {}) => {
-    if (!manual) {
-      const last = Number(localStorage.getItem(LAST_CHECK_KEY) ?? 0);
-      if (Date.now() - last < CHECK_INTERVAL_MS) return;
-    }
+  const runCheck = useCallback(async () => {
     setStatus({ kind: "checking" });
     try {
       if (IS_LINUX) {
         const info = await checkLinuxRelease();
-        if (info) {
-          setStatus({ kind: "manual-available", info });
-        } else {
-          localStorage.setItem(LAST_CHECK_KEY, String(Date.now()));
-          setStatus({ kind: "uptodate" });
-        }
+        if (info) setStatus({ kind: "manual-available", info });
+        else setStatus({ kind: "uptodate" });
         return;
       }
       const update = await check();
-      if (update) {
-        localStorage.setItem(LAST_CHECK_KEY, String(Date.now()));
-        setStatus({ kind: "available", update });
-      } else {
-        localStorage.setItem(LAST_CHECK_KEY, String(Date.now()));
-        setStatus({ kind: "uptodate" });
-      }
+      if (update) setStatus({ kind: "available", update });
+      else setStatus({ kind: "uptodate" });
     } catch (err) {
       setStatus({ kind: "error", message: String(err) });
     }
@@ -168,9 +149,9 @@ export function useUpdater({ autoCheck = true }: HookOptions = {}) {
       void relaunch();
       return;
     }
-    if (!autoCheck || !prefsHydrated) return;
+    if (!autoCheck || !prefsHydrated || !checkForUpdates) return;
     void runCheck();
-  }, [autoCheck, prefsHydrated, runCheck]);
+  }, [autoCheck, prefsHydrated, checkForUpdates, runCheck]);
 
   return { status, check: runCheck, install, dismiss, restart, deferRestart };
 }
