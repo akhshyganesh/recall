@@ -1587,6 +1587,7 @@ export default function App() {
             searchTarget={searchTarget}
             searchRef={searchInlineRef}
             onWorkspaceChange={switchWorkspace}
+            onOpenMarkdownPreview={openMarkdownPreview}
             unsplitDropActive={unsplitOverHeader}
           />}
 
