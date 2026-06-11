@@ -1,3 +1,4 @@
+import { AppLogoMark } from "@/components/AppLogoMark";
 import { cn } from "@/lib/utils";
 import { useExtensionPrimarySidebarPanels } from "@/modules/extensions/registry";
 import {
@@ -246,6 +247,15 @@ export function SidebarRail({
 
   const logoAndNav = (
     <>
+      <div className={cn(
+        "flex shrink-0 items-center gap-1.5 px-2.5",
+        sidebarPosition === "left" ? "pr-3.5 border-r border-border/40 mr-1" : "pl-3.5 border-l border-border/40 ml-1 order-last",
+      )}>
+        <AppLogoMark className="size-4" />
+        <span className="text-[11px] font-semibold tracking-wide text-foreground/70 select-none">
+          Recall
+        </span>
+      </div>
       {orderedItems.map((item, index) => {
         const isActive = item.id === activeView;
         const isExt = item.kind === "ext";
