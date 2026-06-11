@@ -78,7 +78,10 @@ import {
   TerminalStack,
   type TerminalPaneHandle,
 } from "@/modules/terminal";
-import { findTabRenderer } from "@/modules/extensions/registry";
+import { findTabRenderer, useExtensionSecondarySidebarPanels } from "@/modules/extensions/registry";
+import type { SidebarPanelDef } from "@/modules/extensions/types";
+import { GitBranchIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { ThemeProvider } from "@/modules/theme";
 import { UpdaterDialog } from "@/modules/updater";
 import {
@@ -97,14 +100,66 @@ import type { PanelImperativeHandle } from "react-resizable-panels";
 import { SettingsPanel } from "@/settings/SettingsApp";
 import { ExtensionsSection } from "@/settings/sections/ExtensionsSection";
 import {
-  closeRightPanel,
-  createRightPanelState,
-  getVisibleRightPanelView,
-  sanitizeRightPanelState,
+  closeSecondarySidebar,
+  createSecondarySidebarState,
+  getVisibleSecondarySidebarView,
+  sanitizeSecondarySidebarState,
   toggleGitContextPanel,
-  type RightPanelState,
-  type RightPanelViewId,
-} from "./rightPanelState";
+  toggleSecondarySidebarPanel,
+  type SecondarySidebarState,
+} from "./secondarySidebarState";
+
+function SecondarySidebarHeader({
+  hasRepo,
+  extPanels,
+  activeView,
+  onSelectTab,
+}: {
+  hasRepo: boolean;
+  extPanels: SidebarPanelDef[];
+  activeView: string;
+  onSelectTab: (id: string) => void;
+}) {
+  const tabs = [
+    ...(hasRepo
+      ? [
+          {
+            id: "git-context",
+            label: "Source Control",
+            icon: (
+              <HugeiconsIcon icon={GitBranchIcon} size={12} strokeWidth={1.75} className="shrink-0" />
+            ),
+          },
+        ]
+      : []),
+    ...extPanels.map((p) => ({ id: p.id, label: p.label, icon: p.icon })),
+  ];
+  if (tabs.length === 0) return null;
+  return (
+    <div className="flex shrink-0 items-stretch border-b border-border/40">
+      {tabs.map((tab) => {
+        const isActive = activeView === tab.id;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => onSelectTab(tab.id)}
+            className={cn(
+              "relative flex shrink-0 items-center gap-1.5 px-3 py-2 text-[11px] font-medium transition-colors",
+              isActive ? "text-foreground" : "text-muted-foreground/60 hover:text-foreground",
+            )}
+          >
+            {isActive && (
+              <span className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary" />
+            )}
+            <span className="flex shrink-0 items-center">{tab.icon}</span>
+            <span>{tab.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function ExtensionBackground({ render }: { render: () => React.ReactNode }) {
   return <>{render()}</>;
@@ -172,6 +227,19 @@ const RIGHT_PANEL_DEFAULT_WIDTH = 380;
 const RIGHT_PANEL_MIN_WIDTH = 240;
 const RIGHT_PANEL_MAX_WIDTH = 600;
 const RIGHT_PANEL_WIDTH_STORAGE_KEY = "recall.right-panel.width";
+const SIDEBAR_POSITION_STORAGE_KEY = "recall.sidebar.position";
+
+type SidebarPosition = "left" | "right";
+
+function readSidebarPosition(): SidebarPosition {
+  try {
+    const stored = window.localStorage.getItem(SIDEBAR_POSITION_STORAGE_KEY);
+    if (stored === "left" || stored === "right") return stored;
+  } catch {
+    // ignore
+  }
+  return "left";
+}
 
 function clampSidebarWidth(width: number): number {
   return Math.min(
@@ -209,31 +277,31 @@ function readSidebarView(): SidebarViewId {
   return "explorer";
 }
 
-function clampRightPanelWidth(width: number): number {
+function clampSecondarySidebarWidth(width: number): number {
   return Math.min(
     RIGHT_PANEL_MAX_WIDTH,
     Math.max(RIGHT_PANEL_MIN_WIDTH, Math.round(width)),
    );
 }
 
-function readRightPanelWidth(): number {
+function readSecondarySidebarWidth(): number {
   try {
     const stored = window.localStorage.getItem(RIGHT_PANEL_WIDTH_STORAGE_KEY);
     const parsed = stored ? Number.parseInt(stored, 10) : NaN;
     return Number.isFinite(parsed)
-       ? clampRightPanelWidth(parsed)
+       ? clampSecondarySidebarWidth(parsed)
        : RIGHT_PANEL_DEFAULT_WIDTH;
    } catch {
     return RIGHT_PANEL_DEFAULT_WIDTH;
    }
 }
 
-export type { RightPanelViewId } from "./rightPanelState";
+export type { SecondarySidebarViewId } from "./secondarySidebarState";
 
-function readRightPanelView(): RightPanelViewId {
+function readSecondarySidebarView(): string {
   try {
     const stored = window.localStorage.getItem("recall.right-panel.view");
-    if (stored === "git-context") return stored;
+    if (stored && stored !== "closed") return stored;
   } catch {
     // ignore
   }
@@ -296,17 +364,37 @@ export default function App() {
   const explorerReturnFocusRef = useRef<HTMLElement | null>(null);
 
   const sidebarRef = useRef<PanelImperativeHandle | null>(null);
-  const rightPanelRef = useRef<PanelImperativeHandle | null>(null);
+  const secondarySidebarRef = useRef<PanelImperativeHandle | null>(null);
   const sidebarWidthRef = useRef(readSidebarWidth());
-  const rightPanelWidthRef = useRef(readRightPanelWidth());
+  const secondarySidebarWidthRef = useRef(readSecondarySidebarWidth());
   const sidebarWidthWriteTimerRef = useRef(0);
-  const rightPanelWidthWriteTimerRef = useRef(0);
+  const secondarySidebarWidthWriteTimerRef = useRef(0);
   const [sidebarView, setSidebarViewState] = useState<SidebarViewId>(readSidebarView);
-  const [rightPanelState, setRightPanelState] = useState<RightPanelState>(() =>
-    createRightPanelState(readRightPanelView()),
+  const [secondarySidebarState, setSecondarySidebarState] = useState<SecondarySidebarState>(() =>
+    createSecondarySidebarState(readSecondarySidebarView()),
   );
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [settingsDialogTab, setSettingsDialogTab] = useState<string>("general");
+  const [sidebarPosition, setSidebarPositionState] = useState<SidebarPosition>(readSidebarPosition);
+  const swapSidebarPosition = useCallback(() => {
+    setSidebarPositionState((prev) => {
+      const next: SidebarPosition = prev === "left" ? "right" : "left";
+      try { window.localStorage.setItem(SIDEBAR_POSITION_STORAGE_KEY, next); } catch {}
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const handler = () => {
+      try {
+        const v = window.localStorage.getItem(SIDEBAR_POSITION_STORAGE_KEY);
+        if (v === "left" || v === "right") setSidebarPositionState(v);
+      } catch {}
+    };
+    window.addEventListener("recall:sidebar-position-changed", handler);
+    return () => window.removeEventListener("recall:sidebar-position-changed", handler);
+  }, []);
+
   const persistSidebarView = useCallback((view: SidebarViewId) => {
     setSidebarViewState(view);
     try {
@@ -362,13 +450,13 @@ export default function App() {
       }
     }, 200);
     }, []);
-  const persistRightPanelWidth = useCallback((next: number) => {
-    rightPanelWidthRef.current = next;
-    if (rightPanelWidthWriteTimerRef.current) {
-      window.clearTimeout(rightPanelWidthWriteTimerRef.current);
+  const persistSecondarySidebarWidth = useCallback((next: number) => {
+    secondarySidebarWidthRef.current = next;
+    if (secondarySidebarWidthWriteTimerRef.current) {
+      window.clearTimeout(secondarySidebarWidthWriteTimerRef.current);
      }
-    rightPanelWidthWriteTimerRef.current = window.setTimeout(() => {
-      rightPanelWidthWriteTimerRef.current = 0;
+    secondarySidebarWidthWriteTimerRef.current = window.setTimeout(() => {
+      secondarySidebarWidthWriteTimerRef.current = 0;
       try {
         window.localStorage.setItem(RIGHT_PANEL_WIDTH_STORAGE_KEY, String(next));
        } catch {
@@ -382,8 +470,8 @@ export default function App() {
       if (sidebarWidthWriteTimerRef.current) {
         window.clearTimeout(sidebarWidthWriteTimerRef.current);
        }
-      if (rightPanelWidthWriteTimerRef.current) {
-        window.clearTimeout(rightPanelWidthWriteTimerRef.current);
+      if (secondarySidebarWidthWriteTimerRef.current) {
+        window.clearTimeout(secondarySidebarWidthWriteTimerRef.current);
        }
      };
    }, []);
@@ -822,8 +910,8 @@ export default function App() {
     return explorerRoot ?? workspaceFallbackPath;
   })();
   const sourceControl = useSourceControl(sourceControlContextPath, true);
-  const rightPanelView = getVisibleRightPanelView(
-    rightPanelState,
+  const secondarySidebarView = getVisibleSecondarySidebarView(
+    secondarySidebarState,
     sourceControl.hasRepo,
   );
   const branchName = sourceControl.status?.isDetached
@@ -849,34 +937,36 @@ export default function App() {
 
   const toggleSourceControl = useCallback(() => {
     if (!sourceControl.hasRepo) return;
-    setRightPanelState((prev) =>
+    setSecondarySidebarState((prev) =>
       toggleGitContextPanel(prev, sourceControl.hasRepo),
     );
   }, [sourceControl.hasRepo]);
 
-  const rightPanelOpen = rightPanelView !== "closed";
+  const secondaryExtPanels = useExtensionSecondarySidebarPanels();
+
+  const secondarySidebarOpen = secondarySidebarView !== "closed";
 
   useEffect(() => {
-    setRightPanelState((prev) =>
-      sanitizeRightPanelState(prev, sourceControl.hasRepo),
+    setSecondarySidebarState((prev) =>
+      sanitizeSecondarySidebarState(prev, sourceControl.hasRepo),
     );
   }, [sourceControl.hasRepo]);
 
   useEffect(() => {
     try {
-      window.localStorage.setItem("recall.right-panel.view", rightPanelView);
+      window.localStorage.setItem("recall.right-panel.view", secondarySidebarView);
     } catch {
       // ignore
     }
-  }, [rightPanelView]);
+  }, [secondarySidebarView]);
 
   useEffect(() => {
     let retryFrame = 0;
     const applyPanelState = (allowRetry: boolean) => {
-      const panel = rightPanelRef.current;
+      const panel = secondarySidebarRef.current;
       if (!panel) return;
       try {
-        if (rightPanelOpen) panel.resize(`${rightPanelWidthRef.current}px`);
+        if (secondarySidebarOpen) panel.resize(`${secondarySidebarWidthRef.current}px`);
         else panel.collapse();
        } catch (error) {
         if (
@@ -887,7 +977,7 @@ export default function App() {
           retryFrame = window.requestAnimationFrame(() => applyPanelState(false));
           return;
          }
-        console.warn("right panel resize skipped:", error);
+        console.warn("secondary sidebar resize skipped:", error);
        }
      };
 
@@ -896,7 +986,7 @@ export default function App() {
       window.cancelAnimationFrame(frame);
       if (retryFrame) window.cancelAnimationFrame(retryFrame);
      };
-   }, [rightPanelOpen, rightPanelView]);
+   }, [secondarySidebarOpen, secondarySidebarView]);
 
 
   const openGitGraphFromContext = useCallback(async () => {
@@ -1081,6 +1171,11 @@ export default function App() {
       "file.quickOpen": () => { setPaletteInitialQuery(""); setPaletteOpen(true); },
       "command.palette": () => { setPaletteInitialQuery(">"); setPaletteOpen(true); },
       "sidebar.toggle": toggleSidebar,
+      "sidebar.sessions": () => cycleSidebarView("sessions"),
+      "sidebar.files": () => cycleSidebarView("explorer"),
+      "sidebar.extensions": () => cycleSidebarView("extensions"),
+      "sidebar.git": toggleSourceControl,
+      "sidebar.position.swap": swapSidebarPosition,
       "explorer.focus": toggleExplorerFocus,
       "view.zoomIn": zoomIn,
       "view.zoomOut": zoomOut,
@@ -1104,6 +1199,8 @@ export default function App() {
       focusNextPaneInTab,
       toggleSourceControl,
       toggleSidebar,
+      swapSidebarPosition,
+      cycleSidebarView,
       toggleExplorerFocus,
       zoomIn,
       zoomOut,
@@ -1494,24 +1591,8 @@ export default function App() {
           />}
 
           <main className="zoom-content flex min-h-0 flex-1 flex-col bg-background">
-            <ResizablePanelGroup
-              id="workspace-layout"
-              orientation="horizontal"
-              className="min-h-0 flex-1"
-              resizeTargetMinimumSize={{ fine: 24, coarse: 36 }}
-            >
-              <ResizablePanel
-                id="sidebar"
-                panelRef={sidebarRef}
-                defaultSize={`${sidebarWidthRef.current}px`}
-                minSize={`${SIDEBAR_MIN_WIDTH}px`}
-                maxSize={`${SIDEBAR_MAX_WIDTH}px`}
-                collapsible
-                collapsedSize={0}
-                onResize={(size) => {
-                  if (size.inPixels > 0) persistSidebarWidth(size.inPixels);
-                }}
-              >
+            {(() => {
+              const sidebarPanelContent = (
                 <div className="flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground">
                   <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                     {sidebarView === "sessions" ? (
@@ -1539,8 +1620,83 @@ export default function App() {
                     )}
                   </div>
                 </div>
-              </ResizablePanel>
-              <ResizableHandle />
+              );
+              const sidebarPanel = (
+                <ResizablePanel
+                  id="sidebar"
+                  panelRef={sidebarRef}
+                  defaultSize={`${sidebarWidthRef.current}px`}
+                  minSize={`${SIDEBAR_MIN_WIDTH}px`}
+                  maxSize={`${SIDEBAR_MAX_WIDTH}px`}
+                  collapsible
+                  collapsedSize={0}
+                  onResize={(size) => {
+                    if (size.inPixels > 0) persistSidebarWidth(size.inPixels);
+                  }}
+                >
+                  {sidebarPanelContent}
+                </ResizablePanel>
+              );
+              const secondaryPanel = (
+                <ResizablePanel
+                 id="right-panel"
+                 panelRef={secondarySidebarRef}
+                 defaultSize={`${secondarySidebarWidthRef.current}px`}
+                 minSize={`${RIGHT_PANEL_MIN_WIDTH}px`}
+                 maxSize={`${RIGHT_PANEL_MAX_WIDTH}px`}
+                 groupResizeBehavior="preserve-pixel-size"
+                 collapsible
+                 collapsedSize={0}
+                 onResize={(size) => {
+                    if (size.inPixels > 0) persistSecondarySidebarWidth(size.inPixels);
+                    else setSecondarySidebarState((prev) => closeSecondarySidebar(prev));
+                 }}
+                >
+                 <div className="flex h-full flex-col bg-card/25">
+                   <SecondarySidebarHeader
+                     hasRepo={sourceControl.hasRepo}
+                     extPanels={secondaryExtPanels}
+                     activeView={secondarySidebarView}
+                     onSelectTab={(id) =>
+                       setSecondarySidebarState((prev) =>
+                         id === prev.view ? closeSecondarySidebar(prev) : { view: id },
+                       )
+                     }
+                   />
+                   <div className="min-h-0 flex-1 overflow-hidden">
+                     {sourceControl.hasRepo && secondarySidebarView === "git-context" && (
+                       <SourceControlPanel
+                         open
+                         sourceControl={sourceControl}
+                         onOpenDiff={openGitDiffTab}
+                         onOpenGitGraph={openGitGraphFromContext}
+                       />
+                     )}
+                     {secondaryExtPanels.map((p) =>
+                       secondarySidebarView === p.id ? (
+                         <WorkspaceContext.Provider
+                           key={p.id}
+                           value={{ workspacePath: activeTerminalLeafCwd ?? explorerRoot ?? null }}
+                         >
+                           {p.render()}
+                         </WorkspaceContext.Provider>
+                       ) : null,
+                     )}
+                   </div>
+                  </div>
+                </ResizablePanel>
+              );
+              return (
+            <ResizablePanelGroup
+              id="workspace-layout"
+              orientation="horizontal"
+              className="min-h-0 flex-1"
+              resizeTargetMinimumSize={{ fine: 24, coarse: 36 }}
+            >
+              {sidebarPosition === "left" && sidebarPanel}
+              {sidebarPosition === "left" && <ResizableHandle />}
+              {sidebarPosition === "right" && secondaryPanel}
+              {sidebarPosition === "right" && secondarySidebarOpen && <ResizableHandle />}
               <ResizablePanel
                 id="workspace"
                 defaultSize="78%"
@@ -1633,33 +1789,13 @@ export default function App() {
                   )}
                 </div>
               </ResizablePanel>
-               {rightPanelOpen && <ResizableHandle />}
-                <ResizablePanel
-                 id="right-panel"
-                 panelRef={rightPanelRef}
-                 defaultSize={`${rightPanelWidthRef.current}px`}
-                 minSize={`${RIGHT_PANEL_MIN_WIDTH}px`}
-                 maxSize={`${RIGHT_PANEL_MAX_WIDTH}px`}
-                 groupResizeBehavior="preserve-pixel-size"
-                 collapsible
-                 collapsedSize={0}
-                 onResize={(size) => {
-                    if (size.inPixels > 0) persistRightPanelWidth(size.inPixels);
-                    else setRightPanelState((prev) => closeRightPanel(prev));
-                      }}
-                >
-                 <div className="flex h-full bg-card/25">
-                   {sourceControl.hasRepo && rightPanelView === "git-context" ? (
-                     <SourceControlPanel
-                       open={rightPanelView === "git-context"}
-                       sourceControl={sourceControl}
-                       onOpenDiff={openGitDiffTab}
-                       onOpenGitGraph={openGitGraphFromContext}
-                     />
-                   ) : null}
-                  </div>
-                </ResizablePanel>
+              {sidebarPosition === "left" && secondarySidebarOpen && <ResizableHandle />}
+              {sidebarPosition === "left" && secondaryPanel}
+              {sidebarPosition === "right" && <ResizableHandle />}
+              {sidebarPosition === "right" && sidebarPanel}
              </ResizablePanelGroup>
+              ); // end IIFE return
+            })()} {/* end IIFE */}
            </main>
 
           {!zenMode && (
@@ -1673,6 +1809,18 @@ export default function App() {
               stagedCount={stagedChangeCount}
               changedCount={changedFileCount}
               onOpenSourceControl={sourceControl.hasRepo ? toggleSourceControl : undefined}
+              sidebarPosition={sidebarPosition}
+              secondaryPanels={secondaryExtPanels}
+              secondaryView={secondarySidebarView}
+              onSelectSecondaryPanel={(id) => {
+                setSecondarySidebarState((prev) => toggleSecondarySidebarPanel(prev, id));
+                const p = secondarySidebarRef.current;
+                if (p) {
+                  const isOpen = secondarySidebarView === id;
+                  if (isOpen) p.collapse();
+                  else if (p.getSize().asPercentage <= 0) p.expand();
+                }
+              }}
             />
           )}
 

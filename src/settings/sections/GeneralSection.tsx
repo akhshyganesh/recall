@@ -2,18 +2,76 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { ThemePref } from "@/modules/settings/store";
-import { setShowHidden, setAutostart, setCheckForUpdates } from "@/modules/settings/store";
+import { setShowHidden, setCheckForUpdates, setZoomLevel } from "@/modules/settings/store";
 import { useTheme } from "@/modules/theme";
 import {
   ComputerIcon,
+  SidebarLeft01Icon,
+  SidebarRight01Icon,
   Moon02Icon,
+  MinusSignIcon,
+  PlusSignIcon,
   Sun03Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { SettingsCard } from "../components/SettingsCard";
 import { SettingRow } from "../components/SettingRow";
+
+const SIDEBAR_POSITION_KEY = "recall.sidebar.position";
+const SIDEBAR_POSITION_EVENT = "recall:sidebar-position-changed";
+
+type SidebarPosition = "left" | "right";
+
+function readSidebarPosition(): SidebarPosition {
+  try {
+    const v = window.localStorage.getItem(SIDEBAR_POSITION_KEY);
+    if (v === "left" || v === "right") return v;
+  } catch {}
+  return "left";
+}
+
+function SidebarPositionToggle() {
+  const [position, setPositionState] = useState<SidebarPosition>(readSidebarPosition);
+
+  useEffect(() => {
+    const handler = () => setPositionState(readSidebarPosition());
+    window.addEventListener(SIDEBAR_POSITION_EVENT, handler);
+    return () => window.removeEventListener(SIDEBAR_POSITION_EVENT, handler);
+  }, []);
+
+  const select = (next: SidebarPosition) => {
+    try { window.localStorage.setItem(SIDEBAR_POSITION_KEY, next); } catch {}
+    window.dispatchEvent(new CustomEvent(SIDEBAR_POSITION_EVENT));
+    setPositionState(next);
+  };
+
+  const OPTIONS: { value: SidebarPosition; label: string; icon: typeof SidebarLeft01Icon }[] = [
+    { value: "left", label: "Left", icon: SidebarLeft01Icon },
+    { value: "right", label: "Right", icon: SidebarRight01Icon },
+  ];
+
+  return (
+    <div className="flex gap-1">
+      {OPTIONS.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => select(o.value)}
+          className={cn(
+            "flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-[11.5px] font-medium transition-all",
+            position === o.value
+              ? "border-foreground/30 bg-foreground/8 text-foreground"
+              : "border-border/40 text-muted-foreground hover:border-border hover:text-foreground",
+          )}
+        >
+          <HugeiconsIcon icon={o.icon} size={13} strokeWidth={position === o.value ? 2 : 1.75} />
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 const APPEARANCE: {
   id: ThemePref;
@@ -26,14 +84,15 @@ const APPEARANCE: {
 ];
 
 const ACCENT_PRESETS: { label: string; hue: number }[] = [
-  { label: "Amber", hue: 55 },
-  { label: "Orange", hue: 30 },
-  { label: "Red", hue: 10 },
-  { label: "Pink", hue: 340 },
+  { label: "Purple", hue: 300 },
   { label: "Violet", hue: 280 },
   { label: "Blue", hue: 220 },
   { label: "Cyan", hue: 190 },
   { label: "Green", hue: 140 },
+  { label: "Amber", hue: 55 },
+  { label: "Orange", hue: 30 },
+  { label: "Red", hue: 10 },
+  { label: "Pink", hue: 340 },
 ];
 
 function AccentColorPicker() {
@@ -106,34 +165,65 @@ function AccentColorPicker() {
   );
 }
 
+const ZOOM_PRESETS = [0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0] as const;
+const ZOOM_STEP = 0.1;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 2.0;
+
+function clampZoom(z: number): number {
+  return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(z * 100) / 100));
+}
+
+function InterfaceScaleControl() {
+  const zoomLevel = usePreferencesStore((s) => s.zoomLevel);
+
+  const adjust = (delta: number) => {
+    void setZoomLevel(clampZoom(zoomLevel + delta));
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => adjust(-ZOOM_STEP)}
+        disabled={zoomLevel <= MIN_ZOOM}
+        className="flex size-6 items-center justify-center rounded border border-border/40 text-muted-foreground transition-colors hover:border-border hover:text-foreground disabled:opacity-40"
+      >
+        <HugeiconsIcon icon={MinusSignIcon} size={11} strokeWidth={2} />
+      </button>
+      <div className="flex gap-1">
+        {ZOOM_PRESETS.map((z) => (
+          <button
+            key={z}
+            type="button"
+            onClick={() => void setZoomLevel(z)}
+            className={cn(
+              "rounded px-1.5 py-0.5 font-mono text-[10.5px] transition-colors",
+              Math.abs(zoomLevel - z) < 0.01
+                ? "bg-primary/15 text-primary font-semibold"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {Math.round(z * 100)}%
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={() => adjust(ZOOM_STEP)}
+        disabled={zoomLevel >= MAX_ZOOM}
+        className="flex size-6 items-center justify-center rounded border border-border/40 text-muted-foreground transition-colors hover:border-border hover:text-foreground disabled:opacity-40"
+      >
+        <HugeiconsIcon icon={PlusSignIcon} size={11} strokeWidth={2} />
+      </button>
+    </div>
+  );
+}
+
 export function GeneralSection() {
   const { theme, setTheme } = useTheme();
   const showHidden = usePreferencesStore((s) => s.showHidden);
-  const autostart = usePreferencesStore((s) => s.autostart);
   const checkForUpdates = usePreferencesStore((s) => s.checkForUpdates);
-
-  useEffect(() => {
-    let alive = true;
-    void isEnabled()
-      .then((on) => {
-        if (!alive) return;
-        if (on !== usePreferencesStore.getState().autostart) {
-          void setAutostart(on);
-        }
-      })
-      .catch(() => undefined);
-    return () => { alive = false; };
-  }, []);
-
-  const onToggleAutostart = async (next: boolean) => {
-    try {
-      if (next) await enable();
-      else await disable();
-      await setAutostart(next);
-    } catch (error) {
-      console.error("autostart toggle failed", error);
-    }
-  };
 
   return (
     <div className="flex flex-col">
@@ -171,6 +261,19 @@ export function GeneralSection() {
             <AccentColorPicker />
           </div>
         </SettingRow>
+        <SettingRow
+          title="Sidebar position"
+          description="Which side the file explorer and sessions panel appears on."
+        >
+          <SidebarPositionToggle />
+        </SettingRow>
+        <SettingRow
+          title="Interface scale"
+          description="Scales the UI including the sidebar, status bar, and editor. Also adjustable with ⌘+ / ⌘−."
+          className="flex-col items-start gap-2"
+        >
+          <InterfaceScaleControl />
+        </SettingRow>
       </SettingsCard>
 
       <SettingsCard title="Files">
@@ -186,15 +289,6 @@ export function GeneralSection() {
       </SettingsCard>
 
       <SettingsCard title="Startup">
-        <SettingRow
-          title="Launch at login"
-          description="Open Recall automatically when you sign in."
-        >
-          <Switch
-            checked={autostart}
-            onCheckedChange={(value) => void onToggleAutostart(value)}
-          />
-        </SettingRow>
         <SettingRow
           title="Check for updates on launch"
           description="Look for a new version each time Recall opens."

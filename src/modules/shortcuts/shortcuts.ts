@@ -28,6 +28,11 @@ export type ShortcutId =
   | "shortcuts.open"
   | "settings.open"
   | "sidebar.toggle"
+  | "sidebar.sessions"
+  | "sidebar.files"
+  | "sidebar.extensions"
+  | "sidebar.git"
+  | "sidebar.position.swap"
   | "view.zen"
   | "editor.undo"
   | "editor.redo"
@@ -40,6 +45,7 @@ export type ShortcutGroup =
   | "Panes"
   | "Search"
   | "View"
+  | "Navigation"
   | "Editor";
 
 export type KeyBinding = {
@@ -186,6 +192,36 @@ export const SHORTCUTS: Shortcut[] = [
     defaultBindings: [{ [MOD_PROP]: true, key: "b" }],
   },
   {
+    id: "sidebar.sessions",
+    label: "Go to Sessions",
+    group: "Navigation",
+    defaultBindings: [],
+  },
+  {
+    id: "sidebar.files",
+    label: "Go to Files",
+    group: "Navigation",
+    defaultBindings: [],
+  },
+  {
+    id: "sidebar.extensions",
+    label: "Go to Extensions",
+    group: "Navigation",
+    defaultBindings: [],
+  },
+  {
+    id: "sidebar.git",
+    label: "Open Git sidebar",
+    group: "Navigation",
+    defaultBindings: [],
+  },
+  {
+    id: "sidebar.position.swap",
+    label: "Swap sidebar position (left ↔ right)",
+    group: "Navigation",
+    defaultBindings: [],
+  },
+  {
     id: "explorer.focus",
     label: "Toggle file explorer focus",
     group: "View",
@@ -240,6 +276,7 @@ export const SHORTCUTS: Shortcut[] = [
 
 export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   "General",
+  "Navigation",
   "Tabs",
   "Panes",
   "View",

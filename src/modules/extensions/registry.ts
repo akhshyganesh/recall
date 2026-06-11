@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
 import type {
   BackgroundDef,
   CommandDef,
@@ -173,6 +174,14 @@ export function unloadExtension(id: string): void {
 
 export function useExtensionSidebarPanels(): SidebarPanelDef[] {
   return useExtensionRegistry((s) => s.sidebarPanels);
+}
+
+export function useExtensionPrimarySidebarPanels(): SidebarPanelDef[] {
+  return useExtensionRegistry(useShallow((s) => s.sidebarPanels.filter((p) => !p.sidebar || p.sidebar === "primary")));
+}
+
+export function useExtensionSecondarySidebarPanels(): SidebarPanelDef[] {
+  return useExtensionRegistry(useShallow((s) => s.sidebarPanels.filter((p) => p.sidebar === "secondary")));
 }
 
 export function useExtensionSettingsSections(): SettingsSectionDef[] {

@@ -33,7 +33,6 @@ export const EDITOR_THEME_LABELS: Record<EditorThemeId, string> = {
 export type Preferences = {
   theme: ThemePref;
   editorTheme: EditorThemeId;
-  autostart: boolean;
   checkForUpdates: boolean;
   sessionsMcpEnabled: boolean;
   vimMode: boolean;
@@ -54,7 +53,6 @@ export type Preferences = {
 const STORE_PATH = "recall-settings.json";
 const KEY_THEME = "theme";
 const KEY_EDITOR_THEME = "editorTheme";
-const KEY_AUTOSTART = "autostart";
 const KEY_CHECK_FOR_UPDATES = "checkForUpdates";
 const KEY_SESSIONS_MCP_ENABLED = "sessionsMcpEnabled";
 const KEY_VIM_MODE = "vimMode";
@@ -94,7 +92,6 @@ const IS_LINUX =
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
   editorTheme: "atomone",
-  autostart: false,
   checkForUpdates: true,
   sessionsMcpEnabled: false,
   vimMode: false,
@@ -106,7 +103,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalScrollback: TERMINAL_SCROLLBACK_DEFAULT,
   zoomLevel: 1.0,
   shortcuts: {} as Record<ShortcutId, KeyBinding[]>,
-  accentHue: 55,
+  accentHue: 300,
   openRouterApiKey: "",
 };
 
@@ -134,7 +131,6 @@ export async function loadPreferences(): Promise<Preferences> {
     theme: get<ThemePref>(KEY_THEME) ?? DEFAULT_PREFERENCES.theme,
     editorTheme:
       get<EditorThemeId>(KEY_EDITOR_THEME) ?? DEFAULT_PREFERENCES.editorTheme,
-    autostart: get<boolean>(KEY_AUTOSTART) ?? DEFAULT_PREFERENCES.autostart,
     checkForUpdates:
       get<boolean>(KEY_CHECK_FOR_UPDATES) ?? DEFAULT_PREFERENCES.checkForUpdates,
     sessionsMcpEnabled:
@@ -176,10 +172,6 @@ export async function setTheme(value: ThemePref): Promise<void> {
 
 export async function setEditorTheme(value: EditorThemeId): Promise<void> {
   await writePref(KEY_EDITOR_THEME, value);
-}
-
-export async function setAutostart(value: boolean): Promise<void> {
-  await writePref(KEY_AUTOSTART, value);
 }
 
 export async function setCheckForUpdates(value: boolean): Promise<void> {
@@ -253,6 +245,26 @@ export async function setShortcuts(
   await store.save();
 }
 
+export async function importPreferences(prefs: Partial<Preferences>): Promise<void> {
+  const writes: Promise<void>[] = [];
+  if (prefs.theme !== undefined) writes.push(writePref(KEY_THEME, prefs.theme));
+  if (prefs.editorTheme !== undefined) writes.push(writePref(KEY_EDITOR_THEME, prefs.editorTheme));
+  if (prefs.checkForUpdates !== undefined) writes.push(writePref(KEY_CHECK_FOR_UPDATES, prefs.checkForUpdates));
+  if (prefs.sessionsMcpEnabled !== undefined) writes.push(writePref(KEY_SESSIONS_MCP_ENABLED, prefs.sessionsMcpEnabled));
+  if (prefs.vimMode !== undefined) writes.push(writePref(KEY_VIM_MODE, prefs.vimMode));
+  if (prefs.showHidden !== undefined) writes.push(writePref(KEY_SHOW_HIDDEN, prefs.showHidden));
+  if (prefs.terminalWebglEnabled !== undefined) writes.push(writePref(KEY_TERMINAL_WEBGL_ENABLED, prefs.terminalWebglEnabled));
+  if (prefs.terminalFontFamily !== undefined) writes.push(writePref(KEY_TERMINAL_FONT_FAMILY, prefs.terminalFontFamily));
+  if (prefs.terminalLetterSpacing !== undefined) writes.push(writePref(KEY_TERMINAL_LETTER_SPACING, prefs.terminalLetterSpacing));
+  if (prefs.terminalFontSize !== undefined) writes.push(writePref(KEY_TERMINAL_FONT_SIZE, prefs.terminalFontSize));
+  if (prefs.terminalScrollback !== undefined) writes.push(writePref(KEY_TERMINAL_SCROLLBACK, prefs.terminalScrollback));
+  if (prefs.zoomLevel !== undefined) writes.push(writePref(KEY_ZOOM_LEVEL, prefs.zoomLevel));
+  if (prefs.accentHue !== undefined) writes.push(writePref(KEY_ACCENT_HUE, prefs.accentHue));
+  if (prefs.openRouterApiKey !== undefined) writes.push(writePref(KEY_OPEN_ROUTER_API_KEY, prefs.openRouterApiKey));
+  if (prefs.shortcuts !== undefined) writes.push(writePref(KEY_SHORTCUTS, prefs.shortcuts));
+  await Promise.all(writes);
+}
+
 export async function resetShortcuts(): Promise<void> {
   await store.set(KEY_SHORTCUTS, DEFAULT_PREFERENCES.shortcuts);
   await store.save();
@@ -267,7 +279,6 @@ export async function onPreferencesChange(
   const map: Record<string, PrefKey> = {
     [KEY_THEME]: "theme",
     [KEY_EDITOR_THEME]: "editorTheme",
-    [KEY_AUTOSTART]: "autostart",
     [KEY_CHECK_FOR_UPDATES]: "checkForUpdates",
     [KEY_SESSIONS_MCP_ENABLED]: "sessionsMcpEnabled",
     [KEY_VIM_MODE]: "vimMode",
