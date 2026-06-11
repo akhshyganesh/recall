@@ -6,7 +6,7 @@ import { WorkspaceEnvSelector } from "@/modules/statusbar/WorkspaceEnvSelector";
 import type { Tab } from "@/modules/tabs";
 import { TabBar } from "@/modules/tabs";
 import type { WorkspaceEnv } from "@/modules/workspace";
-import { SidebarLeftIcon } from "@hugeicons/core-free-icons";
+import { FileViewIcon, SidebarLeftIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import {
@@ -14,6 +14,10 @@ import {
   type SearchInlineHandle,
   type SearchTarget,
 } from "./SearchInline";
+
+function isMarkdownPath(path: string): boolean {
+  return /\.(md|markdown|mdx)$/i.test(path);
+}
 
 type Props = {
   tabs: Tab[];
@@ -37,6 +41,7 @@ type Props = {
   searchTarget: SearchTarget;
   searchRef: RefObject<SearchInlineHandle | null>;
   onWorkspaceChange: (env: WorkspaceEnv) => void;
+  onOpenMarkdownPreview?: (path: string) => void;
   /** True while the user is dragging a split tab back toward the tab bar. */
   unsplitDropActive?: boolean;
 };
@@ -64,10 +69,19 @@ export function Header({
   searchTarget,
   searchRef,
   onWorkspaceChange,
+  onOpenMarkdownPreview,
   unsplitDropActive,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(false);
+
+  const activeTab = tabs.find((t) => t.id === activeId);
+  const markdownPreviewPath =
+    onOpenMarkdownPreview &&
+    activeTab?.kind === "editor" &&
+    isMarkdownPath(activeTab.path)
+      ? activeTab.path
+      : null;
 
   useEffect(() => {
     const el = rootRef.current;
@@ -139,6 +153,19 @@ export function Header({
           </div>
         </div>
 
+        {markdownPreviewPath && (
+          <div className="flex items-center px-1">
+            <Button
+              onClick={() => onOpenMarkdownPreview!(markdownPreviewPath)}
+              title="Open Markdown preview"
+              variant="ghost"
+              size="icon-sm"
+              className="size-7 shrink-0 rounded-sm text-muted-foreground/60 hover:bg-sidebar-accent/60 hover:text-foreground"
+            >
+              <HugeiconsIcon icon={FileViewIcon} size={16} strokeWidth={1.75} />
+            </Button>
+          </div>
+        )}
         <SearchInline ref={searchRef} target={searchTarget} compact={compact} />
 
         {USE_CUSTOM_WINDOW_CONTROLS && (
