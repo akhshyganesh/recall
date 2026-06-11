@@ -100,14 +100,14 @@ import type { PanelImperativeHandle } from "react-resizable-panels";
 import { SettingsPanel } from "@/settings/SettingsApp";
 import { ExtensionsSection } from "@/settings/sections/ExtensionsSection";
 import {
-  closeRightPanel,
-  createRightPanelState,
-  getVisibleRightPanelView,
-  sanitizeRightPanelState,
+  closeSecondarySidebar,
+  createSecondarySidebarState,
+  getVisibleSecondarySidebarView,
+  sanitizeSecondarySidebarState,
   toggleGitContextPanel,
   toggleSecondarySidebarPanel,
-  type RightPanelState,
-} from "./rightPanelState";
+  type SecondarySidebarState,
+} from "./secondarySidebarState";
 
 function SecondarySidebarHeader({
   hasRepo,
@@ -277,28 +277,28 @@ function readSidebarView(): SidebarViewId {
   return "explorer";
 }
 
-function clampRightPanelWidth(width: number): number {
+function clampSecondarySidebarWidth(width: number): number {
   return Math.min(
     RIGHT_PANEL_MAX_WIDTH,
     Math.max(RIGHT_PANEL_MIN_WIDTH, Math.round(width)),
    );
 }
 
-function readRightPanelWidth(): number {
+function readSecondarySidebarWidth(): number {
   try {
     const stored = window.localStorage.getItem(RIGHT_PANEL_WIDTH_STORAGE_KEY);
     const parsed = stored ? Number.parseInt(stored, 10) : NaN;
     return Number.isFinite(parsed)
-       ? clampRightPanelWidth(parsed)
+       ? clampSecondarySidebarWidth(parsed)
        : RIGHT_PANEL_DEFAULT_WIDTH;
    } catch {
     return RIGHT_PANEL_DEFAULT_WIDTH;
    }
 }
 
-export type { RightPanelViewId } from "./rightPanelState";
+export type { SecondarySidebarViewId } from "./secondarySidebarState";
 
-function readRightPanelView(): string {
+function readSecondarySidebarView(): string {
   try {
     const stored = window.localStorage.getItem("recall.right-panel.view");
     if (stored && stored !== "closed") return stored;
@@ -364,14 +364,14 @@ export default function App() {
   const explorerReturnFocusRef = useRef<HTMLElement | null>(null);
 
   const sidebarRef = useRef<PanelImperativeHandle | null>(null);
-  const rightPanelRef = useRef<PanelImperativeHandle | null>(null);
+  const secondarySidebarRef = useRef<PanelImperativeHandle | null>(null);
   const sidebarWidthRef = useRef(readSidebarWidth());
-  const rightPanelWidthRef = useRef(readRightPanelWidth());
+  const secondarySidebarWidthRef = useRef(readSecondarySidebarWidth());
   const sidebarWidthWriteTimerRef = useRef(0);
-  const rightPanelWidthWriteTimerRef = useRef(0);
+  const secondarySidebarWidthWriteTimerRef = useRef(0);
   const [sidebarView, setSidebarViewState] = useState<SidebarViewId>(readSidebarView);
-  const [rightPanelState, setRightPanelState] = useState<RightPanelState>(() =>
-    createRightPanelState(readRightPanelView()),
+  const [secondarySidebarState, setSecondarySidebarState] = useState<SecondarySidebarState>(() =>
+    createSecondarySidebarState(readSecondarySidebarView()),
   );
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [settingsDialogTab, setSettingsDialogTab] = useState<string>("general");
@@ -450,13 +450,13 @@ export default function App() {
       }
     }, 200);
     }, []);
-  const persistRightPanelWidth = useCallback((next: number) => {
-    rightPanelWidthRef.current = next;
-    if (rightPanelWidthWriteTimerRef.current) {
-      window.clearTimeout(rightPanelWidthWriteTimerRef.current);
+  const persistSecondarySidebarWidth = useCallback((next: number) => {
+    secondarySidebarWidthRef.current = next;
+    if (secondarySidebarWidthWriteTimerRef.current) {
+      window.clearTimeout(secondarySidebarWidthWriteTimerRef.current);
      }
-    rightPanelWidthWriteTimerRef.current = window.setTimeout(() => {
-      rightPanelWidthWriteTimerRef.current = 0;
+    secondarySidebarWidthWriteTimerRef.current = window.setTimeout(() => {
+      secondarySidebarWidthWriteTimerRef.current = 0;
       try {
         window.localStorage.setItem(RIGHT_PANEL_WIDTH_STORAGE_KEY, String(next));
        } catch {
@@ -470,8 +470,8 @@ export default function App() {
       if (sidebarWidthWriteTimerRef.current) {
         window.clearTimeout(sidebarWidthWriteTimerRef.current);
        }
-      if (rightPanelWidthWriteTimerRef.current) {
-        window.clearTimeout(rightPanelWidthWriteTimerRef.current);
+      if (secondarySidebarWidthWriteTimerRef.current) {
+        window.clearTimeout(secondarySidebarWidthWriteTimerRef.current);
        }
      };
    }, []);
@@ -910,8 +910,8 @@ export default function App() {
     return explorerRoot ?? workspaceFallbackPath;
   })();
   const sourceControl = useSourceControl(sourceControlContextPath, true);
-  const rightPanelView = getVisibleRightPanelView(
-    rightPanelState,
+  const secondarySidebarView = getVisibleSecondarySidebarView(
+    secondarySidebarState,
     sourceControl.hasRepo,
   );
   const branchName = sourceControl.status?.isDetached
@@ -937,36 +937,36 @@ export default function App() {
 
   const toggleSourceControl = useCallback(() => {
     if (!sourceControl.hasRepo) return;
-    setRightPanelState((prev) =>
+    setSecondarySidebarState((prev) =>
       toggleGitContextPanel(prev, sourceControl.hasRepo),
     );
   }, [sourceControl.hasRepo]);
 
   const secondaryExtPanels = useExtensionSecondarySidebarPanels();
 
-  const rightPanelOpen = rightPanelView !== "closed";
+  const secondarySidebarOpen = secondarySidebarView !== "closed";
 
   useEffect(() => {
-    setRightPanelState((prev) =>
-      sanitizeRightPanelState(prev, sourceControl.hasRepo),
+    setSecondarySidebarState((prev) =>
+      sanitizeSecondarySidebarState(prev, sourceControl.hasRepo),
     );
   }, [sourceControl.hasRepo]);
 
   useEffect(() => {
     try {
-      window.localStorage.setItem("recall.right-panel.view", rightPanelView);
+      window.localStorage.setItem("recall.right-panel.view", secondarySidebarView);
     } catch {
       // ignore
     }
-  }, [rightPanelView]);
+  }, [secondarySidebarView]);
 
   useEffect(() => {
     let retryFrame = 0;
     const applyPanelState = (allowRetry: boolean) => {
-      const panel = rightPanelRef.current;
+      const panel = secondarySidebarRef.current;
       if (!panel) return;
       try {
-        if (rightPanelOpen) panel.resize(`${rightPanelWidthRef.current}px`);
+        if (secondarySidebarOpen) panel.resize(`${secondarySidebarWidthRef.current}px`);
         else panel.collapse();
        } catch (error) {
         if (
@@ -977,7 +977,7 @@ export default function App() {
           retryFrame = window.requestAnimationFrame(() => applyPanelState(false));
           return;
          }
-        console.warn("right panel resize skipped:", error);
+        console.warn("secondary sidebar resize skipped:", error);
        }
      };
 
@@ -986,7 +986,7 @@ export default function App() {
       window.cancelAnimationFrame(frame);
       if (retryFrame) window.cancelAnimationFrame(retryFrame);
      };
-   }, [rightPanelOpen, rightPanelView]);
+   }, [secondarySidebarOpen, secondarySidebarView]);
 
 
   const openGitGraphFromContext = useCallback(async () => {
@@ -1640,31 +1640,31 @@ export default function App() {
               const secondaryPanel = (
                 <ResizablePanel
                  id="right-panel"
-                 panelRef={rightPanelRef}
-                 defaultSize={`${rightPanelWidthRef.current}px`}
+                 panelRef={secondarySidebarRef}
+                 defaultSize={`${secondarySidebarWidthRef.current}px`}
                  minSize={`${RIGHT_PANEL_MIN_WIDTH}px`}
                  maxSize={`${RIGHT_PANEL_MAX_WIDTH}px`}
                  groupResizeBehavior="preserve-pixel-size"
                  collapsible
                  collapsedSize={0}
                  onResize={(size) => {
-                    if (size.inPixels > 0) persistRightPanelWidth(size.inPixels);
-                    else setRightPanelState((prev) => closeRightPanel(prev));
+                    if (size.inPixels > 0) persistSecondarySidebarWidth(size.inPixels);
+                    else setSecondarySidebarState((prev) => closeSecondarySidebar(prev));
                  }}
                 >
                  <div className="flex h-full flex-col bg-card/25">
                    <SecondarySidebarHeader
                      hasRepo={sourceControl.hasRepo}
                      extPanels={secondaryExtPanels}
-                     activeView={rightPanelView}
+                     activeView={secondarySidebarView}
                      onSelectTab={(id) =>
-                       setRightPanelState((prev) =>
-                         id === prev.view ? closeRightPanel(prev) : { view: id },
+                       setSecondarySidebarState((prev) =>
+                         id === prev.view ? closeSecondarySidebar(prev) : { view: id },
                        )
                      }
                    />
                    <div className="min-h-0 flex-1 overflow-hidden">
-                     {sourceControl.hasRepo && rightPanelView === "git-context" && (
+                     {sourceControl.hasRepo && secondarySidebarView === "git-context" && (
                        <SourceControlPanel
                          open
                          sourceControl={sourceControl}
@@ -1673,7 +1673,7 @@ export default function App() {
                        />
                      )}
                      {secondaryExtPanels.map((p) =>
-                       rightPanelView === p.id ? (
+                       secondarySidebarView === p.id ? (
                          <WorkspaceContext.Provider
                            key={p.id}
                            value={{ workspacePath: activeTerminalLeafCwd ?? explorerRoot ?? null }}
@@ -1695,6 +1695,8 @@ export default function App() {
             >
               {sidebarPosition === "left" && sidebarPanel}
               {sidebarPosition === "left" && <ResizableHandle />}
+              {sidebarPosition === "right" && secondaryPanel}
+              {sidebarPosition === "right" && secondarySidebarOpen && <ResizableHandle />}
               <ResizablePanel
                 id="workspace"
                 defaultSize="78%"
@@ -1787,10 +1789,8 @@ export default function App() {
                   )}
                 </div>
               </ResizablePanel>
-              {sidebarPosition === "left" && rightPanelOpen && <ResizableHandle />}
+              {sidebarPosition === "left" && secondarySidebarOpen && <ResizableHandle />}
               {sidebarPosition === "left" && secondaryPanel}
-              {sidebarPosition === "right" && rightPanelOpen && <ResizableHandle />}
-              {sidebarPosition === "right" && secondaryPanel}
               {sidebarPosition === "right" && <ResizableHandle />}
               {sidebarPosition === "right" && sidebarPanel}
              </ResizablePanelGroup>
@@ -1811,12 +1811,12 @@ export default function App() {
               onOpenSourceControl={sourceControl.hasRepo ? toggleSourceControl : undefined}
               sidebarPosition={sidebarPosition}
               secondaryPanels={secondaryExtPanels}
-              secondaryView={rightPanelView}
+              secondaryView={secondarySidebarView}
               onSelectSecondaryPanel={(id) => {
-                setRightPanelState((prev) => toggleSecondarySidebarPanel(prev, id));
-                const p = rightPanelRef.current;
+                setSecondarySidebarState((prev) => toggleSecondarySidebarPanel(prev, id));
+                const p = secondarySidebarRef.current;
                 if (p) {
-                  const isOpen = rightPanelView === id;
+                  const isOpen = secondarySidebarView === id;
                   if (isOpen) p.collapse();
                   else if (p.getSize().asPercentage <= 0) p.expand();
                 }

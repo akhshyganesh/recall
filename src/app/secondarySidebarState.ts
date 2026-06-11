@@ -1,42 +1,42 @@
-export type RightPanelViewId = "closed" | "git-context" | (string & {});
+export type SecondarySidebarViewId = "closed" | "git-context" | (string & {});
 
-export type RightPanelState = Readonly<{
-  view: RightPanelViewId;
+export type SecondarySidebarState = Readonly<{
+  view: SecondarySidebarViewId;
 }>;
 
 function makeState(
-  view: RightPanelViewId,
-  previous?: RightPanelState,
-): RightPanelState {
+  view: SecondarySidebarViewId,
+  previous?: SecondarySidebarState,
+): SecondarySidebarState {
   if (previous && previous.view === view) return previous;
   return { view };
 }
 
-export function createRightPanelState(view: RightPanelViewId): RightPanelState {
+export function createSecondarySidebarState(view: SecondarySidebarViewId): SecondarySidebarState {
   return { view };
 }
 
-export function sanitizeRightPanelState(
-  state: RightPanelState,
+export function sanitizeSecondarySidebarState(
+  state: SecondarySidebarState,
   hasRepo: boolean,
-): RightPanelState {
+): SecondarySidebarState {
   // Only close when git-context is shown but there's no repo.
   // Extension panel IDs should remain open.
   if (!hasRepo && state.view === "git-context") return makeState("closed", state);
   return state;
 }
 
-export function getVisibleRightPanelView(
-  state: RightPanelState,
+export function getVisibleSecondarySidebarView(
+  state: SecondarySidebarState,
   hasRepo: boolean,
-): RightPanelViewId {
-  return sanitizeRightPanelState(state, hasRepo).view;
+): SecondarySidebarViewId {
+  return sanitizeSecondarySidebarState(state, hasRepo).view;
 }
 
 export function toggleGitContextPanel(
-  state: RightPanelState,
+  state: SecondarySidebarState,
   hasRepo: boolean,
-): RightPanelState {
+): SecondarySidebarState {
   if (!hasRepo) return makeState("closed", state);
   return state.view === "git-context"
     ? makeState("closed", state)
@@ -44,21 +44,21 @@ export function toggleGitContextPanel(
 }
 
 export function openGitContextPanel(
-  state: RightPanelState,
+  state: SecondarySidebarState,
   hasRepo: boolean,
-): RightPanelState {
+): SecondarySidebarState {
   if (!hasRepo) return makeState("closed", state);
   return makeState("git-context", state);
 }
 
-export function closeRightPanel(state: RightPanelState): RightPanelState {
+export function closeSecondarySidebar(state: SecondarySidebarState): SecondarySidebarState {
   return makeState("closed", state);
 }
 
 export function toggleSecondarySidebarPanel(
-  state: RightPanelState,
+  state: SecondarySidebarState,
   panelId: string,
-): RightPanelState {
+): SecondarySidebarState {
   if (state.view === panelId) return makeState("closed", state);
   return makeState(panelId, state);
 }
