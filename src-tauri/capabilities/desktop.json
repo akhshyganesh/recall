@@ -10,7 +10,6 @@
     "settings"
   ],
   "permissions": [
-    "autostart:default",
     "window-state:default",
     "updater:default",
     "process:default"
