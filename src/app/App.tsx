@@ -172,6 +172,19 @@ const RIGHT_PANEL_DEFAULT_WIDTH = 380;
 const RIGHT_PANEL_MIN_WIDTH = 240;
 const RIGHT_PANEL_MAX_WIDTH = 600;
 const RIGHT_PANEL_WIDTH_STORAGE_KEY = "recall.right-panel.width";
+const SIDEBAR_POSITION_STORAGE_KEY = "recall.sidebar.position";
+
+type SidebarPosition = "left" | "right";
+
+function readSidebarPosition(): SidebarPosition {
+  try {
+    const stored = window.localStorage.getItem(SIDEBAR_POSITION_STORAGE_KEY);
+    if (stored === "left" || stored === "right") return stored;
+  } catch {
+    // ignore
+  }
+  return "left";
+}
 
 function clampSidebarWidth(width: number): number {
   return Math.min(
@@ -307,6 +320,14 @@ export default function App() {
   );
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [settingsDialogTab, setSettingsDialogTab] = useState<string>("general");
+  const [sidebarPosition, setSidebarPositionState] = useState<SidebarPosition>(readSidebarPosition);
+  const swapSidebarPosition = useCallback(() => {
+    setSidebarPositionState((prev) => {
+      const next: SidebarPosition = prev === "left" ? "right" : "left";
+      try { window.localStorage.setItem(SIDEBAR_POSITION_STORAGE_KEY, next); } catch {}
+      return next;
+    });
+  }, []);
   const persistSidebarView = useCallback((view: SidebarViewId) => {
     setSidebarViewState(view);
     try {
@@ -1081,6 +1102,11 @@ export default function App() {
       "file.quickOpen": () => { setPaletteInitialQuery(""); setPaletteOpen(true); },
       "command.palette": () => { setPaletteInitialQuery(">"); setPaletteOpen(true); },
       "sidebar.toggle": toggleSidebar,
+      "sidebar.sessions": () => cycleSidebarView("sessions"),
+      "sidebar.files": () => cycleSidebarView("explorer"),
+      "sidebar.extensions": () => cycleSidebarView("extensions"),
+      "sidebar.git": toggleSourceControl,
+      "sidebar.position.swap": swapSidebarPosition,
       "explorer.focus": toggleExplorerFocus,
       "view.zoomIn": zoomIn,
       "view.zoomOut": zoomOut,
@@ -1104,6 +1130,8 @@ export default function App() {
       focusNextPaneInTab,
       toggleSourceControl,
       toggleSidebar,
+      cycleSidebarView,
+      swapSidebarPosition,
       toggleExplorerFocus,
       zoomIn,
       zoomOut,
@@ -1500,47 +1528,51 @@ export default function App() {
               className="min-h-0 flex-1"
               resizeTargetMinimumSize={{ fine: 24, coarse: 36 }}
             >
-              <ResizablePanel
-                id="sidebar"
-                panelRef={sidebarRef}
-                defaultSize={`${sidebarWidthRef.current}px`}
-                minSize={`${SIDEBAR_MIN_WIDTH}px`}
-                maxSize={`${SIDEBAR_MAX_WIDTH}px`}
-                collapsible
-                collapsedSize={0}
-                onResize={(size) => {
-                  if (size.inPixels > 0) persistSidebarWidth(size.inPixels);
-                }}
-              >
-                <div className="flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground">
-                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                    {sidebarView === "sessions" ? (
-                      <SessionSidebar
-                        contextPath={sourceControlContextPath}
-                        repoRoot={sourceControl.repo?.repoRoot ?? null}
-                        onOpenSession={handleOpenSession}
-                      />
-                    ) : sidebarView === "explorer" ? (
-                      <FileExplorer
-                        ref={explorerRef}
-                        rootPath={explorerRoot}
-                        onOpenFile={handleOpenFile}
-                        onPathRenamed={handlePathRenamed}
-                        onPathDeleted={handlePathDeleted}
-                        onRevealInTerminal={cdInNewTab}
-                        onOpenMarkdownPreview={openMarkdownPreview}
-                      />
-                    ) : sidebarView === "extensions" ? (
-                      <div className="flex h-full flex-col overflow-hidden">
-                        <ExtensionsSection />
+              {sidebarPosition === "left" && (
+                <>
+                  <ResizablePanel
+                    id="sidebar"
+                    panelRef={sidebarRef}
+                    defaultSize={`${sidebarWidthRef.current}px`}
+                    minSize={`${SIDEBAR_MIN_WIDTH}px`}
+                    maxSize={`${SIDEBAR_MAX_WIDTH}px`}
+                    collapsible
+                    collapsedSize={0}
+                    onResize={(size) => {
+                      if (size.inPixels > 0) persistSidebarWidth(size.inPixels);
+                    }}
+                  >
+                    <div className="flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground">
+                      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                        {sidebarView === "sessions" ? (
+                          <SessionSidebar
+                            contextPath={sourceControlContextPath}
+                            repoRoot={sourceControl.repo?.repoRoot ?? null}
+                            onOpenSession={handleOpenSession}
+                          />
+                        ) : sidebarView === "explorer" ? (
+                          <FileExplorer
+                            ref={explorerRef}
+                            rootPath={explorerRoot}
+                            onOpenFile={handleOpenFile}
+                            onPathRenamed={handlePathRenamed}
+                            onPathDeleted={handlePathDeleted}
+                            onRevealInTerminal={cdInNewTab}
+                            onOpenMarkdownPreview={openMarkdownPreview}
+                          />
+                        ) : sidebarView === "extensions" ? (
+                          <div className="flex h-full flex-col overflow-hidden">
+                            <ExtensionsSection />
+                          </div>
+                        ) : (
+                          <ExtensionSidebarPanel viewId={sidebarView} workspacePath={activeTerminalLeafCwd ?? explorerRoot ?? null} />
+                        )}
                       </div>
-                    ) : (
-                      <ExtensionSidebarPanel viewId={sidebarView} workspacePath={activeTerminalLeafCwd ?? explorerRoot ?? null} />
-                    )}
-                  </div>
-                </div>
-              </ResizablePanel>
-              <ResizableHandle />
+                    </div>
+                  </ResizablePanel>
+                  <ResizableHandle />
+                </>
+              )}
               <ResizablePanel
                 id="workspace"
                 defaultSize="78%"
@@ -1659,6 +1691,51 @@ export default function App() {
                    ) : null}
                   </div>
                 </ResizablePanel>
+              {sidebarPosition === "right" && (
+                <>
+                  <ResizableHandle />
+                  <ResizablePanel
+                    id="sidebar"
+                    panelRef={sidebarRef}
+                    defaultSize={`${sidebarWidthRef.current}px`}
+                    minSize={`${SIDEBAR_MIN_WIDTH}px`}
+                    maxSize={`${SIDEBAR_MAX_WIDTH}px`}
+                    collapsible
+                    collapsedSize={0}
+                    onResize={(size) => {
+                      if (size.inPixels > 0) persistSidebarWidth(size.inPixels);
+                    }}
+                  >
+                    <div className="flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground">
+                      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                        {sidebarView === "sessions" ? (
+                          <SessionSidebar
+                            contextPath={sourceControlContextPath}
+                            repoRoot={sourceControl.repo?.repoRoot ?? null}
+                            onOpenSession={handleOpenSession}
+                          />
+                        ) : sidebarView === "explorer" ? (
+                          <FileExplorer
+                            ref={explorerRef}
+                            rootPath={explorerRoot}
+                            onOpenFile={handleOpenFile}
+                            onPathRenamed={handlePathRenamed}
+                            onPathDeleted={handlePathDeleted}
+                            onRevealInTerminal={cdInNewTab}
+                            onOpenMarkdownPreview={openMarkdownPreview}
+                          />
+                        ) : sidebarView === "extensions" ? (
+                          <div className="flex h-full flex-col overflow-hidden">
+                            <ExtensionsSection />
+                          </div>
+                        ) : (
+                          <ExtensionSidebarPanel viewId={sidebarView} workspacePath={activeTerminalLeafCwd ?? explorerRoot ?? null} />
+                        )}
+                      </div>
+                    </div>
+                  </ResizablePanel>
+                </>
+              )}
              </ResizablePanelGroup>
            </main>
 

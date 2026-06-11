@@ -1,3 +1,4 @@
+import { AppLogoMark } from "@/components/AppLogoMark";
 import { cn } from "@/lib/utils";
 import { useExtensionSidebarPanels } from "@/modules/extensions/registry";
 import {
@@ -241,6 +242,12 @@ export function SidebarRail({
       style={{ height: SIDEBAR_RAIL_HEIGHT }}
       className="flex shrink-0 items-stretch border-t border-border/60 bg-sidebar px-1"
     >
+      <div className="flex shrink-0 items-center gap-1.5 px-2 pr-3 border-r border-border/40 mr-1">
+        <AppLogoMark className="size-3.5" />
+        <span className="text-[10px] font-semibold tracking-wide text-muted-foreground/60 select-none">
+          Recall
+        </span>
+      </div>
       {orderedItems.map((item, index) => {
         const isActive = item.id === activeView;
         const isExt = item.kind === "ext";
