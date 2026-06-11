@@ -1,6 +1,6 @@
 [package]
 name = "recall"
-version = "1.0.18"
+version = "1.0.19"
 description = "Recall terminal workspace"
 authors = ["akhshyganesh"]
 edition = "2021"
