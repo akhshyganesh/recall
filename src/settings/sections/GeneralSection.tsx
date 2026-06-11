@@ -2,11 +2,13 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { ThemePref } from "@/modules/settings/store";
-import { setShowHidden, setAutostart, setCheckForUpdates } from "@/modules/settings/store";
+import { setShowHidden, setAutostart, setCheckForUpdates, setZoomLevel } from "@/modules/settings/store";
 import { useTheme } from "@/modules/theme";
 import {
   ComputerIcon,
   Moon02Icon,
+  MinusSignIcon,
+  PlusSignIcon,
   Sun03Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -26,14 +28,15 @@ const APPEARANCE: {
 ];
 
 const ACCENT_PRESETS: { label: string; hue: number }[] = [
-  { label: "Amber", hue: 55 },
-  { label: "Orange", hue: 30 },
-  { label: "Red", hue: 10 },
-  { label: "Pink", hue: 340 },
+  { label: "Purple", hue: 300 },
   { label: "Violet", hue: 280 },
   { label: "Blue", hue: 220 },
   { label: "Cyan", hue: 190 },
   { label: "Green", hue: 140 },
+  { label: "Amber", hue: 55 },
+  { label: "Orange", hue: 30 },
+  { label: "Red", hue: 10 },
+  { label: "Pink", hue: 340 },
 ];
 
 function AccentColorPicker() {
@@ -106,6 +109,61 @@ function AccentColorPicker() {
   );
 }
 
+const ZOOM_PRESETS = [0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0] as const;
+const ZOOM_STEP = 0.1;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 2.0;
+
+function clampZoom(z: number): number {
+  return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(z * 100) / 100));
+}
+
+function InterfaceScaleControl() {
+  const zoomLevel = usePreferencesStore((s) => s.zoomLevel);
+
+  const adjust = (delta: number) => {
+    void setZoomLevel(clampZoom(zoomLevel + delta));
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => adjust(-ZOOM_STEP)}
+        disabled={zoomLevel <= MIN_ZOOM}
+        className="flex size-6 items-center justify-center rounded border border-border/40 text-muted-foreground transition-colors hover:border-border hover:text-foreground disabled:opacity-40"
+      >
+        <HugeiconsIcon icon={MinusSignIcon} size={11} strokeWidth={2} />
+      </button>
+      <div className="flex gap-1">
+        {ZOOM_PRESETS.map((z) => (
+          <button
+            key={z}
+            type="button"
+            onClick={() => void setZoomLevel(z)}
+            className={cn(
+              "rounded px-1.5 py-0.5 font-mono text-[10.5px] transition-colors",
+              Math.abs(zoomLevel - z) < 0.01
+                ? "bg-primary/15 text-primary font-semibold"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {Math.round(z * 100)}%
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={() => adjust(ZOOM_STEP)}
+        disabled={zoomLevel >= MAX_ZOOM}
+        className="flex size-6 items-center justify-center rounded border border-border/40 text-muted-foreground transition-colors hover:border-border hover:text-foreground disabled:opacity-40"
+      >
+        <HugeiconsIcon icon={PlusSignIcon} size={11} strokeWidth={2} />
+      </button>
+    </div>
+  );
+}
+
 export function GeneralSection() {
   const { theme, setTheme } = useTheme();
   const showHidden = usePreferencesStore((s) => s.showHidden);
@@ -170,6 +228,13 @@ export function GeneralSection() {
           <div className="w-full">
             <AccentColorPicker />
           </div>
+        </SettingRow>
+        <SettingRow
+          title="Interface scale"
+          description="Scales the UI including the sidebar, status bar, and editor. Also adjustable with ⌘+ / ⌘−."
+          className="flex-col items-start gap-2"
+        >
+          <InterfaceScaleControl />
         </SettingRow>
       </SettingsCard>
 

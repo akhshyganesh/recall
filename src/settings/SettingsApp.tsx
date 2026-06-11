@@ -6,6 +6,7 @@ import type { SettingsTab } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useExtensionSettingsSections } from "@/modules/extensions/registry";
 import {
+  ArrowDataTransferHorizontalIcon,
   Cancel01Icon,
   ComputerTerminal02Icon,
   InformationCircleIcon,
@@ -18,6 +19,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect, useState, type JSX } from "react";
 import { AboutSection } from "./sections/AboutSection";
+import { DataSection } from "./sections/DataSection";
 import { EditorSection } from "./sections/EditorSection";
 import { GeneralSection } from "./sections/GeneralSection";
 import { SessionsMcpSection } from "./sections/McpSection";
@@ -35,6 +37,7 @@ const CORE_TABS: {
   { id: "editor", label: "Editor", icon: PencilEdit02Icon, component: EditorSection },
   { id: "integrations", label: "Integrations", icon: Link01Icon, component: SessionsMcpSection },
   { id: "shortcuts", label: "Shortcuts", icon: KeyboardIcon, component: ShortcutsSection },
+  { id: "data", label: "Data", icon: ArrowDataTransferHorizontalIcon, component: DataSection },
   { id: "about", label: "About", icon: InformationCircleIcon, component: AboutSection },
 ];
 

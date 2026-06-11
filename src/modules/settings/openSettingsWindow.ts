@@ -4,6 +4,7 @@ export type SettingsTab =
   | "terminal"
   | "integrations"
   | "shortcuts"
+  | "data"
   | "about";
 
 export const SETTINGS_TAB_LABELS: Record<SettingsTab, string> = {
@@ -12,6 +13,7 @@ export const SETTINGS_TAB_LABELS: Record<SettingsTab, string> = {
   editor: "Editor",
   integrations: "Integrations",
   shortcuts: "Shortcuts",
+  data: "Data",
   about: "About",
 };
 

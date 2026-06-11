@@ -106,7 +106,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalScrollback: TERMINAL_SCROLLBACK_DEFAULT,
   zoomLevel: 1.0,
   shortcuts: {} as Record<ShortcutId, KeyBinding[]>,
-  accentHue: 55,
+  accentHue: 300,
   openRouterApiKey: "",
 };
 
@@ -251,6 +251,27 @@ export async function setShortcuts(
 ): Promise<void> {
   await store.set(KEY_SHORTCUTS, value);
   await store.save();
+}
+
+export async function importPreferences(prefs: Partial<Preferences>): Promise<void> {
+  const writes: Promise<void>[] = [];
+  if (prefs.theme !== undefined) writes.push(writePref(KEY_THEME, prefs.theme));
+  if (prefs.editorTheme !== undefined) writes.push(writePref(KEY_EDITOR_THEME, prefs.editorTheme));
+  if (prefs.autostart !== undefined) writes.push(writePref(KEY_AUTOSTART, prefs.autostart));
+  if (prefs.checkForUpdates !== undefined) writes.push(writePref(KEY_CHECK_FOR_UPDATES, prefs.checkForUpdates));
+  if (prefs.sessionsMcpEnabled !== undefined) writes.push(writePref(KEY_SESSIONS_MCP_ENABLED, prefs.sessionsMcpEnabled));
+  if (prefs.vimMode !== undefined) writes.push(writePref(KEY_VIM_MODE, prefs.vimMode));
+  if (prefs.showHidden !== undefined) writes.push(writePref(KEY_SHOW_HIDDEN, prefs.showHidden));
+  if (prefs.terminalWebglEnabled !== undefined) writes.push(writePref(KEY_TERMINAL_WEBGL_ENABLED, prefs.terminalWebglEnabled));
+  if (prefs.terminalFontFamily !== undefined) writes.push(writePref(KEY_TERMINAL_FONT_FAMILY, prefs.terminalFontFamily));
+  if (prefs.terminalLetterSpacing !== undefined) writes.push(writePref(KEY_TERMINAL_LETTER_SPACING, prefs.terminalLetterSpacing));
+  if (prefs.terminalFontSize !== undefined) writes.push(writePref(KEY_TERMINAL_FONT_SIZE, prefs.terminalFontSize));
+  if (prefs.terminalScrollback !== undefined) writes.push(writePref(KEY_TERMINAL_SCROLLBACK, prefs.terminalScrollback));
+  if (prefs.zoomLevel !== undefined) writes.push(writePref(KEY_ZOOM_LEVEL, prefs.zoomLevel));
+  if (prefs.accentHue !== undefined) writes.push(writePref(KEY_ACCENT_HUE, prefs.accentHue));
+  if (prefs.openRouterApiKey !== undefined) writes.push(writePref(KEY_OPEN_ROUTER_API_KEY, prefs.openRouterApiKey));
+  if (prefs.shortcuts !== undefined) writes.push(writePref(KEY_SHORTCUTS, prefs.shortcuts));
+  await Promise.all(writes);
 }
 
 export async function resetShortcuts(): Promise<void> {

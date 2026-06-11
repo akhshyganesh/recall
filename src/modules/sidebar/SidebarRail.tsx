@@ -240,7 +240,7 @@ export function SidebarRail({
   return (
     <div
       style={{ height: SIDEBAR_RAIL_HEIGHT }}
-      className="flex shrink-0 items-stretch border-t border-border/60 bg-sidebar px-1"
+      className="zoom-content flex shrink-0 items-stretch border-t border-border/60 bg-sidebar px-1"
     >
       <div className="flex shrink-0 items-center gap-1.5 px-2 pr-3 border-r border-border/40 mr-1">
         <AppLogoMark className="size-3.5" />
