@@ -17,6 +17,7 @@ import { fmtShortcut, MOD_KEY, SHIFT_KEY } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import {
+  ArrowDown01Icon,
   Cancel01Icon,
   Clock01Icon,
   ComputerTerminal02Icon,
@@ -465,50 +466,60 @@ export function TabBar({
             })()}
           </TabsList>
         </Tabs>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="self-center mx-0.5 shrink-0 rounded-sm text-muted-foreground/50 hover:bg-sidebar-accent/60 hover:text-muted-foreground aria-expanded:bg-sidebar-accent aria-expanded:text-foreground"
-              title="New tab"
-            >
-              <HugeiconsIcon icon={PlusSignIcon} size={13} strokeWidth={2} />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-max">
-            <DropdownMenuItem onSelect={() => onNew()}>
-              <HugeiconsIcon
-                icon={ComputerTerminal02Icon}
-                size={14}
-                strokeWidth={1.75}
-              />
-              <span className="flex-1">Terminal</span>
-              <span className="text-xs text-muted-foreground">
-                {fmtShortcut(MOD_KEY, "T")}
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => onNewEditor()}>
-              <HugeiconsIcon
-                icon={PencilEdit02Icon}
-                size={14}
-                strokeWidth={1.75}
-              />
-              <span className="flex-1">Editor</span>
-              <span className="text-xs text-muted-foreground">
-                {fmtShortcut(MOD_KEY, "E")}
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => onNewPreview()}>
-              <HugeiconsIcon icon={Globe02Icon} size={14} strokeWidth={1.75} />
-              <span className="flex-1">Preview</span>
-              <span className="text-xs text-muted-foreground">
-                {fmtShortcut(MOD_KEY, SHIFT_KEY, "P")}
-              </span>
-            </DropdownMenuItem>
-
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center self-center mx-0.5 shrink-0">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="rounded-sm text-muted-foreground/50 hover:bg-sidebar-accent/60 hover:text-muted-foreground"
+            title="New terminal (⌘T)"
+            onClick={() => onNew()}
+          >
+            <HugeiconsIcon icon={PlusSignIcon} size={13} strokeWidth={2} />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="w-3.5 rounded-sm text-muted-foreground/50 hover:bg-sidebar-accent/60 hover:text-muted-foreground aria-expanded:bg-sidebar-accent aria-expanded:text-foreground"
+                title="New tab…"
+              >
+                <HugeiconsIcon icon={ArrowDown01Icon} size={9} strokeWidth={2} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-max">
+              <DropdownMenuItem onSelect={() => onNew()}>
+                <HugeiconsIcon
+                  icon={ComputerTerminal02Icon}
+                  size={14}
+                  strokeWidth={1.75}
+                />
+                <span className="flex-1">Terminal</span>
+                <span className="text-xs text-muted-foreground">
+                  {fmtShortcut(MOD_KEY, "T")}
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onNewEditor()}>
+                <HugeiconsIcon
+                  icon={PencilEdit02Icon}
+                  size={14}
+                  strokeWidth={1.75}
+                />
+                <span className="flex-1">Editor</span>
+                <span className="text-xs text-muted-foreground">
+                  {fmtShortcut(MOD_KEY, "E")}
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onNewPreview()}>
+                <HugeiconsIcon icon={Globe02Icon} size={14} strokeWidth={1.75} />
+                <span className="flex-1">Preview</span>
+                <span className="text-xs text-muted-foreground">
+                  {fmtShortcut(MOD_KEY, SHIFT_KEY, "P")}
+                </span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </div>
     {draggedTab !== null && dragPos !== null && createPortal(
