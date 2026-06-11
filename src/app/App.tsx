@@ -986,7 +986,7 @@ export default function App() {
       window.cancelAnimationFrame(frame);
       if (retryFrame) window.cancelAnimationFrame(retryFrame);
      };
-   }, [secondarySidebarOpen, secondarySidebarView]);
+   }, [secondarySidebarOpen, secondarySidebarView, sidebarPosition]);
 
 
   const openGitGraphFromContext = useCallback(async () => {
