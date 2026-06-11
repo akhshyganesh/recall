@@ -33,7 +33,6 @@ export const EDITOR_THEME_LABELS: Record<EditorThemeId, string> = {
 export type Preferences = {
   theme: ThemePref;
   editorTheme: EditorThemeId;
-  autostart: boolean;
   checkForUpdates: boolean;
   sessionsMcpEnabled: boolean;
   vimMode: boolean;
@@ -54,7 +53,6 @@ export type Preferences = {
 const STORE_PATH = "recall-settings.json";
 const KEY_THEME = "theme";
 const KEY_EDITOR_THEME = "editorTheme";
-const KEY_AUTOSTART = "autostart";
 const KEY_CHECK_FOR_UPDATES = "checkForUpdates";
 const KEY_SESSIONS_MCP_ENABLED = "sessionsMcpEnabled";
 const KEY_VIM_MODE = "vimMode";
@@ -94,7 +92,6 @@ const IS_LINUX =
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
   editorTheme: "atomone",
-  autostart: false,
   checkForUpdates: true,
   sessionsMcpEnabled: false,
   vimMode: false,
@@ -134,7 +131,6 @@ export async function loadPreferences(): Promise<Preferences> {
     theme: get<ThemePref>(KEY_THEME) ?? DEFAULT_PREFERENCES.theme,
     editorTheme:
       get<EditorThemeId>(KEY_EDITOR_THEME) ?? DEFAULT_PREFERENCES.editorTheme,
-    autostart: get<boolean>(KEY_AUTOSTART) ?? DEFAULT_PREFERENCES.autostart,
     checkForUpdates:
       get<boolean>(KEY_CHECK_FOR_UPDATES) ?? DEFAULT_PREFERENCES.checkForUpdates,
     sessionsMcpEnabled:
@@ -176,10 +172,6 @@ export async function setTheme(value: ThemePref): Promise<void> {
 
 export async function setEditorTheme(value: EditorThemeId): Promise<void> {
   await writePref(KEY_EDITOR_THEME, value);
-}
-
-export async function setAutostart(value: boolean): Promise<void> {
-  await writePref(KEY_AUTOSTART, value);
 }
 
 export async function setCheckForUpdates(value: boolean): Promise<void> {
@@ -257,7 +249,6 @@ export async function importPreferences(prefs: Partial<Preferences>): Promise<vo
   const writes: Promise<void>[] = [];
   if (prefs.theme !== undefined) writes.push(writePref(KEY_THEME, prefs.theme));
   if (prefs.editorTheme !== undefined) writes.push(writePref(KEY_EDITOR_THEME, prefs.editorTheme));
-  if (prefs.autostart !== undefined) writes.push(writePref(KEY_AUTOSTART, prefs.autostart));
   if (prefs.checkForUpdates !== undefined) writes.push(writePref(KEY_CHECK_FOR_UPDATES, prefs.checkForUpdates));
   if (prefs.sessionsMcpEnabled !== undefined) writes.push(writePref(KEY_SESSIONS_MCP_ENABLED, prefs.sessionsMcpEnabled));
   if (prefs.vimMode !== undefined) writes.push(writePref(KEY_VIM_MODE, prefs.vimMode));
@@ -288,7 +279,6 @@ export async function onPreferencesChange(
   const map: Record<string, PrefKey> = {
     [KEY_THEME]: "theme",
     [KEY_EDITOR_THEME]: "editorTheme",
-    [KEY_AUTOSTART]: "autostart",
     [KEY_CHECK_FOR_UPDATES]: "checkForUpdates",
     [KEY_SESSIONS_MCP_ENABLED]: "sessionsMcpEnabled",
     [KEY_VIM_MODE]: "vimMode",

@@ -2,7 +2,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { ThemePref } from "@/modules/settings/store";
-import { setShowHidden, setAutostart, setCheckForUpdates, setZoomLevel } from "@/modules/settings/store";
+import { setShowHidden, setCheckForUpdates, setZoomLevel } from "@/modules/settings/store";
 import { useTheme } from "@/modules/theme";
 import {
   ComputerIcon,
@@ -14,7 +14,6 @@ import {
   Sun03Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { useEffect, useState } from "react";
 import { SettingsCard } from "../components/SettingsCard";
 import { SettingRow } from "../components/SettingRow";
@@ -224,31 +223,7 @@ function InterfaceScaleControl() {
 export function GeneralSection() {
   const { theme, setTheme } = useTheme();
   const showHidden = usePreferencesStore((s) => s.showHidden);
-  const autostart = usePreferencesStore((s) => s.autostart);
   const checkForUpdates = usePreferencesStore((s) => s.checkForUpdates);
-
-  useEffect(() => {
-    let alive = true;
-    void isEnabled()
-      .then((on) => {
-        if (!alive) return;
-        if (on !== usePreferencesStore.getState().autostart) {
-          void setAutostart(on);
-        }
-      })
-      .catch(() => undefined);
-    return () => { alive = false; };
-  }, []);
-
-  const onToggleAutostart = async (next: boolean) => {
-    try {
-      if (next) await enable();
-      else await disable();
-      await setAutostart(next);
-    } catch (error) {
-      console.error("autostart toggle failed", error);
-    }
-  };
 
   return (
     <div className="flex flex-col">
@@ -314,15 +289,6 @@ export function GeneralSection() {
       </SettingsCard>
 
       <SettingsCard title="Startup">
-        <SettingRow
-          title="Launch at login"
-          description="Open Recall automatically when you sign in."
-        >
-          <Switch
-            checked={autostart}
-            onCheckedChange={(value) => void onToggleAutostart(value)}
-          />
-        </SettingRow>
         <SettingRow
           title="Check for updates on launch"
           description="Look for a new version each time Recall opens."
