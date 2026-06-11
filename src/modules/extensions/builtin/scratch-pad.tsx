@@ -224,6 +224,7 @@ export const scratchPadExtension: RecallExtension = {
       label: "Scratch Pad",
       icon: <PadIcon />,
       render: () => <ScratchPadLauncher />,
+      sidebar: "secondary",
     });
 
     const cleanupTab = api.registerTabRenderer("canvas", {

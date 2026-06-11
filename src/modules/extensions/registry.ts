@@ -175,6 +175,14 @@ export function useExtensionSidebarPanels(): SidebarPanelDef[] {
   return useExtensionRegistry((s) => s.sidebarPanels);
 }
 
+export function useExtensionPrimarySidebarPanels(): SidebarPanelDef[] {
+  return useExtensionRegistry((s) => s.sidebarPanels.filter((p) => !p.sidebar || p.sidebar === "primary"));
+}
+
+export function useExtensionSecondarySidebarPanels(): SidebarPanelDef[] {
+  return useExtensionRegistry((s) => s.sidebarPanels.filter((p) => p.sidebar === "secondary"));
+}
+
 export function useExtensionSettingsSections(): SettingsSectionDef[] {
   return useExtensionRegistry((s) => s.settingsSections);
 }

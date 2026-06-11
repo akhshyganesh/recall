@@ -10,6 +10,12 @@ export interface SidebarPanelDef {
   icon: ReactNode;
   /** The panel body, rendered when this view is active. */
   render: () => ReactNode;
+  /**
+   * Which sidebar this panel appears in.
+   * - `"primary"` (default) — the main left/right nav rail.
+   * - `"secondary"` — the right secondary panel (alongside git source control).
+   */
+  sidebar?: "primary" | "secondary";
 }
 
 // ── Tab renderers ─────────────────────────────────────────────────────────────
@@ -58,7 +64,9 @@ export interface BackgroundDef {
 
 export interface RecallAPI {
   /**
-   * Register a panel that appears as a button in the sidebar rail.
+   * Register a panel in one of the sidebars.
+   * Set `sidebar: "secondary"` to place the panel in the right secondary panel
+   * (alongside git source control). Defaults to `"primary"` (the main nav rail).
    * Returns a cleanup function that removes the panel.
    */
   registerSidebarPanel(def: Omit<SidebarPanelDef, "id"> & { id?: string }): () => void;

@@ -1,6 +1,5 @@
-import { AppLogoMark } from "@/components/AppLogoMark";
 import { cn } from "@/lib/utils";
-import { useExtensionSidebarPanels } from "@/modules/extensions/registry";
+import { useExtensionPrimarySidebarPanels } from "@/modules/extensions/registry";
 import {
   Folder01Icon,
   FolderOpenIcon,
@@ -51,6 +50,9 @@ type Props = {
   stagedCount?: number;
   changedCount?: number;
   onOpenSourceControl?: () => void;
+  secondaryPanels?: Array<{ id: string; label: string; icon: ReactNode }>;
+  secondaryView?: string;
+  onSelectSecondaryPanel?: (id: string) => void;
   sidebarPosition?: "left" | "right";
 };
 
@@ -116,9 +118,12 @@ export function SidebarRail({
   stagedCount = 0,
   changedCount = 0,
   onOpenSourceControl,
+  secondaryPanels = [],
+  secondaryView,
+  onSelectSecondaryPanel,
   sidebarPosition = "left",
 }: Props) {
-  const extPanels = useExtensionSidebarPanels();
+  const extPanels = useExtensionPrimarySidebarPanels();
 
   const coreItems: CoreRailItem[] = [
     { kind: "core", id: "sessions", label: "Sessions", icon: Orbit01Icon },
@@ -241,15 +246,6 @@ export function SidebarRail({
 
   const logoAndNav = (
     <>
-      <div className={cn(
-        "flex shrink-0 items-center gap-1.5 px-2.5",
-        sidebarPosition === "left" ? "pr-3.5 border-r border-border/40 mr-1" : "pl-3.5 border-l border-border/40 ml-1 order-last",
-      )}>
-        <AppLogoMark className="size-4" />
-        <span className="text-[11px] font-semibold tracking-wide text-foreground/70 select-none">
-          Recall
-        </span>
-      </div>
       {orderedItems.map((item, index) => {
         const isActive = item.id === activeView;
         const isExt = item.kind === "ext";
@@ -329,74 +325,99 @@ export function SidebarRail({
   const statusAndSettings = (
     <div className={cn("flex items-stretch", sidebarPosition === "left" ? "ml-auto" : "mr-auto")}>
       {showStatusInfo && (
-        <button
-          type="button"
-          onClick={onOpenSourceControl}
-          disabled={!onOpenSourceControl}
-          className={cn(
-            "flex items-center gap-2 border-t-2 border-transparent px-2.5 text-[10.5px] text-muted-foreground/60 outline-none transition-colors duration-100",
-            "font-mono tracking-tight",
-            "focus-visible:ring-2 focus-visible:ring-ring/40",
-            onOpenSourceControl
-              ? "cursor-pointer hover:bg-sidebar-accent/60 hover:text-muted-foreground"
-              : "cursor-default",
-          )}
-        >
-          {hasCwd && (
-            <span className="flex max-w-[12rem] items-center gap-1 truncate">
-              <HugeiconsIcon
-                icon={Folder01Icon}
-                size={11}
-                strokeWidth={1.75}
-                className="shrink-0"
-              />
-              <span className="truncate">{formatCwd(cwd!)}</span>
-            </span>
-          )}
-          {hasGitInfo && (
-            <span className="flex items-center gap-1">
-              <HugeiconsIcon
-                icon={GitBranchIcon}
-                size={11}
-                strokeWidth={1.75}
-                className="shrink-0"
-              />
-              <span>{branchLabel}</span>
-              {stagedCount > 0 && (
-                <span className="text-[9.5px] text-primary/80">{stagedCount}+</span>
-              )}
-              {unstagedCount > 0 && (
-                <span className="text-[9.5px] text-muted-foreground/50">{unstagedCount}~</span>
-              )}
-            </span>
-          )}
-        </button>
-      )}
+          <button
+            type="button"
+            onClick={onOpenSourceControl}
+            disabled={!onOpenSourceControl}
+            className={cn(
+              "flex items-center gap-2 border-t-2 border-transparent px-2.5 text-[10.5px] text-muted-foreground/60 outline-none transition-colors duration-100",
+              "font-mono tracking-tight",
+              "focus-visible:ring-2 focus-visible:ring-ring/40",
+              onOpenSourceControl
+                ? "cursor-pointer hover:bg-sidebar-accent/60 hover:text-muted-foreground"
+                : "cursor-default",
+            )}
+          >
+            {hasCwd && (
+              <span className="flex max-w-[12rem] items-center gap-1 truncate">
+                <HugeiconsIcon
+                  icon={Folder01Icon}
+                  size={11}
+                  strokeWidth={1.75}
+                  className="shrink-0"
+                />
+                <span className="truncate">{formatCwd(cwd!)}</span>
+              </span>
+            )}
+            {hasGitInfo && (
+              <span className="flex items-center gap-1">
+                <HugeiconsIcon
+                  icon={GitBranchIcon}
+                  size={11}
+                  strokeWidth={1.75}
+                  className="shrink-0"
+                />
+                <span>{branchLabel}</span>
+                {stagedCount > 0 && (
+                  <span className="text-[9.5px] text-primary/80">{stagedCount}+</span>
+                )}
+                {unstagedCount > 0 && (
+                  <span className="text-[9.5px] text-muted-foreground/50">{unstagedCount}~</span>
+                )}
+              </span>
+            )}
+          </button>
+        )}
 
-      {onToggleSettings && (
-        <button
-          type="button"
-          aria-label="Settings"
-          aria-pressed={settingsOpen}
-          onClick={onToggleSettings}
-          className={cn(
-            "relative flex cursor-pointer items-center gap-1.5 border-t-2 px-2.5 text-[11px] font-medium outline-none transition-colors duration-100",
-            "focus-visible:ring-2 focus-visible:ring-ring/40",
-            settingsOpen
-              ? "border-primary text-foreground"
-              : "border-transparent text-muted-foreground/70 hover:text-muted-foreground hover:bg-sidebar-accent/60",
-          )}
-        >
-          <HugeiconsIcon
-            icon={SlidersHorizontalIcon}
-            size={12}
-            strokeWidth={settingsOpen ? 2.25 : 1.75}
-            className="shrink-0 transition-[stroke-width] duration-100"
-          />
-          <span>Settings</span>
-        </button>
-      )}
-    </div>
+        {secondaryPanels.map((panel) => {
+          const isActive = secondaryView === panel.id;
+          return (
+            <button
+              key={panel.id}
+              type="button"
+              aria-label={panel.label}
+              aria-pressed={isActive}
+              onClick={() => onSelectSecondaryPanel?.(panel.id)}
+              className={cn(
+                "relative flex cursor-pointer items-center gap-1.5 border-t-2 px-2.5 text-[11px] font-medium outline-none transition-colors duration-100",
+                "focus-visible:ring-2 focus-visible:ring-ring/40",
+                isActive
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground/70 hover:text-muted-foreground hover:bg-sidebar-accent/60",
+              )}
+            >
+              <span className="flex h-3 w-3 shrink-0 items-center justify-center">
+                {panel.icon}
+              </span>
+              <span>{panel.label}</span>
+            </button>
+          );
+        })}
+
+        {onToggleSettings && (
+          <button
+            type="button"
+            aria-label="Settings"
+            aria-pressed={settingsOpen}
+            onClick={onToggleSettings}
+            className={cn(
+              "relative flex cursor-pointer items-center gap-1.5 border-t-2 px-2.5 text-[11px] font-medium outline-none transition-colors duration-100",
+              "focus-visible:ring-2 focus-visible:ring-ring/40",
+              settingsOpen
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground/70 hover:text-muted-foreground hover:bg-sidebar-accent/60",
+            )}
+          >
+            <HugeiconsIcon
+              icon={SlidersHorizontalIcon}
+              size={12}
+              strokeWidth={settingsOpen ? 2.25 : 1.75}
+              className="shrink-0 transition-[stroke-width] duration-100"
+            />
+            <span>Settings</span>
+          </button>
+        )}
+      </div>
   );
 
   return (

@@ -1,4 +1,4 @@
-export type RightPanelViewId = "closed" | "git-context";
+export type RightPanelViewId = "closed" | "git-context" | (string & {});
 
 export type RightPanelState = Readonly<{
   view: RightPanelViewId;
@@ -20,6 +20,8 @@ export function sanitizeRightPanelState(
   state: RightPanelState,
   hasRepo: boolean,
 ): RightPanelState {
+  // Only close when git-context is shown but there's no repo.
+  // Extension panel IDs should remain open.
   if (!hasRepo && state.view === "git-context") return makeState("closed", state);
   return state;
 }
@@ -51,4 +53,12 @@ export function openGitContextPanel(
 
 export function closeRightPanel(state: RightPanelState): RightPanelState {
   return makeState("closed", state);
+}
+
+export function toggleSecondarySidebarPanel(
+  state: RightPanelState,
+  panelId: string,
+): RightPanelState {
+  if (state.view === panelId) return makeState("closed", state);
+  return makeState(panelId, state);
 }
