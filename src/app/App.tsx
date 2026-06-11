@@ -328,6 +328,17 @@ export default function App() {
       return next;
     });
   }, []);
+
+  useEffect(() => {
+    const handler = () => {
+      try {
+        const v = window.localStorage.getItem(SIDEBAR_POSITION_STORAGE_KEY);
+        if (v === "left" || v === "right") setSidebarPositionState(v);
+      } catch {}
+    };
+    window.addEventListener("recall:sidebar-position-changed", handler);
+    return () => window.removeEventListener("recall:sidebar-position-changed", handler);
+  }, []);
   const persistSidebarView = useCallback((view: SidebarViewId) => {
     setSidebarViewState(view);
     try {

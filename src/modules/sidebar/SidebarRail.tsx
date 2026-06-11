@@ -242,9 +242,9 @@ export function SidebarRail({
       style={{ height: SIDEBAR_RAIL_HEIGHT }}
       className="zoom-content flex shrink-0 items-stretch border-t border-border/60 bg-sidebar px-1"
     >
-      <div className="flex shrink-0 items-center gap-1.5 px-2 pr-3 border-r border-border/40 mr-1">
-        <AppLogoMark className="size-3.5" />
-        <span className="text-[10px] font-semibold tracking-wide text-muted-foreground/60 select-none">
+      <div className="flex shrink-0 items-center gap-1.5 px-2.5 pr-3.5 border-r border-border/40 mr-1">
+        <AppLogoMark className="size-4" />
+        <span className="text-[11px] font-semibold tracking-wide text-foreground/70 select-none">
           Recall
         </span>
       </div>

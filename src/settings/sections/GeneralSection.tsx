@@ -6,6 +6,8 @@ import { setShowHidden, setAutostart, setCheckForUpdates, setZoomLevel } from "@
 import { useTheme } from "@/modules/theme";
 import {
   ComputerIcon,
+  SidebarLeft01Icon,
+  SidebarRight01Icon,
   Moon02Icon,
   MinusSignIcon,
   PlusSignIcon,
@@ -13,9 +15,64 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { SettingsCard } from "../components/SettingsCard";
 import { SettingRow } from "../components/SettingRow";
+
+const SIDEBAR_POSITION_KEY = "recall.sidebar.position";
+const SIDEBAR_POSITION_EVENT = "recall:sidebar-position-changed";
+
+type SidebarPosition = "left" | "right";
+
+function readSidebarPosition(): SidebarPosition {
+  try {
+    const v = window.localStorage.getItem(SIDEBAR_POSITION_KEY);
+    if (v === "left" || v === "right") return v;
+  } catch {}
+  return "left";
+}
+
+function SidebarPositionToggle() {
+  const [position, setPositionState] = useState<SidebarPosition>(readSidebarPosition);
+
+  useEffect(() => {
+    const handler = () => setPositionState(readSidebarPosition());
+    window.addEventListener(SIDEBAR_POSITION_EVENT, handler);
+    return () => window.removeEventListener(SIDEBAR_POSITION_EVENT, handler);
+  }, []);
+
+  const select = (next: SidebarPosition) => {
+    try { window.localStorage.setItem(SIDEBAR_POSITION_KEY, next); } catch {}
+    window.dispatchEvent(new CustomEvent(SIDEBAR_POSITION_EVENT));
+    setPositionState(next);
+  };
+
+  const OPTIONS: { value: SidebarPosition; label: string; icon: typeof SidebarLeft01Icon }[] = [
+    { value: "left", label: "Left", icon: SidebarLeft01Icon },
+    { value: "right", label: "Right", icon: SidebarRight01Icon },
+  ];
+
+  return (
+    <div className="flex gap-1">
+      {OPTIONS.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => select(o.value)}
+          className={cn(
+            "flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-[11.5px] font-medium transition-all",
+            position === o.value
+              ? "border-foreground/30 bg-foreground/8 text-foreground"
+              : "border-border/40 text-muted-foreground hover:border-border hover:text-foreground",
+          )}
+        >
+          <HugeiconsIcon icon={o.icon} size={13} strokeWidth={position === o.value ? 2 : 1.75} />
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 const APPEARANCE: {
   id: ThemePref;
@@ -228,6 +285,12 @@ export function GeneralSection() {
           <div className="w-full">
             <AccentColorPicker />
           </div>
+        </SettingRow>
+        <SettingRow
+          title="Sidebar position"
+          description="Which side the file explorer and sessions panel appears on."
+        >
+          <SidebarPositionToggle />
         </SettingRow>
         <SettingRow
           title="Interface scale"
