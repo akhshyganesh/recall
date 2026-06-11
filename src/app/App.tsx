@@ -1726,6 +1726,7 @@ export default function App() {
               stagedCount={stagedChangeCount}
               changedCount={changedFileCount}
               onOpenSourceControl={sourceControl.hasRepo ? toggleSourceControl : undefined}
+              sidebarPosition={sidebarPosition}
             />
           )}
 
