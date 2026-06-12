@@ -36,6 +36,10 @@ export type Preferences = {
   checkForUpdates: boolean;
   sessionsMcpEnabled: boolean;
   vimMode: boolean;
+  /** Breadcrumbs bar (path + symbol chain) above code editors. */
+  editorBreadcrumbs: boolean;
+  /** Pin enclosing scope headers to the top of code editors on scroll. */
+  editorStickyScroll: boolean;
   showHidden: boolean;
   terminalWebglEnabled: boolean;
   terminalFontFamily: string;
@@ -56,6 +60,8 @@ const KEY_EDITOR_THEME = "editorTheme";
 const KEY_CHECK_FOR_UPDATES = "checkForUpdates";
 const KEY_SESSIONS_MCP_ENABLED = "sessionsMcpEnabled";
 const KEY_VIM_MODE = "vimMode";
+const KEY_EDITOR_BREADCRUMBS = "editorBreadcrumbs";
+const KEY_EDITOR_STICKY_SCROLL = "editorStickyScroll";
 const KEY_SHOW_HIDDEN = "showHidden";
 const LEGACY_KEY_SHOW_HIDDEN_DIRS = "showHiddenDirectories";
 const KEY_TERMINAL_WEBGL_ENABLED = "terminalWebglEnabled";
@@ -95,6 +101,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   checkForUpdates: true,
   sessionsMcpEnabled: false,
   vimMode: false,
+  editorBreadcrumbs: true,
+  editorStickyScroll: true,
   showHidden: false,
   terminalWebglEnabled: !IS_LINUX,
   terminalFontFamily: "",
@@ -137,6 +145,12 @@ export async function loadPreferences(): Promise<Preferences> {
       get<boolean>(KEY_SESSIONS_MCP_ENABLED) ??
       DEFAULT_PREFERENCES.sessionsMcpEnabled,
     vimMode: get<boolean>(KEY_VIM_MODE) ?? DEFAULT_PREFERENCES.vimMode,
+    editorBreadcrumbs:
+      get<boolean>(KEY_EDITOR_BREADCRUMBS) ??
+      DEFAULT_PREFERENCES.editorBreadcrumbs,
+    editorStickyScroll:
+      get<boolean>(KEY_EDITOR_STICKY_SCROLL) ??
+      DEFAULT_PREFERENCES.editorStickyScroll,
     showHidden:
       get<boolean>(KEY_SHOW_HIDDEN) ??
       get<boolean>(LEGACY_KEY_SHOW_HIDDEN_DIRS) ??
@@ -184,6 +198,14 @@ export async function setSessionsMcpEnabled(value: boolean): Promise<void> {
 
 export async function setVimMode(value: boolean): Promise<void> {
   await writePref(KEY_VIM_MODE, value);
+}
+
+export async function setEditorBreadcrumbs(value: boolean): Promise<void> {
+  await writePref(KEY_EDITOR_BREADCRUMBS, value);
+}
+
+export async function setEditorStickyScroll(value: boolean): Promise<void> {
+  await writePref(KEY_EDITOR_STICKY_SCROLL, value);
 }
 
 export async function setShowHidden(value: boolean): Promise<void> {
@@ -252,6 +274,8 @@ export async function importPreferences(prefs: Partial<Preferences>): Promise<vo
   if (prefs.checkForUpdates !== undefined) writes.push(writePref(KEY_CHECK_FOR_UPDATES, prefs.checkForUpdates));
   if (prefs.sessionsMcpEnabled !== undefined) writes.push(writePref(KEY_SESSIONS_MCP_ENABLED, prefs.sessionsMcpEnabled));
   if (prefs.vimMode !== undefined) writes.push(writePref(KEY_VIM_MODE, prefs.vimMode));
+  if (prefs.editorBreadcrumbs !== undefined) writes.push(writePref(KEY_EDITOR_BREADCRUMBS, prefs.editorBreadcrumbs));
+  if (prefs.editorStickyScroll !== undefined) writes.push(writePref(KEY_EDITOR_STICKY_SCROLL, prefs.editorStickyScroll));
   if (prefs.showHidden !== undefined) writes.push(writePref(KEY_SHOW_HIDDEN, prefs.showHidden));
   if (prefs.terminalWebglEnabled !== undefined) writes.push(writePref(KEY_TERMINAL_WEBGL_ENABLED, prefs.terminalWebglEnabled));
   if (prefs.terminalFontFamily !== undefined) writes.push(writePref(KEY_TERMINAL_FONT_FAMILY, prefs.terminalFontFamily));
@@ -282,6 +306,8 @@ export async function onPreferencesChange(
     [KEY_CHECK_FOR_UPDATES]: "checkForUpdates",
     [KEY_SESSIONS_MCP_ENABLED]: "sessionsMcpEnabled",
     [KEY_VIM_MODE]: "vimMode",
+    [KEY_EDITOR_BREADCRUMBS]: "editorBreadcrumbs",
+    [KEY_EDITOR_STICKY_SCROLL]: "editorStickyScroll",
     [KEY_SHOW_HIDDEN]: "showHidden",
     [KEY_TERMINAL_WEBGL_ENABLED]: "terminalWebglEnabled",
     [KEY_TERMINAL_FONT_FAMILY]: "terminalFontFamily",

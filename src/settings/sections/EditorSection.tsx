@@ -11,6 +11,8 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   EDITOR_THEME_LABELS,
   EDITOR_THEMES,
+  setEditorBreadcrumbs,
+  setEditorStickyScroll,
   setEditorTheme,
   setVimMode,
   type EditorThemeId,
@@ -23,6 +25,8 @@ import { SettingRow } from "../components/SettingRow";
 export function EditorSection() {
   const editorTheme = usePreferencesStore((s) => s.editorTheme);
   const vimMode = usePreferencesStore((s) => s.vimMode);
+  const editorBreadcrumbs = usePreferencesStore((s) => s.editorBreadcrumbs);
+  const editorStickyScroll = usePreferencesStore((s) => s.editorStickyScroll);
 
   const onPickEditor = (id: EditorThemeId) => void setEditorTheme(id);
 
@@ -55,6 +59,27 @@ export function EditorSection() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+        </SettingRow>
+      </SettingsCard>
+
+      <SettingsCard title="Editor features">
+        <SettingRow
+          title="Breadcrumbs"
+          description="Show the file path and current symbol above the editor."
+        >
+          <Switch
+            checked={editorBreadcrumbs}
+            onCheckedChange={(value) => void setEditorBreadcrumbs(value)}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Sticky scroll"
+          description="Pin the enclosing function or class header to the top while scrolling."
+        >
+          <Switch
+            checked={editorStickyScroll}
+            onCheckedChange={(value) => void setEditorStickyScroll(value)}
+          />
         </SettingRow>
       </SettingsCard>
 

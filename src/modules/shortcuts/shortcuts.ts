@@ -18,6 +18,7 @@ export type ShortcutId =
   | "pane.focusPrev"
   | "pane.source"
   | "search.focus"
+  | "search.project"
   | "explorer.search"
   | "explorer.focus"
   | "file.quickOpen"
@@ -36,6 +37,7 @@ export type ShortcutId =
   | "view.zen"
   | "editor.undo"
   | "editor.redo"
+  | "editor.goToSymbol"
   | "terminal.clear"
   | "ai.nlCommand";
 
@@ -177,6 +179,14 @@ export const SHORTCUTS: Shortcut[] = [
     id: "explorer.search",
     label: "Search files",
     group: "Search",
+    // Cmd/Ctrl+Shift+F now opens project search; explorer filename search
+    // remains available via the explorer toolbar button.
+    defaultBindings: [],
+  },
+  {
+    id: "search.project",
+    label: "Search in project",
+    group: "Search",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "f" }],
   },
   {
@@ -271,6 +281,12 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Redo",
     group: "Editor",
     defaultBindings: [{ [MOD_PROP]: true, key: "y" }],
+  },
+  {
+    id: "editor.goToSymbol",
+    label: "Go to symbol in editor",
+    group: "Editor",
+    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "o" }],
   },
 ];
 

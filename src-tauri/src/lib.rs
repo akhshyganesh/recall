@@ -1,6 +1,6 @@
 mod modules;
 
-use modules::{fs, git, pty, sessions, workspace};
+use modules::{fs, git, lsp, pty, sessions, workspace};
 use std::sync::Mutex;
 use tauri::{Manager, State};
 use tauri_plugin_window_state::StateFlags;
@@ -63,6 +63,7 @@ pub fn run() {
         })
         .manage(LaunchDir(Mutex::new(parse_launch_dir())))
         .manage(fs::watch::WatchState::default())
+        .manage(lsp::LspState::default())
         .setup(|app| {
             let session_state = app.state::<sessions::AppState>();
             sessions::spawn_initial_scan(session_state.db_handle());
@@ -104,6 +105,12 @@ pub fn run() {
             fs::mutate::fs_delete,
             fs::search::fs_search,
             fs::search::fs_list_files,
+            fs::content_search::fs_content_search,
+            fs::content_search::fs_replace_in_file,
+            fs::content_search::fs_replace_all,
+            lsp::lsp_start,
+            lsp::lsp_send,
+            lsp::lsp_stop,
             fs::watch::fs_watch_add,
             fs::watch::fs_watch_remove,
             git::commands::git_resolve_repo,
@@ -135,6 +142,13 @@ pub fn run() {
             workspace::workspace_current_dir,
             get_launch_dir,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while running tauri application")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                // Kill all language-server children so they never outlive the
+                // host process (PTY children are killed via Session::drop).
+                app.state::<lsp::LspState>().shutdown_all();
+            }
+        });
 }

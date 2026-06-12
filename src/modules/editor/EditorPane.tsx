@@ -5,28 +5,35 @@ import {
   SearchQuery,
   setSearchQuery,
 } from "@codemirror/search";
-import { keymap } from "@codemirror/view";
+import { EditorView, keymap } from "@codemirror/view";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { EDITOR_THEME_EXT } from "./lib/themes";
 import {
   forwardRef,
+  useCallback,
   useEffect,
   useImperativeHandle,
   useMemo,
   useRef,
+  useState,
 } from "react";
 import { Prec } from "@codemirror/state";
 import { vim } from "@replit/codemirror-vim";
 import {
   buildSharedExtensions,
   languageCompartment,
+  stickyScrollCompartment,
   vimCompartment,
 } from "./lib/extensions";
 import { initVimGlobals, vimHandlersExtension } from "./lib/vim";
 
 initVimGlobals();
+import { EditorBreadcrumbs } from "./EditorBreadcrumbs";
 import { resolveLanguage } from "./lib/languageResolver";
+import { rainbowBrackets } from "./lib/rainbowBrackets";
+import { stickyScroll } from "./lib/stickyScroll";
+import { extractSymbols, symbolChainAt, type EditorSymbol } from "./lib/symbols";
 import { useDocument } from "./lib/useDocument";
 
 export type EditorPaneHandle = {
@@ -42,6 +49,13 @@ export type EditorPaneHandle = {
   /** Apply CodeMirror's undo/redo commands. */
   undo: () => void;
   redo: () => void;
+  /**
+   * Move the cursor to a 1-based line and scroll it into view.
+   * Returns false if the editor view is not mounted yet (caller may retry).
+   */
+  revealLine: (line: number) => boolean;
+  /** Document symbols (functions, classes, headings, …) for go-to-symbol. */
+  getSymbols: () => EditorSymbol[];
 };
 
 type Props = {
@@ -65,6 +79,10 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const cmRef = useRef<ReactCodeMirrorRef>(null);
     const editorThemeId = usePreferencesStore((s) => s.editorTheme);
     const vimMode = usePreferencesStore((s) => s.vimMode);
+    const breadcrumbsEnabled = usePreferencesStore((s) => s.editorBreadcrumbs);
+    const stickyScrollEnabled = usePreferencesStore(
+      (s) => s.editorStickyScroll,
+    );
     const languageRef = useRef<string | null>(null);
     const themeExt = EDITOR_THEME_EXT[editorThemeId] ?? EDITOR_THEME_EXT.atomone;
 
@@ -80,6 +98,36 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
 
     const pathRef = useRef(path);
     pathRef.current = path;
+
+    // Breadcrumbs: debounced symbol-chain recompute on cursor/doc changes.
+    const [symbolChain, setSymbolChain] = useState<EditorSymbol[]>([]);
+    const breadcrumbsEnabledRef = useRef(breadcrumbsEnabled);
+    breadcrumbsEnabledRef.current = breadcrumbsEnabled;
+    const breadcrumbTimer = useRef<number | null>(null);
+    const scheduleBreadcrumbs = useCallback(() => {
+      if (!breadcrumbsEnabledRef.current) return;
+      if (breadcrumbTimer.current !== null) {
+        window.clearTimeout(breadcrumbTimer.current);
+      }
+      breadcrumbTimer.current = window.setTimeout(() => {
+        breadcrumbTimer.current = null;
+        const view = cmRef.current?.view;
+        if (!view) return;
+        setSymbolChain(
+          symbolChainAt(view.state, view.state.selection.main.head),
+        );
+      }, 150);
+    }, []);
+    useEffect(
+      () => () => {
+        if (breadcrumbTimer.current !== null) {
+          window.clearTimeout(breadcrumbTimer.current);
+        }
+      },
+      [],
+    );
+    const scheduleBreadcrumbsRef = useRef(scheduleBreadcrumbs);
+    scheduleBreadcrumbsRef.current = scheduleBreadcrumbs;
 
     const extensions = useMemo(
       () => [
@@ -99,6 +147,17 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
         })),
         ...buildSharedExtensions(),
         languageCompartment.of([]),
+        rainbowBrackets(),
+        stickyScrollCompartment.of(
+          usePreferencesStore.getState().editorStickyScroll
+            ? stickyScroll()
+            : [],
+        ),
+        EditorView.updateListener.of((u) => {
+          if (u.selectionSet || u.docChanged) {
+            scheduleBreadcrumbsRef.current();
+          }
+        }),
         keymap.of([
           {
             key: "Mod-s",
@@ -127,6 +186,16 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     }, [vimMode]);
 
     useEffect(() => {
+      const view = cmRef.current?.view;
+      if (!view) return;
+      view.dispatch({
+        effects: stickyScrollCompartment.reconfigure(
+          stickyScrollEnabled ? stickyScroll() : [],
+        ),
+      });
+    }, [stickyScrollEnabled]);
+
+    useEffect(() => {
       let cancelled = false;
       const ext = path.split(".").pop()?.toLowerCase() ?? null;
       languageRef.current = ext;
@@ -137,6 +206,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
         view.dispatch({
           effects: languageCompartment.reconfigure(ext ?? []),
         });
+        scheduleBreadcrumbsRef.current();
       });
       return () => {
         cancelled = true;
@@ -191,6 +261,23 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
           const view = cmRef.current?.view;
           if (view) redo(view);
         },
+        revealLine: (line: number) => {
+          const view = cmRef.current?.view;
+          if (!view) return false;
+          const clamped = Math.max(1, Math.min(line, view.state.doc.lines));
+          const pos = view.state.doc.line(clamped).from;
+          view.dispatch({
+            selection: { anchor: pos },
+            effects: EditorView.scrollIntoView(pos, { y: "center" }),
+          });
+          view.focus();
+          return true;
+        },
+        getSymbols: () => {
+          const view = cmRef.current?.view;
+          if (!view) return [];
+          return extractSymbols(view.state);
+        },
       }),
       [path],
     );
@@ -232,6 +319,9 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
 
     return (
       <div className="flex h-full min-h-0 flex-col">
+        {breadcrumbsEnabled && (
+          <EditorBreadcrumbs path={path} symbols={symbolChain} />
+        )}
         <CodeMirror
           ref={cmRef}
           value={doc.content}

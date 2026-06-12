@@ -1,4 +1,4 @@
-export type CoreSidebarViewId = "sessions" | "explorer" | "extensions";
+export type CoreSidebarViewId = "sessions" | "explorer" | "search" | "extensions";
 
 /**
  * Built-in view IDs plus any string registered by an extension.

@@ -114,6 +114,45 @@ export type GitDiscardEntry = {
 	untracked: boolean;
 };
 
+// Mirrors src-tauri/gen/bindings/ContentSearchOptions.ts (all fields defaulted server-side).
+export type ContentSearchOptions = {
+	case_sensitive?: boolean;
+	whole_word?: boolean;
+	regex?: boolean;
+	include_glob?: string | null;
+	exclude_glob?: string | null;
+	max_results?: number | null;
+};
+
+// Mirrors src-tauri/gen/bindings/ContentMatch.ts.
+// NOTE: match_start/match_end are UTF-8 BYTE offsets into line_text.
+export type ContentMatch = {
+	path: string;
+	absolute_path: string;
+	line_number: number;
+	line_text: string;
+	match_start: number;
+	match_end: number;
+};
+
+export type ContentSearchResult = {
+	matches: ContentMatch[];
+	truncated: boolean;
+};
+
+// Mirrors src-tauri/gen/bindings/ReplaceEdit.ts.
+export type ReplaceEdit = {
+	line_number: number;
+	match_start: number;
+	match_end: number;
+	replacement: string;
+};
+
+export type ReplaceAllResult = {
+	files_changed: number;
+	matches_replaced: number;
+};
+
 export const native = {
 	workspaceCurrentDir: () => invoke<string>("workspace_current_dir"),
 	workspaceAuthorize: (path: string) =>
@@ -141,6 +180,32 @@ export const native = {
 		invoke<void>("fs_create_file", { path, workspace: currentWorkspaceEnv() }),
 	createDir: (path: string) =>
 		invoke<void>("fs_create_dir", { path, workspace: currentWorkspaceEnv() }),
+	contentSearch: (root: string, query: string, options?: ContentSearchOptions) =>
+		invoke<ContentSearchResult>("fs_content_search", {
+			root,
+			query,
+			options: options ?? null,
+			workspace: currentWorkspaceEnv(),
+		}),
+	replaceInFile: (path: string, replacements: ReplaceEdit[]) =>
+		invoke<void>("fs_replace_in_file", {
+			path,
+			replacements,
+			workspace: currentWorkspaceEnv(),
+		}),
+	replaceAll: (
+		root: string,
+		query: string,
+		options: ContentSearchOptions | undefined,
+		replacement: string,
+	) =>
+		invoke<ReplaceAllResult>("fs_replace_all", {
+			root,
+			query,
+			options: options ?? null,
+			replacement,
+			workspace: currentWorkspaceEnv(),
+		}),
 	gitResolveRepo: (cwd: string) =>
 		invoke<GitRepoInfo | null>("git_resolve_repo", {
 			cwd,

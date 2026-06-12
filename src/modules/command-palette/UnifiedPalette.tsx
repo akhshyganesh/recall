@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { KEY_SEP } from "@/lib/platform";
+import type { EditorSymbol, SymbolKind } from "@/modules/editor";
 import { useExtensionCommands } from "@/modules/extensions";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import {
@@ -54,6 +55,30 @@ function fuzzyMatch(text: string, query: string): boolean {
   return qi === q.length;
 }
 
+/** Active editor surface for the "@" go-to-symbol mode. */
+export type SymbolSource = {
+  getSymbols: () => EditorSymbol[];
+  revealLine: (line: number) => boolean;
+};
+
+const SYMBOL_KIND_LABELS: Record<SymbolKind, string> = {
+  function: "fn",
+  method: "method",
+  class: "class",
+  interface: "interface",
+  enum: "enum",
+  type: "type",
+  struct: "struct",
+  trait: "trait",
+  impl: "impl",
+  module: "mod",
+  constant: "const",
+  property: "key",
+  heading: "h",
+};
+
+const MAX_SYMBOL_RESULTS = 200;
+
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -61,6 +86,8 @@ type Props = {
   onOpenFile: (path: string) => void;
   onRunCommand: (id: ShortcutId) => void;
   initialQuery?: string;
+  /** Symbols provider for the active editor tab, if any. */
+  symbolSource?: SymbolSource | null;
 };
 
 export function UnifiedPalette({
@@ -70,6 +97,7 @@ export function UnifiedPalette({
   onOpenFile,
   onRunCommand,
   initialQuery = "",
+  symbolSource = null,
 }: Props) {
   const [query, setQuery] = useState(initialQuery);
   const showHidden = usePreferencesStore((s) => s.showHidden);
@@ -77,9 +105,12 @@ export function UnifiedPalette({
   const extensionCommands = useExtensionCommands();
 
   const isCommandMode = query.trimStart().startsWith(">");
+  const isSymbolMode = !isCommandMode && query.trimStart().startsWith("@");
   const effectiveSearch = isCommandMode
     ? query.slice(query.indexOf(">") + 1).trim()
-    : query.trim();
+    : isSymbolMode
+      ? query.slice(query.indexOf("@") + 1).trim()
+      : query.trim();
 
   useEffect(() => {
     if (open) setQuery(initialQuery);
@@ -91,8 +122,25 @@ export function UnifiedPalette({
   const [fileTruncated, setFileTruncated] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Symbols of the active editor — snapshotted once per palette open.
+  const [symbols, setSymbols] = useState<EditorSymbol[]>([]);
   useEffect(() => {
-    if (isCommandMode) {
+    if (!open || !isSymbolMode) return;
+    setSymbols(symbolSource?.getSymbols() ?? []);
+    // Intentionally not re-reading on every keystroke; the doc can't change
+    // while the palette is open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isSymbolMode]);
+
+  const filteredSymbols = useMemo(() => {
+    if (!isSymbolMode) return [];
+    return symbols
+      .filter((s) => fuzzyMatch(s.name, effectiveSearch))
+      .slice(0, MAX_SYMBOL_RESULTS);
+  }, [isSymbolMode, symbols, effectiveSearch]);
+
+  useEffect(() => {
+    if (isCommandMode || isSymbolMode) {
       setFileResults([]);
       setFileTruncated(false);
       return;
@@ -125,7 +173,7 @@ export function UnifiedPalette({
       alive = false;
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [effectiveSearch, isCommandMode, rootPath, showHidden]);
+  }, [effectiveSearch, isCommandMode, isSymbolMode, rootPath, showHidden]);
 
   // Command filtering
   const commandGroups = useMemo(() => {
@@ -151,11 +199,19 @@ export function UnifiedPalette({
   }, [isCommandMode, effectiveSearch, extensionCommands]);
 
   const hasCommands = commandGroups.length > 0 || filteredExtensions.length > 0;
-  const hasDirectPath = !isCommandMode && isAbsolutePath(effectiveSearch);
+  const hasDirectPath =
+    !isCommandMode && !isSymbolMode && isAbsolutePath(effectiveSearch);
   const hasFiles = fileResults.length > 0;
   const showEmpty = isCommandMode
     ? effectiveSearch.length > 0 && !hasCommands
-    : effectiveSearch.length > 0 && !hasDirectPath && !hasFiles;
+    : isSymbolMode
+      ? filteredSymbols.length === 0
+      : effectiveSearch.length > 0 && !hasDirectPath && !hasFiles;
+
+  const revealSymbol = (s: EditorSymbol) => {
+    onOpenChange(false);
+    setTimeout(() => symbolSource?.revealLine(s.line), 16);
+  };
 
   const runCommand = (id: ShortcutId) => {
     onOpenChange(false);
@@ -186,9 +242,9 @@ export function UnifiedPalette({
         <Command shouldFilter={false} className="rounded-none bg-transparent p-0">
           {/* Input row */}
           <div className="flex items-center gap-2 border-b border-border/40 px-3 py-1.5">
-            {isCommandMode ? (
+            {isCommandMode || isSymbolMode ? (
               <span className="shrink-0 select-none rounded px-1 py-0.5 font-mono text-[10px] font-bold text-primary bg-primary/10">
-                &gt;
+                {isCommandMode ? ">" : "@"}
               </span>
             ) : (
               <HugeiconsIcon
@@ -202,7 +258,9 @@ export function UnifiedPalette({
               placeholder={
                 isCommandMode
                   ? "Search commands…"
-                  : "Search files… (> for commands)"
+                  : isSymbolMode
+                    ? "Go to symbol…"
+                    : "Search files… (> for commands, @ for symbols)"
               }
               value={query}
               onValueChange={setQuery}
@@ -213,17 +271,52 @@ export function UnifiedPalette({
           <CommandList className="max-h-[340px] pb-0">
             {showEmpty && (
               <CommandEmpty className="py-5 text-xs">
-                {isCommandMode ? "No commands found." : "No files found."}
+                {isCommandMode
+                  ? "No commands found."
+                  : isSymbolMode
+                    ? "No symbols found."
+                    : "No files found."}
               </CommandEmpty>
             )}
 
             {/* File mode: empty hint */}
-            {!isCommandMode && !effectiveSearch && (
+            {!isCommandMode && !isSymbolMode && !effectiveSearch && (
               <div className="px-3 py-5 text-center text-xs text-muted-foreground/60">
                 Type to search files &nbsp;·&nbsp;{" "}
                 <span className="font-mono font-medium text-foreground/40">&gt;</span>{" "}
-                for commands
+                for commands &nbsp;·&nbsp;{" "}
+                <span className="font-mono font-medium text-foreground/40">@</span>{" "}
+                for symbols
               </div>
+            )}
+
+            {/* Symbol mode: active editor symbols */}
+            {isSymbolMode && filteredSymbols.length > 0 && (
+              <CommandGroup
+                heading="Symbols"
+                className="[&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-[10px]"
+              >
+                {filteredSymbols.map((s, i) => (
+                  <CommandItem
+                    key={`${s.from}-${i}`}
+                    value={`${s.name}-${s.from}`}
+                    onSelect={() => revealSymbol(s)}
+                    className="mx-1 rounded-lg px-2 py-1 text-xs"
+                  >
+                    <span
+                      className="shrink-0"
+                      style={{ width: `${Math.min(s.depth, 6) * 10}px` }}
+                    />
+                    <span className="shrink-0 select-none rounded bg-muted px-1 font-mono text-[9px] uppercase text-muted-foreground">
+                      {SYMBOL_KIND_LABELS[s.kind]}
+                    </span>
+                    <span className="truncate font-medium">{s.name}</span>
+                    <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
+                      :{s.line}
+                    </span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
             )}
 
             {/* Direct absolute path */}
