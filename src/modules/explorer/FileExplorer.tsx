@@ -7,6 +7,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import {
+  CollapseIcon,
   FileAddIcon,
   Folder01Icon,
   FolderAddIcon,
@@ -158,6 +159,9 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
     const [selectedPath, setSelectedPath] = useState<string | null>(null);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isSearchActive, setIsSearchActive] = useState(false);
+    const [draggingPath, setDraggingPath] = useState<string | null>(null);
+    const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
+    const [clipboard, setClipboard] = useState<{ path: string; op: "copy" | "cut" } | null>(null);
     const searchRef = useRef<ExplorerSearchHandle>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -267,7 +271,40 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
         requestAnimationFrame(() => scrollEntryIntoView(path));
       };
 
+      const isMod = e.metaKey || e.ctrlKey;
+
       switch (e.key) {
+        case "c": {
+          if (!isMod || !selectedPath) break;
+          e.preventDefault();
+          setClipboard({ path: selectedPath, op: "copy" });
+          break;
+        }
+        case "x": {
+          if (!isMod || !selectedPath) break;
+          e.preventDefault();
+          setClipboard({ path: selectedPath, op: "cut" });
+          break;
+        }
+        case "v": {
+          if (!isMod || !clipboard) break;
+          e.preventDefault();
+          const pasteTarget = (() => {
+            if (!selectedPath) return rootPath;
+            const idx = entryIndexByPath.get(selectedPath);
+            if (idx === undefined) return rootPath;
+            const row = rows[idx];
+            if (row.kind === "entry" && row.isDir) return selectedPath;
+            return selectedPath.slice(0, selectedPath.lastIndexOf("/")) || rootPath;
+          })();
+          if (clipboard.op === "cut") {
+            void tree.movePath(clipboard.path, pasteTarget);
+            setClipboard(null);
+          } else {
+            void tree.copyPath(clipboard.path, pasteTarget);
+          }
+          break;
+        }
         case "ArrowDown":
           e.preventDefault();
           move(currentIdx < 0 ? 0 : currentIdx + 1);
@@ -321,6 +358,12 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
       }
     };
 
+    const handleDrop = (fromPath: string, toDir: string) => {
+      void tree.movePath(fromPath, toDir);
+      setDraggingPath(null);
+      setDropTargetPath(null);
+    };
+
     const renderRow = (row: Row) => {
       switch (row.kind) {
         case "entry":
@@ -340,6 +383,12 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
               onSelectPath={setSelectedPath}
               onRevealInTerminal={onRevealInTerminal}
               onOpenMarkdownPreview={onOpenMarkdownPreview}
+              draggingPath={draggingPath}
+              dropTargetPath={dropTargetPath}
+              onDragStart={setDraggingPath}
+              onDragEnd={() => { setDraggingPath(null); setDropTargetPath(null); }}
+              onDragOverPath={setDropTargetPath}
+              onDropOnPath={handleDrop}
             />
           );
         }
@@ -390,6 +439,16 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
             aria-label="Search files"
           >
             <HugeiconsIcon icon={Search01Icon} size={13} strokeWidth={2} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-6 text-muted-foreground hover:text-foreground"
+            onClick={() => tree.collapseAll()}
+            title="Collapse all folders"
+            aria-label="Collapse all folders"
+          >
+            <HugeiconsIcon icon={CollapseIcon} size={13} strokeWidth={2} />
           </Button>
 
           <Button
