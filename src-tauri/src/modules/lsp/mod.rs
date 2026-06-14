@@ -76,8 +76,8 @@ fn try_extract_frame(buf: &[u8]) -> Result<Option<(String, usize)>, String> {
     let Some(header_end) = buf.windows(4).position(|w| w == b"\r\n\r\n") else {
         return Ok(None);
     };
-    let headers = std::str::from_utf8(&buf[..header_end])
-        .map_err(|_| "non-UTF-8 LSP header".to_string())?;
+    let headers =
+        std::str::from_utf8(&buf[..header_end]).map_err(|_| "non-UTF-8 LSP header".to_string())?;
     let mut content_length: Option<usize> = None;
     for line in headers.split("\r\n") {
         if let Some((name, value)) = line.split_once(':') {
@@ -96,7 +96,8 @@ fn try_extract_frame(buf: &[u8]) -> Result<Option<(String, usize)>, String> {
     if buf.len() < body_start + len {
         return Ok(None);
     }
-    let body = String::from_utf8_lossy(&buf[body_start..body_start + len]).into_owned();
+    let body = String::from_utf8(buf[body_start..body_start + len].to_vec())
+        .map_err(|e| format!("LSP frame body is not valid UTF-8: {e}"))?;
     Ok(Some((body, body_start + len)))
 }
 
@@ -288,7 +289,9 @@ mod tests {
 
     #[test]
     fn waits_for_header_terminator() {
-        assert!(try_extract_frame(b"Content-Length: 5\r\n").unwrap().is_none());
+        assert!(try_extract_frame(b"Content-Length: 5\r\n")
+            .unwrap()
+            .is_none());
     }
 
     #[test]

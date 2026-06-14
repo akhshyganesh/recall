@@ -40,8 +40,7 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), String> {
         if ty.is_dir() {
             copy_dir_all(&entry.path(), &dst.join(entry.file_name()))?;
         } else {
-            std::fs::copy(entry.path(), dst.join(entry.file_name()))
-                .map_err(|e| e.to_string())?;
+            std::fs::copy(entry.path(), dst.join(entry.file_name())).map_err(|e| e.to_string())?;
         }
     }
     Ok(())

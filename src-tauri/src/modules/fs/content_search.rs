@@ -175,7 +175,11 @@ fn search_file(
                     match_end,
                 });
                 // Guard against zero-width regex matches looping forever.
-                at = if m.end() > m.start() { m.end() } else { m.end() + 1 };
+                at = if m.end() > m.start() {
+                    m.end()
+                } else {
+                    m.end() + 1
+                };
                 if at >= line.len() {
                     break;
                 }
@@ -358,14 +362,19 @@ fn apply_replacements(content: &str, replacements: &[ReplaceEdit]) -> Result<Str
         if edits.is_empty() {
             out.push_str(line);
         } else {
-            out.push_str(&apply_line_edits(line, &mut edits).map_err(|e| {
-                format!("line {line_number}: {e}")
-            })?);
+            out.push_str(
+                &apply_line_edits(line, &mut edits)
+                    .map_err(|e| format!("line {line_number}: {e}"))?,
+            );
         }
         out.push_str(ending);
         rest = &rest[line_end + ending_len..];
     }
-    let max_line = replacements.iter().map(|r| r.line_number).max().unwrap_or(0);
+    let max_line = replacements
+        .iter()
+        .map(|r| r.line_number)
+        .max()
+        .unwrap_or(0);
     if max_line > line_number {
         return Err(format!(
             "replacement targets line {max_line} but file has only {line_number} lines"

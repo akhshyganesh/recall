@@ -12,7 +12,7 @@ import { SessionHistoryStack } from "@/modules/sessions";
 import type { Tab } from "@/modules/tabs";
 import { TerminalStack, type TerminalPaneHandle } from "@/modules/terminal";
 import type { SearchAddon } from "@xterm/addon-search";
-import React from "react";
+import type React from "react";
 
 type SplitPaneHandlers = {
   registerTerminalHandle: (leafId: number, h: TerminalPaneHandle | null) => void;

@@ -8,7 +8,8 @@ import {
 import type { SidebarViewId } from "@/modules/sidebar";
 import type { Tab } from "@/modules/tabs";
 import type { TerminalPaneHandle } from "@/modules/terminal";
-import React, { useCallback, useMemo } from "react";
+import type React from "react";
+import { useCallback, useMemo } from "react";
 
 export function useAppShortcuts({
   activeId,
