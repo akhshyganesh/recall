@@ -149,6 +149,42 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     };
   }, [rootPath, refreshLoadedPaths]);
 
+  const collapseAll = useCallback(() => {
+    setExpanded(new Set());
+  }, []);
+
+  const movePath = useCallback(
+    async (from: string, toDir: string) => {
+      const name = from.slice(from.lastIndexOf("/") + 1);
+      const to = joinPath(toDir, name);
+      if (to === from) return;
+      const fromParent = dirname(from);
+      try {
+        await invoke("fs_rename", { from, to, workspace: currentWorkspaceEnv() });
+        options?.onPathRenamed?.(from, to);
+        await Promise.all([fetchChildren(fromParent), fetchChildren(toDir)]);
+      } catch (e) {
+        console.error("fs_rename (move) failed:", e);
+      }
+    },
+    [fetchChildren, options],
+  );
+
+  const copyPath = useCallback(
+    async (from: string, toDir: string) => {
+      const name = from.slice(from.lastIndexOf("/") + 1);
+      const to = joinPath(toDir, name);
+      if (to === from) return;
+      try {
+        await invoke("fs_copy", { from, to, workspace: currentWorkspaceEnv() });
+        await fetchChildren(toDir);
+      } catch (e) {
+        console.error("fs_copy failed:", e);
+      }
+    },
+    [fetchChildren],
+  );
+
   const toggle = useCallback(
     (path: string) => {
       setExpanded((curr) => {
@@ -293,6 +329,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     renaming,
     toggle,
     expand,
+    collapseAll,
     refresh,
     beginCreate,
     cancelCreate,
@@ -301,6 +338,8 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     cancelRename,
     commitRename,
     deletePath,
+    movePath,
+    copyPath,
     joinPath,
   };
 }

@@ -7,11 +7,11 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import {
+  ArrowShrinkIcon,
   FileAddIcon,
   Folder01Icon,
   FolderAddIcon,
   Refresh01Icon,
-  Search01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -24,14 +24,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { ExplorerSearch, type ExplorerSearchHandle } from "./ExplorerSearch";
 import { EntryRow, PendingRow, StatusRow } from "./TreeRow";
 import { InlineInput } from "./InlineInput";
 import { copyToClipboard, revealInFinder } from "./lib/contextActions";
 import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import { useFileTree } from "./lib/useFileTree";
-import { useGlobalShortcuts } from "@/modules/shortcuts";
 
 export type FileExplorerHandle = {
   focus: () => void;
@@ -156,9 +154,9 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
   ) {
     const tree = useFileTree(rootPath, { onPathRenamed, onPathDeleted });
     const [selectedPath, setSelectedPath] = useState<string | null>(null);
-    const [isSearchOpen, setIsSearchOpen] = useState(false);
-    const [isSearchActive, setIsSearchActive] = useState(false);
-    const searchRef = useRef<ExplorerSearchHandle>(null);
+    const [draggingPath, setDraggingPath] = useState<string | null>(null);
+    const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
+    const [clipboard, setClipboard] = useState<{ path: string; op: "copy" | "cut" } | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -217,17 +215,6 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
       [entryPaths, scrollEntryIntoView, selectedPath],
     );
 
-    useGlobalShortcuts({
-      "explorer.search": () => {
-        if (searchRef.current?.isFocused()) {
-          setIsSearchOpen(false);
-          return;
-        }
-        setIsSearchOpen(true);
-        searchRef.current?.focus();
-      },
-    });
-
     if (!rootPath) {
       return (
         <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
@@ -249,7 +236,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
       tree.pendingCreate?.parentPath === rootPath ? tree.pendingCreate : null;
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-      if (tree.renaming || tree.pendingCreate || isSearchOpen) return;
+      if (tree.renaming || tree.pendingCreate) return;
       const target = e.target as HTMLElement;
       if (
         target.tagName === "INPUT" ||
@@ -267,7 +254,40 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
         requestAnimationFrame(() => scrollEntryIntoView(path));
       };
 
+      const isMod = e.metaKey || e.ctrlKey;
+
       switch (e.key) {
+        case "c": {
+          if (!isMod || !selectedPath) break;
+          e.preventDefault();
+          setClipboard({ path: selectedPath, op: "copy" });
+          break;
+        }
+        case "x": {
+          if (!isMod || !selectedPath) break;
+          e.preventDefault();
+          setClipboard({ path: selectedPath, op: "cut" });
+          break;
+        }
+        case "v": {
+          if (!isMod || !clipboard) break;
+          e.preventDefault();
+          const pasteTarget = (() => {
+            if (!selectedPath) return rootPath;
+            const idx = entryIndexByPath.get(selectedPath);
+            if (idx === undefined) return rootPath;
+            const row = rows[idx];
+            if (row.kind === "entry" && row.isDir) return selectedPath;
+            return selectedPath.slice(0, selectedPath.lastIndexOf("/")) || rootPath;
+          })();
+          if (clipboard.op === "cut") {
+            void tree.movePath(clipboard.path, pasteTarget);
+            setClipboard(null);
+          } else {
+            void tree.copyPath(clipboard.path, pasteTarget);
+          }
+          break;
+        }
         case "ArrowDown":
           e.preventDefault();
           move(currentIdx < 0 ? 0 : currentIdx + 1);
@@ -321,6 +341,12 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
       }
     };
 
+    const handleDrop = (fromPath: string, toDir: string) => {
+      void tree.movePath(fromPath, toDir);
+      setDraggingPath(null);
+      setDropTargetPath(null);
+    };
+
     const renderRow = (row: Row) => {
       switch (row.kind) {
         case "entry":
@@ -340,6 +366,12 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
               onSelectPath={setSelectedPath}
               onRevealInTerminal={onRevealInTerminal}
               onOpenMarkdownPreview={onOpenMarkdownPreview}
+              draggingPath={draggingPath}
+              dropTargetPath={dropTargetPath}
+              onDragStart={setDraggingPath}
+              onDragEnd={() => { setDraggingPath(null); setDropTargetPath(null); }}
+              onDragOverPath={setDropTargetPath}
+              onDropOnPath={handleDrop}
             />
           );
         }
@@ -385,11 +417,11 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
             variant="ghost"
             size="icon"
             className="size-6 text-muted-foreground hover:text-foreground"
-            onClick={() => setIsSearchOpen((v) => !v)}
-            title="Search files"
-            aria-label="Search files"
+            onClick={() => tree.collapseAll()}
+            title="Collapse all folders"
+            aria-label="Collapse all folders"
           >
-            <HugeiconsIcon icon={Search01Icon} size={13} strokeWidth={2} />
+            <HugeiconsIcon icon={ArrowShrinkIcon} size={13} strokeWidth={2} />
           </Button>
 
           <Button
@@ -421,18 +453,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
           </Button>
         </div>
 
-        <ExplorerSearch
-          ref={searchRef}
-          rootPath={rootPath}
-          onOpenFile={onOpenFile}
-          open={isSearchOpen}
-          onRequestClose={() => setIsSearchOpen(false)}
-          onActiveChange={setIsSearchActive}
-          onRevealInTerminal={onRevealInTerminal}
-        />
-
-        {!isSearchActive ? (
-          <ContextMenu>
+        <ContextMenu>
             <ContextMenuTrigger asChild>
               <div
                 ref={scrollRef}
@@ -553,7 +574,6 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
               </ContextMenuItem>
             </ContextMenuContent>
           </ContextMenu>
-        ) : null}
       </div>
     );
   },

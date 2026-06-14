@@ -54,6 +54,12 @@ export default defineConfig(async ({ mode }) => ({
       },
       output: {
         manualChunks(id: string) {
+          if (
+            id.includes("modules/explorer/lib/fileIcons") ||
+            id.includes("modules/explorer/lib/folderIcons") ||
+            id.includes("@iconify-json/catppuccin")
+          )
+            return "file-icons";
           if (!id.includes("node_modules")) return;
 
           if (id.includes("/xterm/") || id.includes("@xterm/")) return "xterm";

@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use crate::modules::workspace::{resolve_path, WorkspaceEnv};
 
 /// Creates a new empty file. Fails if the file already exists.
@@ -28,6 +30,41 @@ pub fn fs_create_dir(path: String, workspace: Option<WorkspaceEnv>) -> Result<()
         log::debug!("fs_create_dir({}) failed: {e}", p.display());
         e.to_string()
     })
+}
+
+fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), String> {
+    std::fs::create_dir_all(dst).map_err(|e| e.to_string())?;
+    for entry in std::fs::read_dir(src).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let ty = entry.file_type().map_err(|e| e.to_string())?;
+        if ty.is_dir() {
+            copy_dir_all(&entry.path(), &dst.join(entry.file_name()))?;
+        } else {
+            std::fs::copy(entry.path(), dst.join(entry.file_name())).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+/// Copies a file or directory to a new path. Refuses to overwrite an existing target.
+#[tauri::command]
+pub fn fs_copy(from: String, to: String, workspace: Option<WorkspaceEnv>) -> Result<(), String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    let from_p = resolve_path(&from, &workspace);
+    let to_p = resolve_path(&to, &workspace);
+    if !from_p.exists() {
+        return Err(format!("not found: {}", from_p.display()));
+    }
+    if to_p.exists() {
+        return Err(format!("already exists: {}", to_p.display()));
+    }
+    if from_p.is_dir() {
+        copy_dir_all(&from_p, &to_p)
+    } else {
+        std::fs::copy(&from_p, &to_p)
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
 }
 
 /// Renames (or moves) a path. Refuses to overwrite an existing target.

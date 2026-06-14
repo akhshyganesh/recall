@@ -4,60 +4,35 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { native } from "@/lib/native";
 import {
-  EditorStack,
-  GitDiffStack,
   NewEditorDialog,
   type EditorPaneHandle,
 } from "@/modules/editor";
-import {
-  GitHistoryStack,
-  type GitHistorySearchHandle,
-} from "@/modules/git-history";
+import type { GitHistorySearchHandle } from "@/modules/git-history";
 import { getLaunchDir } from "@/lib/launchDir";
 import { useZoom } from "@/lib/useZoom";
 import { FileExplorer, type FileExplorerHandle } from "@/modules/explorer";
-import { UnifiedPalette } from "@/modules/command-palette/UnifiedPalette";
+import { SearchPanel, type SearchPanelHandle } from "@/modules/search";
+import { UnifiedPalette } from "@/modules/command-palette/UnifiedPaletteLazy";
 import {
   Header,
   type SearchInlineHandle,
   type SearchTarget,
 } from "@/modules/header";
-import { MarkdownStack } from "@/modules/markdown";
-import {
-  MediaStack,
-  PreviewStack,
-  type PreviewPaneHandle,
-} from "@/modules/preview";
+import { type PreviewPaneHandle } from "@/modules/preview";
 import { listenSettingsTabRequests } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setSessionsMcpEnabled as applySessionsMcpEnabled } from "@/modules/sessions/api";
-import { SessionHistoryStack, SessionSidebar } from "@/modules/sessions";
-import {
-  useGlobalShortcuts,
-  type ShortcutHandlers,
-  type ShortcutId,
-} from "@/modules/shortcuts";
+import { SessionSidebar } from "@/modules/sessions";
 import {
   loadInstalledExtensions,
-  useExtensionRegistry,
   useExtensionBackgrounds,
 } from "@/modules/extensions";
 import { WorkspaceContext } from "@/modules/extensions/WorkspaceContext";
-import { SidebarRail, type SidebarViewId } from "@/modules/sidebar";
+import { SidebarRail } from "@/modules/sidebar";
 import {
   SourceControlPanel,
   useSourceControl,
@@ -65,9 +40,6 @@ import {
 import {
   useTabs,
   useWorkspaceCwd,
-  type MediaKind,
-  type Tab,
-  type ExtensionTab,
 } from "@/modules/tabs";
 import {
   disposeSession,
@@ -75,29 +47,15 @@ import {
   hasLeaf,
   leafIds,
   respawnSession,
-  TerminalStack,
   type TerminalPaneHandle,
 } from "@/modules/terminal";
-import { findTabRenderer, useExtensionSecondarySidebarPanels } from "@/modules/extensions/registry";
-import type { SidebarPanelDef } from "@/modules/extensions/types";
-import { GitBranchIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { useExtensionSecondarySidebarPanels } from "@/modules/extensions/registry";
 import { ThemeProvider } from "@/modules/theme";
 import { UpdaterDialog } from "@/modules/updater";
-import {
-  getWslHome,
-  LOCAL_WORKSPACE,
-  useWorkspaceEnvStore,
-  type WorkspaceEnv,
-} from "@/modules/workspace";
-import { invoke } from "@tauri-apps/api/core";
-import { homeDir } from "@tauri-apps/api/path";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type { SearchAddon } from "@xterm/addon-search";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { PanelImperativeHandle } from "react-resizable-panels";
-import { SettingsPanel } from "@/settings/SettingsApp";
 import { ExtensionsSection } from "@/settings/sections/ExtensionsSection";
 import {
   closeSecondarySidebar,
@@ -108,205 +66,30 @@ import {
   toggleSecondarySidebarPanel,
   type SecondarySidebarState,
 } from "./secondarySidebarState";
+import {
+  readSecondarySidebarView,
+  RIGHT_PANEL_MAX_WIDTH,
+  RIGHT_PANEL_MIN_WIDTH,
+  RIGHT_PANEL_VIEW_STORAGE_KEY,
+  SIDEBAR_MAX_WIDTH,
+  SIDEBAR_MIN_WIDTH,
+} from "./layoutPersistence";
+import { dirname, mediaKindForPath } from "./lib/media";
+import { CloseConfirmDialogs } from "./CloseConfirmDialogs";
+import { ExtensionBackground } from "./ExtensionBackground";
+import { ExtensionSidebarPanel } from "./ExtensionSidebarPanel";
+import { SecondarySidebarHeader } from "./SecondarySidebarHeader";
+import { SplitPanels } from "./SplitPanels";
+import { useAppShortcuts } from "./useAppShortcuts";
+import { useSidebarLayout } from "./useSidebarLayout";
+import { useSplitView } from "./useSplitView";
+import { useTabClosing } from "./useTabClosing";
+import { useWorkspaceBootstrap } from "./useWorkspaceBootstrap";
+import { WorkspaceSurface } from "./WorkspaceSurface";
 
-function SecondarySidebarHeader({
-  hasRepo,
-  extPanels,
-  activeView,
-  onSelectTab,
-}: {
-  hasRepo: boolean;
-  extPanels: SidebarPanelDef[];
-  activeView: string;
-  onSelectTab: (id: string) => void;
-}) {
-  const tabs = [
-    ...(hasRepo
-      ? [
-          {
-            id: "git-context",
-            label: "Source Control",
-            icon: (
-              <HugeiconsIcon icon={GitBranchIcon} size={12} strokeWidth={1.75} className="shrink-0" />
-            ),
-          },
-        ]
-      : []),
-    ...extPanels.map((p) => ({ id: p.id, label: p.label, icon: p.icon })),
-  ];
-  if (tabs.length === 0) return null;
-  return (
-    <div className="flex shrink-0 items-stretch border-b border-border/40">
-      {tabs.map((tab) => {
-        const isActive = activeView === tab.id;
-        return (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => onSelectTab(tab.id)}
-            className={cn(
-              "relative flex shrink-0 items-center gap-1.5 px-3 py-2 text-[11px] font-medium transition-colors",
-              isActive ? "text-foreground" : "text-muted-foreground/60 hover:text-foreground",
-            )}
-          >
-            {isActive && (
-              <span className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary" />
-            )}
-            <span className="flex shrink-0 items-center">{tab.icon}</span>
-            <span>{tab.label}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function ExtensionBackground({ render }: { render: () => React.ReactNode }) {
-  return <>{render()}</>;
-}
-
-function ExtensionSidebarPanel({ viewId, workspacePath }: { viewId: string; workspacePath: string | null }) {
-  const panel = useExtensionRegistry((s) => s.sidebarPanels.find((p) => p.id === viewId));
-  if (!panel) return null;
-  return (
-    <WorkspaceContext.Provider value={{ workspacePath }}>
-      {panel.render()}
-    </WorkspaceContext.Provider>
-  );
-}
-
-function dirname(path: string | null): string | null {
-  if (!path) return null;
-  const normalized = path.replace(/\\/g, "/");
-  const idx = normalized.lastIndexOf("/");
-  if (idx <= 0) return normalized;
-  return normalized.slice(0, idx);
-}
-
-const IMAGE_EXTENSIONS = new Set([
-  "apng",
-  "avif",
-  "bmp",
-  "gif",
-  "ico",
-  "jpeg",
-  "jpg",
-  "png",
-  "svg",
-  "tif",
-  "tiff",
-  "webp",
-]);
-const VIDEO_EXTENSIONS = new Set([
-  "avi",
-  "m4v",
-  "mkv",
-  "mov",
-  "mp4",
-  "mpeg",
-  "mpg",
-  "ogv",
-  "webm",
-]);
-
-function mediaKindForPath(path: string): MediaKind | null {
-  const ext = path.split(/[\\/.]/).pop()?.toLowerCase();
-  if (!ext) return null;
-  if (IMAGE_EXTENSIONS.has(ext)) return "image";
-  if (VIDEO_EXTENSIONS.has(ext)) return "video";
-  return null;
-}
-
-const SIDEBAR_DEFAULT_WIDTH = 260;
-const SIDEBAR_MIN_WIDTH = 220;
-const SIDEBAR_MAX_WIDTH = 480;
-const SIDEBAR_WIDTH_STORAGE_KEY = "recall.sidebar.width";
-const SIDEBAR_VIEW_STORAGE_KEY = "recall.sidebar.view.v2";
-// Single right panel used for both Settings and Source Control views.
-const RIGHT_PANEL_DEFAULT_WIDTH = 380;
-const RIGHT_PANEL_MIN_WIDTH = 240;
-const RIGHT_PANEL_MAX_WIDTH = 600;
-const RIGHT_PANEL_WIDTH_STORAGE_KEY = "recall.right-panel.width";
-const SIDEBAR_POSITION_STORAGE_KEY = "recall.sidebar.position";
-
-type SidebarPosition = "left" | "right";
-
-function readSidebarPosition(): SidebarPosition {
-  try {
-    const stored = window.localStorage.getItem(SIDEBAR_POSITION_STORAGE_KEY);
-    if (stored === "left" || stored === "right") return stored;
-  } catch {
-    // ignore
-  }
-  return "left";
-}
-
-function clampSidebarWidth(width: number): number {
-  return Math.min(
-    SIDEBAR_MAX_WIDTH,
-    Math.max(SIDEBAR_MIN_WIDTH, Math.round(width)),
-  );
-}
-
-function readSidebarWidth(): number {
-  try {
-    const stored = window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
-    const parsed = stored ? Number.parseInt(stored, 10) : NaN;
-    return Number.isFinite(parsed)
-      ? clampSidebarWidth(parsed)
-      : SIDEBAR_DEFAULT_WIDTH;
-  } catch {
-    return SIDEBAR_DEFAULT_WIDTH;
-  }
-}
-
-function readSidebarView(): SidebarViewId {
-  try {
-    const stored = window.localStorage.getItem(SIDEBAR_VIEW_STORAGE_KEY);
-    if (
-      stored === "sessions" ||
-      stored === "explorer" ||
-      stored === "extensions" ||
-      // Allow any stored extension panel ID (namespaced as "<extId>:<panelId>")
-      (stored && stored.includes(":"))
-    )
-      return stored;
-  } catch {
-    // ignore
-  }
-  return "explorer";
-}
-
-function clampSecondarySidebarWidth(width: number): number {
-  return Math.min(
-    RIGHT_PANEL_MAX_WIDTH,
-    Math.max(RIGHT_PANEL_MIN_WIDTH, Math.round(width)),
-   );
-}
-
-function readSecondarySidebarWidth(): number {
-  try {
-    const stored = window.localStorage.getItem(RIGHT_PANEL_WIDTH_STORAGE_KEY);
-    const parsed = stored ? Number.parseInt(stored, 10) : NaN;
-    return Number.isFinite(parsed)
-       ? clampSecondarySidebarWidth(parsed)
-       : RIGHT_PANEL_DEFAULT_WIDTH;
-   } catch {
-    return RIGHT_PANEL_DEFAULT_WIDTH;
-   }
-}
-
-export type { SecondarySidebarViewId } from "./secondarySidebarState";
-
-function readSecondarySidebarView(): string {
-  try {
-    const stored = window.localStorage.getItem("recall.right-panel.view");
-    if (stored && stored !== "closed") return stored;
-  } catch {
-    // ignore
-  }
-  return "closed";
-}
+const SettingsPanel = lazy(() =>
+  import("@/settings/SettingsApp").then((m) => ({ default: m.SettingsPanel })),
+);
 
 export default function App() {
   const {
@@ -361,71 +144,28 @@ export default function App() {
     useState<GitHistorySearchHandle | null>(null);
   const { zoomIn, zoomOut, zoomReset } = useZoom();
   const explorerRef = useRef<FileExplorerHandle>(null);
-  const explorerReturnFocusRef = useRef<HTMLElement | null>(null);
+  const searchPanelRef = useRef<SearchPanelHandle>(null);
 
-  const sidebarRef = useRef<PanelImperativeHandle | null>(null);
-  const secondarySidebarRef = useRef<PanelImperativeHandle | null>(null);
-  const sidebarWidthRef = useRef(readSidebarWidth());
-  const secondarySidebarWidthRef = useRef(readSecondarySidebarWidth());
-  const sidebarWidthWriteTimerRef = useRef(0);
-  const secondarySidebarWidthWriteTimerRef = useRef(0);
-  const [sidebarView, setSidebarViewState] = useState<SidebarViewId>(readSidebarView);
+  const {
+    sidebarRef,
+    secondarySidebarRef,
+    sidebarWidthRef,
+    secondarySidebarWidthRef,
+    sidebarView,
+    sidebarPosition,
+    swapSidebarPosition,
+    persistSidebarView,
+    toggleSidebar,
+    cycleSidebarView,
+    persistSidebarWidth,
+    persistSecondarySidebarWidth,
+    toggleExplorerFocus,
+  } = useSidebarLayout({ explorerRef });
   const [secondarySidebarState, setSecondarySidebarState] = useState<SecondarySidebarState>(() =>
     createSecondarySidebarState(readSecondarySidebarView()),
   );
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [settingsDialogTab, setSettingsDialogTab] = useState<string>("general");
-  const [sidebarPosition, setSidebarPositionState] = useState<SidebarPosition>(readSidebarPosition);
-  const swapSidebarPosition = useCallback(() => {
-    setSidebarPositionState((prev) => {
-      const next: SidebarPosition = prev === "left" ? "right" : "left";
-      try { window.localStorage.setItem(SIDEBAR_POSITION_STORAGE_KEY, next); } catch {}
-      return next;
-    });
-  }, []);
-
-  useEffect(() => {
-    const handler = () => {
-      try {
-        const v = window.localStorage.getItem(SIDEBAR_POSITION_STORAGE_KEY);
-        if (v === "left" || v === "right") setSidebarPositionState(v);
-      } catch {}
-    };
-    window.addEventListener("recall:sidebar-position-changed", handler);
-    return () => window.removeEventListener("recall:sidebar-position-changed", handler);
-  }, []);
-
-  const persistSidebarView = useCallback((view: SidebarViewId) => {
-    setSidebarViewState(view);
-    try {
-      window.localStorage.setItem(SIDEBAR_VIEW_STORAGE_KEY, view);
-    } catch {
-      // storage may fail in private mode
-    }
-  }, []);
-  const toggleSidebar = useCallback(() => {
-    const p = sidebarRef.current;
-    if (!p) return;
-    if (p.getSize().asPercentage <= 0) p.expand();
-    else p.collapse();
-  }, []);
-  const cycleSidebarView = useCallback(
-    (view: SidebarViewId) => {
-      const panel = sidebarRef.current;
-      const collapsed = panel ? panel.getSize().asPercentage <= 0 : false;
-      if (collapsed) {
-        if (panel) panel.resize(`${sidebarWidthRef.current}px`);
-        if (view !== sidebarView) persistSidebarView(view);
-        return;
-      }
-      if (view === sidebarView) {
-        panel?.collapse();
-        return;
-      }
-      persistSidebarView(view);
-    },
-    [persistSidebarView, sidebarView],
-  );
   const openSidebarSettings = useCallback((tab: string = "general") => {
     setSettingsDialogTab(tab);
     setSettingsDialogOpen(true);
@@ -436,158 +176,25 @@ export default function App() {
   const closeSidebarSettings = useCallback(() => {
     setSettingsDialogOpen(false);
   }, []);
-  const persistSidebarWidth = useCallback((next: number) => {
-    sidebarWidthRef.current = next;
-    if (sidebarWidthWriteTimerRef.current) {
-      window.clearTimeout(sidebarWidthWriteTimerRef.current);
-    }
-    sidebarWidthWriteTimerRef.current = window.setTimeout(() => {
-      sidebarWidthWriteTimerRef.current = 0;
-      try {
-        window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(next));
-      } catch {
-        // ignore
-      }
-    }, 200);
-    }, []);
-  const persistSecondarySidebarWidth = useCallback((next: number) => {
-    secondarySidebarWidthRef.current = next;
-    if (secondarySidebarWidthWriteTimerRef.current) {
-      window.clearTimeout(secondarySidebarWidthWriteTimerRef.current);
-     }
-    secondarySidebarWidthWriteTimerRef.current = window.setTimeout(() => {
-      secondarySidebarWidthWriteTimerRef.current = 0;
-      try {
-        window.localStorage.setItem(RIGHT_PANEL_WIDTH_STORAGE_KEY, String(next));
-       } catch {
-         // ignore
-       }
-     }, 200);
-   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (sidebarWidthWriteTimerRef.current) {
-        window.clearTimeout(sidebarWidthWriteTimerRef.current);
-       }
-      if (secondarySidebarWidthWriteTimerRef.current) {
-        window.clearTimeout(secondarySidebarWidthWriteTimerRef.current);
-       }
-     };
-   }, []);
-
-  const toggleExplorerFocus = useCallback(() => {
-    const explorer = explorerRef.current;
-    const panel = sidebarRef.current;
-    const collapsed = panel ? panel.getSize().asPercentage <= 0 : false;
-    if (sidebarView !== "explorer" || collapsed) {
-      if (panel && collapsed) panel.resize(`${sidebarWidthRef.current}px`);
-      if (sidebarView !== "explorer") persistSidebarView("explorer");
-      const active = document.activeElement;
-      explorerReturnFocusRef.current =
-        active instanceof HTMLElement && active !== document.body
-          ? active
-          : null;
-      requestAnimationFrame(() => explorerRef.current?.focus());
-      return;
-    }
-    if (!explorer) return;
-    if (explorer.isFocused()) {
-      const target = explorerReturnFocusRef.current;
-      explorerReturnFocusRef.current = null;
-      if (target && document.body.contains(target)) {
-        target.focus();
-      } else {
-        (document.activeElement as HTMLElement | null)?.blur?.();
-      }
-      return;
-    }
-    const active = document.activeElement;
-    explorerReturnFocusRef.current =
-      active instanceof HTMLElement && active !== document.body ? active : null;
-    explorer.focus();
-  }, [persistSidebarView, sidebarView]);
-
-  const [home, setHome] = useState<string | null>(null);
-  const [pendingCloseTab, setPendingCloseTab] = useState<number | null>(null);
-  const workspaceEnv = useWorkspaceEnvStore((s) => s.env);
-  const setWorkspaceEnv = useWorkspaceEnvStore((s) => s.setEnv);
-  const [launchCwd, setLaunchCwd] = useState<string | null>(null);
-  const [launchCwdResolved, setLaunchCwdResolved] = useState(false);
-  const [pendingDeleteTabs, setPendingDeleteTabs] = useState<number[] | null>(
-    null,
-  );
   const [zenMode, setZenMode] = useState(false);
-  const [pendingRunningTab, setPendingRunningTab] = useState<number | null>(null);
-  useEffect(() => {
-    homeDir()
-      .then(async (p) => {
-        const normalized = p.replace(/\\/g, "/");
-        setHome(normalized);
-        try {
-          await native.workspaceAuthorize(normalized);
-        } catch {
-          // Bootstrap already authorizes home from Rust; ignore.
-        }
-      })
-      .catch(() => setHome(null));
+
+  const handleBeforeWorkspaceSwitch = useCallback(() => {
+    for (const id of liveLeavesRef.current) disposeSession(id);
+    searchAddons.current.clear();
+    terminalRefs.current.clear();
+    editorRefs.current.clear();
+    previewRefs.current.clear();
+    setActiveSearchAddon(null);
+    setActiveEditorHandle(null);
   }, []);
 
-  const switchWorkspace = useCallback(
-    async (env: WorkspaceEnv) => {
-      if (
-        env.kind === workspaceEnv.kind &&
-        (env.kind === "local" ||
-          (workspaceEnv.kind === "wsl" && env.distro === workspaceEnv.distro))
-      ) {
-        return;
-      }
-      const dirty = tabsRef.current.some((t) => t.kind === "editor" && t.dirty);
-      if (dirty) {
-        window.alert("Save or close unsaved editor tabs before switching workspace.");
-        return;
-      }
-
-      let nextHome: string | null = null;
-      try {
-        if (env.kind === "wsl") {
-          nextHome = await getWslHome(env.distro);
-        } else {
-          nextHome = (await homeDir()).replace(/\\/g, "/");
-        }
-      } catch (e) {
-        window.alert(String(e));
-        return;
-      }
-
-      for (const id of liveLeavesRef.current) disposeSession(id);
-      searchAddons.current.clear();
-      terminalRefs.current.clear();
-      editorRefs.current.clear();
-      previewRefs.current.clear();
-      setActiveSearchAddon(null);
-      setActiveEditorHandle(null);
-      setWorkspaceEnv(env.kind === "local" ? LOCAL_WORKSPACE : env);
-      setHome(nextHome);
-      setLaunchCwd(nextHome);
-      if (nextHome) {
-        try {
-          await native.workspaceAuthorize(nextHome);
-        } catch {
-          // Non-fatal — git panel will surface "not authorized" if needed.
-        }
-      }
-      resetWorkspace(nextHome ?? undefined);
-    },
-    [workspaceEnv, setWorkspaceEnv, resetWorkspace],
-  );
-  useEffect(() => {
-    native
-      .workspaceCurrentDir()
-      .then(setLaunchCwd)
-      .catch(() => setLaunchCwd(null))
-      .finally(() => setLaunchCwdResolved(true));
-  }, []);
+  const { home, launchCwd, launchCwdResolved, switchWorkspace } =
+    useWorkspaceBootstrap({
+      tabsRef,
+      resetWorkspace,
+      onBeforeSwitch: handleBeforeWorkspaceSwitch,
+    });
 
   // Load community extensions once on startup (non-blocking; failures are isolated).
   useEffect(() => { void loadInstalledExtensions(); }, []);
@@ -640,16 +247,7 @@ export default function App() {
   const activeTab = tabs.find((t) => t.id === activeId);
   const isTerminalTab = activeTab?.kind === "terminal";
   const isEditorTab = activeTab?.kind === "editor";
-  const isPreviewTab = activeTab?.kind === "preview";
-  const isMarkdownTab = activeTab?.kind === "markdown";
-  const isMediaTab = activeTab?.kind === "media";
-  const isSessionTab = activeTab?.kind === "session";
-  const isGitDiffTab =
-    activeTab?.kind === "git-diff" || activeTab?.kind === "git-commit-file";
   const isGitHistoryTab = activeTab?.kind === "git-history";
-  const isExtensionTab =
-    !!activeTab &&
-    !["terminal","editor","preview","markdown","media","session","git-diff","git-commit-file","git-history"].includes(activeTab.kind);
 
   useEffect(() => {
     type FileWrittenPayload = { path: string; source?: string };
@@ -725,58 +323,24 @@ export default function App() {
       if (!live.has(k)) searchAddons.current.delete(k);
   }, [tabs]);
 
-  const handleClose = useCallback(
-    (id: number) => {
-      const t = tabs.find((x) => x.id === id);
-      if (t?.kind === "editor" && t.dirty) {
-        setPendingCloseTab(id);
-        return;
-      }
-      if (t?.kind === "terminal") {
-        const tabLeafIds = leafIds(t.paneTree);
-        void (async () => {
-          for (const leafId of tabLeafIds) {
-            const hasChild = await invoke<boolean>("pty_has_child", { id: leafId }).catch(() => false);
-            if (hasChild) {
-              setPendingRunningTab(id);
-              return;
-            }
-          }
-          disposeTab(id);
-        })();
-        return;
-      }
-      disposeTab(id);
-    },
-    [tabs, disposeTab],
-  );
+  const {
+    pendingCloseTab,
+    pendingDeleteTabs,
+    pendingRunningTab,
+    handleClose,
+    confirmClose,
+    cancelClose,
+    confirmRunningClose,
+    cancelRunningClose,
+    confirmDeleteClose,
+    cancelDeleteClose,
+    handlePathDeleted,
+  } = useTabClosing({ tabs, disposeTab });
 
   const handleRenameTab = useCallback(
     (id: number, title: string) => updateTab(id, { title }),
     [updateTab],
   );
-
-  const confirmClose = useCallback(() => {
-    if (pendingCloseTab !== null) {
-      disposeTab(pendingCloseTab);
-      setPendingCloseTab(null);
-    }
-  }, [pendingCloseTab, disposeTab]);
-
-  const cancelClose = useCallback(() => {
-    setPendingCloseTab(null);
-  }, []);
-
-  const confirmRunningClose = useCallback(() => {
-    if (pendingRunningTab !== null) {
-      disposeTab(pendingRunningTab);
-      setPendingRunningTab(null);
-    }
-  }, [pendingRunningTab, disposeTab]);
-
-  const cancelRunningClose = useCallback(() => {
-    setPendingRunningTab(null);
-  }, []);
 
   const cycleTab = useCallback(
     (delta: 1 | -1) => {
@@ -824,6 +388,34 @@ export default function App() {
     [openFileTab, openMediaTab],
   );
 
+  const handleOpenSearchMatch = useCallback(
+    (path: string, line: number) => {
+      const id = openFileTab(path, false);
+      if (id === null) return;
+      // The editor mounts (and loads its document) asynchronously; retry
+      // revealLine until the CodeMirror view exists.
+      let attempts = 0;
+      const tryReveal = () => {
+        const handle = editorRefs.current.get(id);
+        if (handle?.revealLine(line)) return;
+        if (++attempts < 40) window.setTimeout(tryReveal, 50);
+      };
+      tryReveal();
+    },
+    [openFileTab],
+  );
+
+  const openProjectSearch = useCallback(() => {
+    const panel = sidebarRef.current;
+    if (panel && panel.getSize().asPercentage <= 0) {
+      panel.resize(`${sidebarWidthRef.current}px`);
+    }
+    if (sidebarView !== "search") persistSidebarView("search");
+    searchPanelRef.current?.focus();
+    // The panel may not be mounted yet when switching views.
+    requestAnimationFrame(() => searchPanelRef.current?.focus());
+  }, [persistSidebarView, sidebarRef, sidebarView, sidebarWidthRef]);
+
   const handleOpenSession = useCallback(
     (sessionId: string, title: string) => {
       openSessionTab(sessionId, title);
@@ -850,34 +442,6 @@ export default function App() {
       }
     },
     [tabs, updateTab],
-  );
-
-  const confirmDeleteClose = useCallback(() => {
-    if (pendingDeleteTabs !== null) {
-      for (const id of pendingDeleteTabs) disposeTab(id);
-      setPendingDeleteTabs(null);
-    }
-  }, [pendingDeleteTabs, disposeTab]);
-
-  const cancelDeleteClose = useCallback(() => {
-    setPendingDeleteTabs(null);
-  }, []);
-
-  const handlePathDeleted = useCallback(
-    (path: string) => {
-      const dirty: number[] = [];
-      for (const t of tabs) {
-        if (t.kind !== "editor" && t.kind !== "media") continue;
-        if (t.path !== path && !t.path.startsWith(`${path}/`)) continue;
-        if (t.kind === "editor" && t.dirty) {
-          dirty.push(t.id);
-        } else {
-          disposeTab(t.id);
-        }
-      }
-      if (dirty.length > 0) setPendingDeleteTabs(dirty);
-    },
-    [tabs, disposeTab],
   );
 
   const activeTerminalLeafCwd =
@@ -954,7 +518,7 @@ export default function App() {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem("recall.right-panel.view", secondarySidebarView);
+      window.localStorage.setItem(RIGHT_PANEL_VIEW_STORAGE_KEY, secondarySidebarView);
     } catch {
       // ignore
     }
@@ -1053,178 +617,58 @@ export default function App() {
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteInitialQuery, setPaletteInitialQuery] = useState("");
-  const [rowSplitTabIds, setRowSplitTabIds] = useState<number[]>([]);
-  const [colSplitTabIds, setColSplitTabIds] = useState<number[]>([]);
-  const [splitDragZone, setSplitDragZone] = useState<"row" | "col" | null>(null);
-  const workspacePanelRef = useRef<HTMLDivElement>(null);
-  // Refs so callbacks can read current split IDs without stale closures.
-  const rowSplitTabIdsRef = useRef<number[]>([]);
-  const colSplitTabIdsRef = useRef<number[]>([]);
-  rowSplitTabIdsRef.current = rowSplitTabIds;
-  colSplitTabIdsRef.current = colSplitTabIds;
 
-  const openSplitView = useCallback((tabId: number, dir: "row" | "col" = "row") => {
-    if (rowSplitTabIdsRef.current.includes(tabId) || colSplitTabIdsRef.current.includes(tabId)) return;
-    if (dir === "row") {
-      setRowSplitTabIds((prev) => [...prev, tabId]);
-    } else {
-      setColSplitTabIds((prev) => [...prev, tabId]);
-    }
-    setActiveId((prev) => {
-      if (prev !== tabId) return prev;
-      const allSplit = new Set([...rowSplitTabIdsRef.current, ...colSplitTabIdsRef.current, tabId]);
-      const other = tabsRef.current.find((t) => !allSplit.has(t.id));
-      return other?.id ?? prev;
-    });
-  }, []);
+  const {
+    rowSplitTabIds,
+    colSplitTabIds,
+    splitDragZone,
+    setSplitDragZone,
+    workspacePanelRef,
+    openSplitView,
+    removeSplitTab,
+    handleDragToSplit,
+    getWorkspaceRect,
+    unsplitDraggingTabId,
+    unsplitDragPos,
+    unsplitOverHeader,
+    handleUnsplitPointerDown,
+    handleUnsplitPointerMove,
+    handleUnsplitPointerUp,
+    draggingTab,
+    hasSplit,
+    primaryTabs,
+  } = useSplitView({ tabs, tabsRef, setActiveId });
 
-  const removeSplitTab = useCallback((tabId: number) => {
-    setRowSplitTabIds((prev) => prev.filter((id) => id !== tabId));
-    setColSplitTabIds((prev) => prev.filter((id) => id !== tabId));
-  }, []);
-
-  const handleDragToSplit = useCallback(
-    (tabId: number, dir: "row" | "col") => openSplitView(tabId, dir),
-    [openSplitView],
-  );
-
-  const getWorkspaceRect = useCallback(
-    () => workspacePanelRef.current?.getBoundingClientRect() ?? null,
-    [],
-  );
-
-  const [unsplitDraggingTabId, setUnsplitDraggingTabId] = useState<number | null>(null);
-  const [unsplitDragPos, setUnsplitDragPos] = useState<{ x: number; y: number } | null>(null);
-  const [unsplitOverHeader, setUnsplitOverHeader] = useState(false);
-  const unsplitStartRef = useRef<{ x: number; y: number; tabId: number } | null>(null);
-
-  const handleUnsplitPointerDown = useCallback((e: React.PointerEvent, tabId: number) => {
-    e.stopPropagation();
-    unsplitStartRef.current = { x: e.clientX, y: e.clientY, tabId };
-    (e.currentTarget as Element).setPointerCapture(e.pointerId);
-  }, []);
-
-  const handleUnsplitPointerMove = useCallback((e: React.PointerEvent) => {
-    const start = unsplitStartRef.current;
-    if (!start) return;
-    if (unsplitDraggingTabId === null) {
-      if (Math.abs(e.clientX - start.x) <= 5 && Math.abs(e.clientY - start.y) <= 5) return;
-      setUnsplitDraggingTabId(start.tabId);
-      setUnsplitDragPos({ x: e.clientX, y: e.clientY });
-      return;
-    }
-    setUnsplitDragPos({ x: e.clientX, y: e.clientY });
-    const wsRect = workspacePanelRef.current?.getBoundingClientRect();
-    setUnsplitOverHeader(!!wsRect && e.clientY < wsRect.top);
-  }, [unsplitDraggingTabId]);
-
-  const handleUnsplitPointerUp = useCallback((e: React.PointerEvent) => {
-    const draggingId = unsplitDraggingTabId ?? unsplitStartRef.current?.tabId;
-    if (draggingId !== null && draggingId !== undefined) {
-      const wsRect = workspacePanelRef.current?.getBoundingClientRect();
-      if (wsRect && e.clientY < wsRect.top) {
-        removeSplitTab(draggingId);
-        setActiveId(draggingId);
-      }
-    }
-    unsplitStartRef.current = null;
-    setUnsplitDraggingTabId(null);
-    setUnsplitDragPos(null);
-    setUnsplitOverHeader(false);
-  }, [unsplitDraggingTabId, removeSplitTab]);
-  const draggingTab = useMemo(
-    () =>
-      unsplitDraggingTabId === null
-        ? null
-        : tabs.find((tab) => tab.id === unsplitDraggingTabId) ?? null,
-    [tabs, unsplitDraggingTabId],
-  );
-
-  const shortcutHandlers = useMemo<ShortcutHandlers>(
-    () => ({
-      "tab.new": openNewTab,
-      "tab.newPreview": () => openPreviewTab(""),
-      "tab.newEditor": () => setNewEditorOpen(true),
-      "tab.close": handleCloseTabOrPane,
-      "tab.next": () => cycleTab(1),
-      "tab.prev": () => cycleTab(-1),
-      "tab.selectByIndex": (e) => selectByIndex(parseInt(e.key, 10) - 1),
-      "pane.splitRight": () => splitActivePaneInActiveTab("row"),
-      "pane.splitDown": () => splitActivePaneInActiveTab("col"),
-      "pane.focusNext": () => focusNextPaneInTab(activeId, 1),
-      "pane.focusPrev": () => focusNextPaneInTab(activeId, -1),
-      "pane.source": toggleSourceControl,
-      "search.focus": () => searchInlineRef.current?.focus(),
-      "shortcuts.open": () => openSidebarSettings("shortcuts"),
-      "settings.open": () => openSidebarSettings("general"),
-      "terminal.clear": () => {
-        if (activeLeafId !== null) terminalRefs.current.get(activeLeafId)?.clear();
-      },
-      "ai.nlCommand": () => {
-        if (activeTab?.kind !== "terminal") return;
-        window.dispatchEvent(
-          new CustomEvent("recall:nl-command:trigger", {
-            detail: { cwd: activeTerminalLeafCwd },
-          }),
-        );
-      },
-      "file.quickOpen": () => { setPaletteInitialQuery(""); setPaletteOpen(true); },
-      "command.palette": () => { setPaletteInitialQuery(">"); setPaletteOpen(true); },
-      "sidebar.toggle": toggleSidebar,
-      "sidebar.sessions": () => cycleSidebarView("sessions"),
-      "sidebar.files": () => cycleSidebarView("explorer"),
-      "sidebar.extensions": () => cycleSidebarView("extensions"),
-      "sidebar.git": toggleSourceControl,
-      "sidebar.position.swap": swapSidebarPosition,
-      "explorer.focus": toggleExplorerFocus,
-      "view.zoomIn": zoomIn,
-      "view.zoomOut": zoomOut,
-      "view.zoomReset": zoomReset,
-      "view.zen": () => setZenMode((z) => !z),
-      "editor.undo": () => editorRefs.current.get(activeId)?.undo(),
-      "editor.redo": () => editorRefs.current.get(activeId)?.redo(),
-    }),
-    [
-      activeId,
-      activeLeafId,
-      activeTab,
-      activeTerminalLeafCwd,
-      cycleTab,
-      handleCloseTabOrPane,
-      openNewTab,
-      openPreviewTab,
-      openSidebarSettings,
-      selectByIndex,
-      splitActivePaneInActiveTab,
-      focusNextPaneInTab,
-      toggleSourceControl,
-      toggleSidebar,
-      swapSidebarPosition,
-      cycleSidebarView,
-      toggleExplorerFocus,
-      zoomIn,
-      zoomOut,
-      zoomReset,
-    ],
-  );
-
-  const shortcutsDisabled = useCallback(
-    (id: ShortcutId) => {
-      if (id === "editor.undo" || id === "editor.redo") {
-        return activeTab?.kind !== "editor";
-      }
-      if (id === "terminal.clear") {
-        return activeTab?.kind !== "terminal";
-      }
-      if (id === "ai.nlCommand") {
-        return activeTab?.kind !== "terminal";
-      }
-      return false;
-    },
-    [activeTab],
-  );
-
-  useGlobalShortcuts(shortcutHandlers, { isDisabled: shortcutsDisabled });
+  const shortcutHandlers = useAppShortcuts({
+    activeId,
+    activeLeafId,
+    activeTab,
+    activeTerminalLeafCwd,
+    terminalRefs,
+    editorRefs,
+    searchInlineRef,
+    openNewTab,
+    openPreviewTab,
+    setNewEditorOpen,
+    handleCloseTabOrPane,
+    cycleTab,
+    selectByIndex,
+    splitActivePaneInActiveTab,
+    focusNextPaneInTab,
+    toggleSourceControl,
+    openSidebarSettings,
+    setPaletteInitialQuery,
+    setPaletteOpen,
+    toggleSidebar,
+    cycleSidebarView,
+    swapSidebarPosition,
+    toggleExplorerFocus,
+    openProjectSearch,
+    zoomIn,
+    zoomOut,
+    zoomReset,
+    setZenMode,
+  });
 
   const registerTerminalHandle = useCallback(
     (leafId: number, h: TerminalPaneHandle | null) => {
@@ -1320,10 +764,6 @@ export default function App() {
     gitHistoryHandle,
   ]);
 
-  const splitTabs = tabs.filter((t) => rowSplitTabIds.includes(t.id) || colSplitTabIds.includes(t.id));
-  const hasSplit = splitTabs.length > 0;
-  const primaryTabs = hasSplit ? tabs.filter((t) => !rowSplitTabIds.includes(t.id) && !colSplitTabIds.includes(t.id)) : tabs;
-
   const handleCloseOthers = useCallback(
     (keepId: number) => {
       for (const t of primaryTabs) {
@@ -1347,205 +787,31 @@ export default function App() {
     [primaryTabs, disposeTab],
   );
 
-  const renderSplitPanel = (t: Tab) => (
-    <div className="group/pane flex h-full min-h-0 flex-col">
-      <div className="flex h-7 shrink-0 select-none items-center gap-1 border-b border-border/40 bg-card/50 px-1.5">
-        <div
-          className={cn(
-            "flex min-w-0 flex-1 cursor-grab items-center gap-1 active:cursor-grabbing",
-            unsplitDraggingTabId === t.id && "opacity-40",
-          )}
-          onPointerDown={(e) => handleUnsplitPointerDown(e, t.id)}
-          onPointerMove={handleUnsplitPointerMove}
-          onPointerUp={handleUnsplitPointerUp}
-          onPointerCancel={handleUnsplitPointerUp}
-          title="Drag up to the tab bar to un-split"
-        >
-          <span className="shrink-0 text-[8px] leading-none text-muted-foreground/40">⠿</span>
-          <span className="min-w-0 truncate text-xs font-medium text-muted-foreground">
-            {t.title}
-          </span>
-        </div>
-        <button
-          type="button"
-          aria-label="Close pane"
-          className="shrink-0 rounded-sm p-0.5 text-muted-foreground/40 opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover/pane:opacity-100"
-          onClick={() => removeSplitTab(t.id)}
-        >
-          <svg width="9" height="9" viewBox="0 0 11 11" fill="none">
-            <path d="M1 1l9 9M10 1L1 10" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
-          </svg>
-        </button>
-      </div>
-      <div className="relative min-h-0 flex-1">
-        {buildSplitPaneContent(t)}
-      </div>
-    </div>
-  );
-
-  const buildSplitPaneContent = (secTab: Tab) => {
-    if (secTab.kind === "terminal") {
-      return (
-        <div className="absolute inset-0">
-          <TerminalStack
-            tabs={[secTab]}
-            activeId={secTab.id}
-            registerHandle={registerTerminalHandle}
-            onSearchReady={handleSearchReady}
-            onCwd={handleTerminalCwd}
-            onExit={handleLeafExit}
-            onFocusLeaf={handleFocusLeaf}
-          />
-        </div>
-      );
-    }
-    const isSecEditor = secTab.kind === "editor";
-    const isSecPreview = secTab.kind === "preview";
-    const isSecMarkdown = secTab.kind === "markdown";
-    const isSecMedia = secTab.kind === "media";
-    const isSecSession = secTab.kind === "session";
-    const isSecGitDiff = secTab.kind === "git-diff" || secTab.kind === "git-commit-file";
-    const isSecGitHistory = secTab.kind === "git-history";
-    return (
-      <div className="relative h-full min-h-0">
-        <div className={cn("absolute inset-0", !isSecEditor && "invisible pointer-events-none")} aria-hidden={!isSecEditor}>
-          <EditorStack tabs={tabs} activeId={secTab.id} registerHandle={() => {}} onDirtyChange={() => {}} onCloseTab={() => {}} />
-        </div>
-        <div className={cn("absolute inset-0", !isSecPreview && "invisible pointer-events-none")} aria-hidden={!isSecPreview}>
-          <PreviewStack tabs={tabs} activeId={secTab.id} registerHandle={() => {}} onUrlChange={() => {}} />
-        </div>
-        <div className={cn("absolute inset-0", !isSecMarkdown && "invisible pointer-events-none")} aria-hidden={!isSecMarkdown}>
-          <MarkdownStack tabs={tabs} activeId={secTab.id} />
-        </div>
-        <div className={cn("absolute inset-0", !isSecMedia && "invisible pointer-events-none")} aria-hidden={!isSecMedia}>
-          <MediaStack tabs={tabs} activeId={secTab.id} />
-        </div>
-        <div className={cn("absolute inset-0", !isSecSession && "invisible pointer-events-none")} aria-hidden={!isSecSession}>
-          <SessionHistoryStack tabs={tabs} activeId={secTab.id} />
-        </div>
-        <div className={cn("absolute inset-0", !isSecGitDiff && "invisible pointer-events-none")} aria-hidden={!isSecGitDiff}>
-          <GitDiffStack tabs={tabs} activeId={secTab.id} />
-        </div>
-        <div className={cn("absolute inset-0", !isSecGitHistory && "invisible pointer-events-none")} aria-hidden={!isSecGitHistory}>
-          <GitHistoryStack tabs={tabs} activeId={secTab.id} onOpenCommitFile={openCommitFileDiffTab} onSearchHandle={() => {}} />
-        </div>
-      </div>
+  const handleSelectSecondaryTab = useCallback((id: string) => {
+    setSecondarySidebarState((prev) =>
+      id === prev.view ? closeSecondarySidebar(prev) : { view: id },
     );
-  };
+  }, []);
 
   const workspaceSurface = (
-    <div className="relative h-full min-h-0">
-      <div
-        className={cn(
-          "absolute inset-0",
-          !isTerminalTab && "invisible pointer-events-none",
-        )}
-        aria-hidden={!isTerminalTab}
-      >
-        <TerminalStack
-          tabs={primaryTabs}
-          activeId={activeId}
-          registerHandle={registerTerminalHandle}
-          onSearchReady={handleSearchReady}
-          onCwd={handleTerminalCwd}
-          onExit={handleLeafExit}
-          onFocusLeaf={handleFocusLeaf}
-        />
-      </div>
-      <div
-        className={cn(
-          "absolute inset-0 px-3 pt-2 pb-2",
-          !isEditorTab && "invisible pointer-events-none",
-        )}
-        aria-hidden={!isEditorTab}
-      >
-        <EditorStack
-          tabs={tabs}
-          activeId={activeId}
-          registerHandle={registerEditorHandle}
-          onDirtyChange={handleEditorDirty}
-          onCloseTab={disposeTab}
-        />
-      </div>
-      <div
-        className={cn(
-          "absolute inset-0 px-3 pt-2 pb-2",
-          !isPreviewTab && "invisible pointer-events-none",
-        )}
-        aria-hidden={!isPreviewTab}
-      >
-        <PreviewStack
-          tabs={tabs}
-          activeId={activeId}
-          registerHandle={registerPreviewHandle}
-          onUrlChange={handlePreviewUrl}
-        />
-      </div>
-      <div
-        className={cn(
-          "absolute inset-0 px-3 pt-2 pb-2",
-          !isMarkdownTab && "invisible pointer-events-none",
-        )}
-        aria-hidden={!isMarkdownTab}
-      >
-        <MarkdownStack tabs={tabs} activeId={activeId} />
-      </div>
-      <div
-        className={cn(
-          "absolute inset-0 px-3 pt-2 pb-2",
-          !isMediaTab && "invisible pointer-events-none",
-        )}
-        aria-hidden={!isMediaTab}
-      >
-        <MediaStack tabs={tabs} activeId={activeId} />
-      </div>
-      <div
-        className={cn(
-          "absolute inset-0 px-3 pt-2 pb-2",
-          !isSessionTab && "invisible pointer-events-none",
-        )}
-        aria-hidden={!isSessionTab}
-      >
-        <SessionHistoryStack tabs={tabs} activeId={activeId} />
-      </div>
-      <div
-        className={cn(
-          "absolute inset-0 px-3 pt-2 pb-2",
-          !isGitDiffTab && "invisible pointer-events-none",
-        )}
-        aria-hidden={!isGitDiffTab}
-      >
-        <GitDiffStack tabs={tabs} activeId={activeId} />
-      </div>
-      <div
-        className={cn(
-          "absolute inset-0",
-          !isGitHistoryTab && "invisible pointer-events-none",
-        )}
-        aria-hidden={!isGitHistoryTab}
-      >
-        <GitHistoryStack
-          tabs={tabs}
-          activeId={activeId}
-          onOpenCommitFile={openCommitFileDiffTab}
-          onSearchHandle={setGitHistoryHandle}
-        />
-      </div>
-      {/* Extension tabs */}
-      {isExtensionTab && activeTab && (() => {
-        const renderer = findTabRenderer(activeTab.kind);
-        if (!renderer) return (
-          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
-            No renderer for {activeTab.kind}
-          </div>
-        );
-        return (
-          <div className="absolute inset-0">
-            {renderer.render({ tabId: activeTab.id, data: (activeTab as ExtensionTab).data })}
-          </div>
-        );
-      })()}
-    </div>
+    <WorkspaceSurface
+      tabs={tabs}
+      primaryTabs={primaryTabs}
+      activeId={activeId}
+      activeTab={activeTab}
+      registerTerminalHandle={registerTerminalHandle}
+      onSearchReady={handleSearchReady}
+      onTerminalCwd={handleTerminalCwd}
+      onLeafExit={handleLeafExit}
+      onFocusLeaf={handleFocusLeaf}
+      registerEditorHandle={registerEditorHandle}
+      onEditorDirty={handleEditorDirty}
+      onCloseTab={disposeTab}
+      registerPreviewHandle={registerPreviewHandle}
+      onPreviewUrl={handlePreviewUrl}
+      onOpenCommitFile={openCommitFileDiffTab}
+      onGitHistorySearchHandle={setGitHistoryHandle}
+    />
   );
 
   const shell = (
@@ -1612,6 +878,12 @@ export default function App() {
                         onRevealInTerminal={cdInNewTab}
                         onOpenMarkdownPreview={openMarkdownPreview}
                       />
+                    ) : sidebarView === "search" ? (
+                      <SearchPanel
+                        ref={searchPanelRef}
+                        rootPath={explorerRoot}
+                        onOpenMatch={handleOpenSearchMatch}
+                      />
                     ) : sidebarView === "extensions" ? (
                       <div className="flex h-full flex-col overflow-hidden">
                         <ExtensionsSection />
@@ -1658,11 +930,7 @@ export default function App() {
                      hasRepo={sourceControl.hasRepo}
                      extPanels={secondaryExtPanels}
                      activeView={secondarySidebarView}
-                     onSelectTab={(id) =>
-                       setSecondarySidebarState((prev) =>
-                         id === prev.view ? closeSecondarySidebar(prev) : { view: id },
-                       )
-                     }
+                     onSelectTab={handleSelectSecondaryTab}
                    />
                    <div className="min-h-0 flex-1 overflow-hidden">
                      {sourceControl.hasRepo && secondarySidebarView === "git-context" && (
@@ -1707,73 +975,26 @@ export default function App() {
                   ref={workspacePanelRef}
                   className="relative flex h-full min-h-0 flex-col bg-background"
                 >
-                  {hasSplit ? (() => {
-                    const rowSplitTabs = tabs.filter((t) => rowSplitTabIds.includes(t.id));
-                    const colSplitTabs = tabs.filter((t) => colSplitTabIds.includes(t.id));
-                    const hasRowSplits = rowSplitTabs.length > 0;
-                    const hasColSplits = colSplitTabs.length > 0;
-
-                    // Left column: primary workspace + any "below" (col) splits stacked vertically
-                    const leftColumnInner = hasColSplits ? (
-                      <ResizablePanelGroup
-                        key={`col-split-${colSplitTabs.length}`}
-                        orientation="vertical"
-                        className="min-h-0 flex-1 h-full"
-                      >
-                        <ResizablePanel
-                          id="workspace-primary"
-                          defaultSize={`${(100 / (colSplitTabs.length + 1)).toFixed(1)}%`}
-                          minSize="15%"
-                        >
-                          <div className="relative h-full min-h-0">{workspaceSurface}</div>
-                        </ResizablePanel>
-                        {colSplitTabs.flatMap((t) => [
-                          <ResizableHandle key={`col-handle-${t.id}`} />,
-                          <ResizablePanel
-                            key={`col-pane-${t.id}`}
-                            id={`workspace-col-${t.id}`}
-                            defaultSize={`${(100 / (colSplitTabs.length + 1)).toFixed(1)}%`}
-                            minSize="15%"
-                          >
-                            {renderSplitPanel(t)}
-                          </ResizablePanel>,
-                        ])}
-                      </ResizablePanelGroup>
-                    ) : (
-                      <div className="relative h-full min-h-0">{workspaceSurface}</div>
-                    );
-
-                    if (!hasRowSplits) {
-                      return <div className="min-h-0 flex-1">{leftColumnInner}</div>;
-                    }
-
-                    return (
-                      <ResizablePanelGroup
-                        key={`row-split-${rowSplitTabs.length}`}
-                        orientation="horizontal"
-                        className="min-h-0 flex-1"
-                      >
-                        <ResizablePanel
-                          id="workspace-left-col"
-                          defaultSize={`${(100 / (rowSplitTabs.length + 1)).toFixed(1)}%`}
-                          minSize="15%"
-                        >
-                          {leftColumnInner}
-                        </ResizablePanel>
-                        {rowSplitTabs.flatMap((t) => [
-                          <ResizableHandle key={`row-handle-${t.id}`} />,
-                          <ResizablePanel
-                            key={`row-pane-${t.id}`}
-                            id={`workspace-row-${t.id}`}
-                            defaultSize={`${(100 / (rowSplitTabs.length + 1)).toFixed(1)}%`}
-                            minSize="15%"
-                          >
-                            {renderSplitPanel(t)}
-                          </ResizablePanel>,
-                        ])}
-                      </ResizablePanelGroup>
-                    );
-                  })() : (
+                  {hasSplit ? (
+                    <SplitPanels
+                      tabs={tabs}
+                      rowSplitTabIds={rowSplitTabIds}
+                      colSplitTabIds={colSplitTabIds}
+                      unsplitDraggingTabId={unsplitDraggingTabId}
+                      onUnsplitPointerDown={handleUnsplitPointerDown}
+                      onUnsplitPointerMove={handleUnsplitPointerMove}
+                      onUnsplitPointerUp={handleUnsplitPointerUp}
+                      removeSplitTab={removeSplitTab}
+                      registerTerminalHandle={registerTerminalHandle}
+                      onSearchReady={handleSearchReady}
+                      onTerminalCwd={handleTerminalCwd}
+                      onLeafExit={handleLeafExit}
+                      onFocusLeaf={handleFocusLeaf}
+                      onOpenCommitFile={openCommitFileDiffTab}
+                    >
+                      {workspaceSurface}
+                    </SplitPanels>
+                  ) : (
                     <div className="relative min-h-0 flex-1">
                       {workspaceSurface}
                     </div>
@@ -1862,12 +1083,14 @@ export default function App() {
           <Dialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen}>
             <DialogContent showCloseButton={false} className="gap-0 overflow-hidden rounded-xl border border-border/40 p-0 w-[960px] sm:max-w-[960px] h-[700px]">
               <DialogTitle className="sr-only">Settings</DialogTitle>
-              <SettingsPanel
-                embedded
-                activeTab={settingsDialogTab}
-                onActiveTabChange={setSettingsDialogTab}
-                onClose={closeSidebarSettings}
-              />
+              <Suspense fallback={null}>
+                <SettingsPanel
+                  embedded
+                  activeTab={settingsDialogTab}
+                  onActiveTabChange={setSettingsDialogTab}
+                  onClose={closeSidebarSettings}
+                />
+              </Suspense>
             </DialogContent>
           </Dialog>
 
@@ -1877,89 +1100,25 @@ export default function App() {
             rootPath={explorerRoot ?? home}
             onOpenFile={handleOpenFile}
             initialQuery={paletteInitialQuery}
+            symbolSource={activeEditorHandle}
             onRunCommand={(id) => {
               const h = shortcutHandlers[id];
               if (h) h(new KeyboardEvent("keydown"));
             }}
           />
 
-          <AlertDialog
-            open={pendingCloseTab !== null}
-            onOpenChange={(open) => !open && cancelClose()}
-          >
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
-                <AlertDialogDescription>
-                  {tabs.find((t) => t.id === pendingCloseTab)?.title
-                    ? `"${
-                        tabs.find((t) => t.id === pendingCloseTab)?.title
-                      }" has unsaved changes. Close anyway?`
-                    : "This file has unsaved changes. Close anyway?"}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel onClick={cancelClose}>
-                  Cancel
-                </AlertDialogCancel>
-                <AlertDialogAction onClick={confirmClose}>
-                  Close Anyway
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-
-          <AlertDialog
-            open={pendingDeleteTabs !== null}
-            onOpenChange={(open) => !open && cancelDeleteClose()}
-          >
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
-                <AlertDialogDescription>
-                  {pendingDeleteTabs?.length === 1
-                    ? (() => {
-                        const title = tabs.find(
-                          (t) => t.id === pendingDeleteTabs[0],
-                        )?.title;
-                        return title
-                          ? `"${title}" has unsaved changes. The file has been deleted. Close anyway?`
-                          : "This file has unsaved changes. The file has been deleted. Close anyway?";
-                      })()
-                    : `${pendingDeleteTabs?.length ?? 0} files have unsaved changes. They have been deleted. Close all anyway?`}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel onClick={cancelDeleteClose}>
-                  Cancel
-                </AlertDialogCancel>
-                <AlertDialogAction onClick={confirmDeleteClose}>
-                  Close Anyway
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-          <AlertDialog
-            open={pendingRunningTab !== null}
-            onOpenChange={(open) => !open && cancelRunningClose()}
-          >
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Running Process</AlertDialogTitle>
-                <AlertDialogDescription>
-                  A process is running in this terminal. Close it anyway?
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel onClick={cancelRunningClose}>
-                  Cancel
-                </AlertDialogCancel>
-                <AlertDialogAction onClick={confirmRunningClose}>
-                  Close Anyway
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <CloseConfirmDialogs
+            tabs={tabs}
+            pendingCloseTab={pendingCloseTab}
+            confirmClose={confirmClose}
+            cancelClose={cancelClose}
+            pendingDeleteTabs={pendingDeleteTabs}
+            confirmDeleteClose={confirmDeleteClose}
+            cancelDeleteClose={cancelDeleteClose}
+            pendingRunningTab={pendingRunningTab}
+            confirmRunningClose={confirmRunningClose}
+            cancelRunningClose={cancelRunningClose}
+          />
         </div>
       </TooltipProvider>
       {/* Extension background components (portals, overlays, global listeners) */}

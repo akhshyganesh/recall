@@ -1,2 +1,2 @@
 export { SessionSidebar } from "./SessionSidebar";
-export { SessionHistoryStack } from "./SessionHistoryStack";
+export { SessionHistoryStack } from "./SessionHistoryStackLazy";

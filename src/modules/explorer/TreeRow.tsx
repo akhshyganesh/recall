@@ -35,6 +35,12 @@ export type EntryRowProps = {
   onSelectPath: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
   onOpenMarkdownPreview?: (path: string) => void;
+  draggingPath?: string | null;
+  dropTargetPath?: string | null;
+  onDragStart?: (path: string) => void;
+  onDragEnd?: () => void;
+  onDragOverPath?: (path: string | null) => void;
+  onDropOnPath?: (fromPath: string, toDir: string) => void;
 };
 
 function isMarkdownPath(path: string): boolean {
@@ -56,6 +62,12 @@ function EntryRowImpl(props: EntryRowProps) {
     onSelectPath,
     onRevealInTerminal,
     onOpenMarkdownPreview,
+    draggingPath,
+    dropTargetPath,
+    onDragStart,
+    onDragEnd,
+    onDragOverPath,
+    onDropOnPath,
   } = props;
 
   const [isConfirming, setIsConfirming] = useState(false);
@@ -63,11 +75,40 @@ function EntryRowImpl(props: EntryRowProps) {
   const createTarget = isDir ? path : path.slice(0, path.lastIndexOf("/")) || rootPath;
   const paddingLeft = 6 + depth * 12;
 
+  const isDragging = draggingPath === path;
+  const isDropTarget = dropTargetPath === path;
+
   const handleClick = () => {
     if (tree.renaming) return;
     onSelectPath(path);
     if (isDir) tree.toggle(path);
     else onOpenFile(path);
+  };
+
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", path);
+    onDragStart?.(path);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!draggingPath || draggingPath === path) return;
+    const targetDir = isDir ? path : path.slice(0, path.lastIndexOf("/")) || rootPath;
+    // Prevent dropping into own subtree
+    if (draggingPath.startsWith(targetDir + "/") || targetDir === draggingPath) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    onDragOverPath?.(targetDir);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const from = e.dataTransfer.getData("text/plain");
+    if (!from) return;
+    const targetDir = isDir ? path : path.slice(0, path.lastIndexOf("/")) || rootPath;
+    if (from.startsWith(targetDir + "/") || targetDir === from) return;
+    onDropOnPath?.(from, targetDir);
+    onDragEnd?.();
   };
 
   return (
@@ -80,7 +121,7 @@ function EntryRowImpl(props: EntryRowProps) {
           >
             <span className="size-3.5 shrink-0" />
             {iconUrl ? (
-              <img src={iconUrl} alt="" className="size-4 shrink-0" />
+              <img src={iconUrl} alt="" title={name} className="size-4 shrink-0" />
             ) : (
               <span className="size-4 shrink-0" />
             )}
@@ -94,11 +135,23 @@ function EntryRowImpl(props: EntryRowProps) {
           <button
             type="button"
             data-fs-path={path}
+            draggable
             onClick={handleClick}
             onDoubleClick={() => !isDir && tree.beginRename(path)}
+            onDragStart={handleDragStart}
+            onDragEnd={onDragEnd}
+            onDragOver={handleDragOver}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                onDragOverPath?.(null);
+              }
+            }}
+            onDrop={handleDrop}
             className={cn(
               "group flex h-6 w-full min-w-0 cursor-pointer items-center gap-2 rounded-sm px-1.5 text-left text-[13px] text-foreground/85 transition-colors hover:bg-accent/70",
               isSelected && "bg-accent text-foreground",
+              isDragging && "opacity-40",
+              isDropTarget && "ring-1 ring-inset ring-primary/60 bg-primary/10",
             )}
             style={{ paddingLeft }}
           >
@@ -116,7 +169,7 @@ function EntryRowImpl(props: EntryRowProps) {
               ) : null}
             </span>
             {iconUrl ? (
-              <img src={iconUrl} alt="" className="size-4 shrink-0" />
+              <img src={iconUrl} alt="" title={name} className="size-4 shrink-0" />
             ) : (
               <span className="size-4 shrink-0" />
             )}

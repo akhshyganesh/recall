@@ -7,6 +7,7 @@ import {
   GitBranchIcon,
   Orbit01Icon,
   PackageIcon,
+  Search01Icon,
   SlidersHorizontalIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -130,6 +131,7 @@ export function SidebarRail({
     { kind: "core", id: "sessions", label: "Sessions", icon: Orbit01Icon },
     { kind: "core", id: "explorer", label: "Files", icon: FolderOpenIcon },
     { kind: "core", id: "extensions", label: "Extensions", icon: PackageIcon },
+    { kind: "core", id: "search", label: "Search", icon: Search01Icon },
   ];
 
   const extItems: ExtRailItem[] = extPanels.map((p) => ({
