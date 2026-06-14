@@ -121,7 +121,7 @@ function EntryRowImpl(props: EntryRowProps) {
           >
             <span className="size-3.5 shrink-0" />
             {iconUrl ? (
-              <img src={iconUrl} alt="" className="size-4 shrink-0" />
+              <img src={iconUrl} alt="" title={name} className="size-4 shrink-0" />
             ) : (
               <span className="size-4 shrink-0" />
             )}
@@ -169,7 +169,7 @@ function EntryRowImpl(props: EntryRowProps) {
               ) : null}
             </span>
             {iconUrl ? (
-              <img src={iconUrl} alt="" className="size-4 shrink-0" />
+              <img src={iconUrl} alt="" title={name} className="size-4 shrink-0" />
             ) : (
               <span className="size-4 shrink-0" />
             )}

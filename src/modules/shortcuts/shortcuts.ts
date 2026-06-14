@@ -19,7 +19,6 @@ export type ShortcutId =
   | "pane.source"
   | "search.focus"
   | "search.project"
-  | "explorer.search"
   | "explorer.focus"
   | "file.quickOpen"
   | "command.palette"
@@ -174,14 +173,6 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Open command palette",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "p" }],
-  },
-  {
-    id: "explorer.search",
-    label: "Search files",
-    group: "Search",
-    // Cmd/Ctrl+Shift+F now opens project search; explorer filename search
-    // remains available via the explorer toolbar button.
-    defaultBindings: [],
   },
   {
     id: "search.project",
