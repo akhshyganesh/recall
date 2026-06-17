@@ -92,11 +92,10 @@ interface TipToastProps {
 
 export function TipToast({ activeTabId, isTerminalTab }: TipToastProps) {
   const showTips = usePreferencesStore((s) => s.showTips);
-  // Track which tab IDs have already been shown a tip this session.
   const shownTabs = useRef<Set<number>>(new Set());
-  const tipIndexRef = useRef(0);
+  const nextSeqIdx = useRef(0);
   const [visible, setVisible] = useState(false);
-  const [tip, setTip] = useState("");
+  const [index, setIndex] = useState(0);
   const [animKey, setAnimKey] = useState(0);
 
   useEffect(() => {
@@ -104,38 +103,74 @@ export function TipToast({ activeTabId, isTerminalTab }: TipToastProps) {
     if (shownTabs.current.has(activeTabId)) return;
 
     shownTabs.current.add(activeTabId);
-    // Pick the next tip in sequence, cycling through the list.
-    const idx = tipIndexRef.current % TIPS.length;
-    tipIndexRef.current += 1;
-    setTip(TIPS[idx]);
+    const idx = nextSeqIdx.current % TIPS.length;
+    nextSeqIdx.current += 1;
+    setIndex(idx);
     setVisible(true);
     setAnimKey((k) => k + 1);
   }, [showTips, activeTabId, isTerminalTab]);
 
   if (!visible) return null;
 
+  const total = TIPS.length;
+  const prev = () => setIndex((i) => (i - 1 + total) % total);
+  const next = () => setIndex((i) => (i + 1) % total);
+
   return (
     <div
       key={animKey}
-      className="fixed top-[52px] right-3 z-40 w-[360px] rounded-lg border border-border/50 bg-card px-4 py-2.5 shadow-lg [animation:ui-fade-in_250ms_ease_both]"
+      className="fixed top-[52px] right-3 z-40 w-[360px] rounded-lg border border-border/50 bg-card shadow-lg [animation:ui-fade-in_250ms_ease_both]"
     >
-      <div className="flex items-start gap-2">
-        <div className="flex items-center gap-1.5 pt-0.5 shrink-0">
-          <HugeiconsIcon icon={Idea01Icon} size={11} strokeWidth={2} className="text-primary" />
-          <span className="text-[9.5px] font-semibold uppercase tracking-wider text-muted-foreground">Tip</span>
-        </div>
-        <p className="flex-1 text-[11px] leading-snug text-foreground/80 line-clamp-2">
-          {tip}
-        </p>
+      {/* Header */}
+      <div className="flex items-center gap-1.5 px-3.5 pt-2.5 pb-1">
+        <HugeiconsIcon icon={Idea01Icon} size={11} strokeWidth={2} className="shrink-0 text-primary" />
+        <span className="text-[9.5px] font-semibold uppercase tracking-wider text-muted-foreground">Tip</span>
+        <span className="flex-1" />
         <button
           type="button"
           onClick={() => setVisible(false)}
-          className="flex shrink-0 size-4 items-center justify-center rounded text-muted-foreground/50 hover:text-foreground pt-0.5"
+          className="flex size-4 items-center justify-center rounded text-muted-foreground/40 hover:text-muted-foreground"
           aria-label="Dismiss tip"
         >
           <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
             <line x1="1" y1="1" x2="7" y2="7" />
             <line x1="7" y1="1" x2="1" y2="7" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Tip text */}
+      <p className="px-3.5 pb-2.5 text-[11.5px] leading-relaxed text-foreground/80 min-h-[2.75rem]">
+        {TIPS[index]}
+      </p>
+
+      {/* Navigation footer */}
+      <div className="flex items-center justify-between border-t border-border/30 px-2.5 py-1.5">
+        <button
+          type="button"
+          onClick={prev}
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-muted-foreground/60 hover:bg-accent/60 hover:text-muted-foreground"
+          aria-label="Previous tip"
+        >
+          <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="6,1 3,4.5 6,8" />
+          </svg>
+          Prev
+        </button>
+
+        <span className="text-[10px] tabular-nums text-muted-foreground/40">
+          {index + 1} / {total}
+        </span>
+
+        <button
+          type="button"
+          onClick={next}
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-muted-foreground/60 hover:bg-accent/60 hover:text-muted-foreground"
+          aria-label="Next tip"
+        >
+          Next
+          <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3,1 6,4.5 3,8" />
           </svg>
         </button>
       </div>
