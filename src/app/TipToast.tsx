@@ -85,45 +85,52 @@ const TIPS = [
   `Swap the sidebar to the right side of the window from Settings → General.`,
 ];
 
-const MAX_DOTS = 5;
-const INTERVAL_MS = 25_000;
+interface TipToastProps {
+  activeTabId: number | null;
+  isTerminalTab: boolean;
+}
 
-export function TipToast() {
+export function TipToast({ activeTabId, isTerminalTab }: TipToastProps) {
   const showTips = usePreferencesStore((s) => s.showTips);
-  const startIdx = useRef(Math.floor(Math.random() * TIPS.length));
-  const [index, setIndex] = useState(startIdx.current);
-  const [dismissed, setDismissed] = useState(false);
+  // Track which tab IDs have already been shown a tip this session.
+  const shownTabs = useRef<Set<number>>(new Set());
+  const tipIndexRef = useRef(0);
+  const [visible, setVisible] = useState(false);
+  const [tip, setTip] = useState("");
   const [animKey, setAnimKey] = useState(0);
 
   useEffect(() => {
-    if (!showTips) return;
-    const id = setInterval(() => {
-      setIndex((i) => (i + 1) % TIPS.length);
-      setDismissed(false);
-      setAnimKey((k) => k + 1);
-    }, INTERVAL_MS);
-    return () => clearInterval(id);
-  }, [showTips]);
+    if (!showTips || !isTerminalTab || activeTabId === null) return;
+    if (shownTabs.current.has(activeTabId)) return;
 
-  if (!showTips || dismissed) return null;
+    shownTabs.current.add(activeTabId);
+    // Pick the next tip in sequence, cycling through the list.
+    const idx = tipIndexRef.current % TIPS.length;
+    tipIndexRef.current += 1;
+    setTip(TIPS[idx]);
+    setVisible(true);
+    setAnimKey((k) => k + 1);
+  }, [showTips, activeTabId, isTerminalTab]);
 
-  const total = TIPS.length;
-  const showDots = total <= MAX_DOTS;
+  if (!visible) return null;
 
   return (
     <div
       key={animKey}
-      className="fixed top-[52px] right-3 z-40 max-w-[280px] rounded-xl border border-border/50 bg-card px-4 py-3 shadow-lg [animation:ui-fade-in_250ms_ease_both]"
+      className="fixed top-[52px] right-3 z-40 w-[360px] rounded-lg border border-border/50 bg-card px-4 py-2.5 shadow-lg [animation:ui-fade-in_250ms_ease_both]"
     >
-      <div className="mb-1.5 flex items-center gap-1.5">
-        <HugeiconsIcon icon={Idea01Icon} size={12} strokeWidth={2} className="shrink-0 text-primary" />
-        <span className="flex-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-          Tip
-        </span>
+      <div className="flex items-start gap-2">
+        <div className="flex items-center gap-1.5 pt-0.5 shrink-0">
+          <HugeiconsIcon icon={Idea01Icon} size={11} strokeWidth={2} className="text-primary" />
+          <span className="text-[9.5px] font-semibold uppercase tracking-wider text-muted-foreground">Tip</span>
+        </div>
+        <p className="flex-1 text-[11px] leading-snug text-foreground/80 line-clamp-2">
+          {tip}
+        </p>
         <button
           type="button"
-          onClick={() => setDismissed(true)}
-          className="flex size-4 items-center justify-center rounded text-muted-foreground/60 transition-colors hover:text-foreground"
+          onClick={() => setVisible(false)}
+          className="flex shrink-0 size-4 items-center justify-center rounded text-muted-foreground/50 hover:text-foreground pt-0.5"
           aria-label="Dismiss tip"
         >
           <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
@@ -131,31 +138,6 @@ export function TipToast() {
             <line x1="7" y1="1" x2="1" y2="7" />
           </svg>
         </button>
-      </div>
-
-      <p className="text-[11.5px] leading-relaxed text-foreground/85">
-        {TIPS[index]}
-      </p>
-
-      <div className="mt-2.5 flex items-center justify-center">
-        {showDots ? (
-          <div className="flex gap-1">
-            {TIPS.map((_, i) => (
-              <div
-                key={i}
-                className={
-                  i === index
-                    ? "size-1.5 rounded-full bg-primary"
-                    : "size-1.5 rounded-full border border-muted-foreground/30"
-                }
-              />
-            ))}
-          </div>
-        ) : (
-          <span className="text-[10px] tabular-nums text-muted-foreground/50">
-            {index + 1} / {total}
-          </span>
-        )}
       </div>
     </div>
   );

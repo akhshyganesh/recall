@@ -1121,7 +1121,7 @@ export default function App() {
             cancelRunningClose={cancelRunningClose}
           />
 
-          <TipToast />
+          <TipToast activeTabId={activeId} isTerminalTab={isTerminalTab} />
         </div>
       </TooltipProvider>
       {/* Extension background components (portals, overlays, global listeners) */}

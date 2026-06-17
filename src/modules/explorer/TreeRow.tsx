@@ -148,7 +148,7 @@ function EntryRowImpl(props: EntryRowProps) {
             }}
             onDrop={handleDrop}
             className={cn(
-              "group flex h-6 w-full min-w-0 cursor-pointer items-center gap-2 rounded-sm px-1.5 text-left text-[13px] text-foreground/85 transition-colors hover:bg-accent/70",
+              "group flex h-6 w-full min-w-0 cursor-pointer items-center gap-2 rounded-sm px-1.5 text-left text-[13px] text-foreground/85 hover:bg-accent/70",
               isSelected && "bg-accent text-foreground",
               isDragging && "opacity-40",
               isDropTarget && "ring-1 ring-inset ring-primary/60 bg-primary/10",
