@@ -144,9 +144,9 @@ function termOptions() {
 }
 
 // FitAddon.fit() subtracts DEFAULT_SCROLL_BAR_WIDTH (14px) from available width
-// to leave room for the Monaco scrollbar. Since we hide the scrollbar via CSS,
-// those 14px become dead space. This replacement computes dims without that
-// subtraction so the terminal fills the full container edge-to-edge.
+// to reserve space for the Monaco scrollbar. Since we hide the scrollbar via
+// CSS, those 14px would show as dead space. We use clientWidth/clientHeight
+// (integer layout pixels) for a precise fill without that reservation.
 function fitSlot(slot: Slot): void {
   const { term } = slot;
   if (!term.element?.parentElement) {
@@ -160,18 +160,17 @@ function fitSlot(slot: Slot): void {
     slot.fitAddon.fit();
     return;
   }
-  const parentStyle = window.getComputedStyle(term.element.parentElement);
-  const parentW = parseFloat(parentStyle.getPropertyValue("width"));
-  const parentH = parseFloat(parentStyle.getPropertyValue("height"));
-  const termStyle = window.getComputedStyle(term.element);
-  const padHor =
-    parseFloat(termStyle.getPropertyValue("padding-left")) +
-    parseFloat(termStyle.getPropertyValue("padding-right"));
-  const padVer =
-    parseFloat(termStyle.getPropertyValue("padding-top")) +
-    parseFloat(termStyle.getPropertyValue("padding-bottom"));
-  const cols = Math.max(2, Math.floor((parentW - padHor) / dims.css.cell.width));
-  const rows = Math.max(1, Math.floor((parentH - padVer) / dims.css.cell.height));
+  // clientWidth/clientHeight return integer CSS px values that precisely match
+  // the actual layout box, avoiding sub-pixel drift from getComputedStyle.
+  const parent = term.element.parentElement;
+  const containerW = parent.clientWidth;
+  const containerH = parent.clientHeight;
+  if (containerW === 0 || containerH === 0) {
+    slot.fitAddon.fit();
+    return;
+  }
+  const cols = Math.max(2, Math.floor(containerW / dims.css.cell.width));
+  const rows = Math.max(1, Math.floor(containerH / dims.css.cell.height));
   if (term.cols !== cols || term.rows !== rows) {
     core._renderService.clear();
     term.resize(cols, rows);

@@ -180,6 +180,7 @@ html[data-chrome="borderless"] #settings-root {
 .xterm-viewport {
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
+  overflow-x: hidden !important;
 }
 .xterm .xterm-viewport::-webkit-scrollbar,
 .xterm-viewport::-webkit-scrollbar {
@@ -224,6 +225,20 @@ html[data-chrome="borderless"] #settings-root {
 :is(.dark *) .cm-searchMatch.cm-searchMatch-selected {
   background: rgba(120, 100, 230, 0.58) !important;
   outline: 2px solid rgba(170, 150, 255, 0.95) !important;
+}
+
+/*
+ * On Linux (WebKitGTK), CSS transitions cause synchronous CPU repaints on
+ * every hover/click event. With 50+ file-explorer rows and many tab triggers
+ * all carrying `transition-colors`, interaction feels sluggish. Disabling
+ * transitions makes clicks and hovers respond instantly on Ubuntu.
+ * Animations are kept but clamped to 1ms so Radix popover/menu open animations
+ * don't flicker but also don't add perceived latency.
+ */
+[data-platform="linux"] * {
+  transition: none !important;
+  animation-duration: 1ms !important;
+  animation-delay: 0ms !important;
 }
 
 .no-scrollbar {

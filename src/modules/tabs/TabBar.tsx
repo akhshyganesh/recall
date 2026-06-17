@@ -325,7 +325,7 @@ export function TabBar({
                           position: "relative",
                         }}
                         className={cn(
-                          "group h-full! flex-none! shrink-0 justify-between! gap-1.5! rounded-none! border-x-0! border-t-0! border-b-2! text-[11.5px]! font-medium! transition-colors! duration-100!",
+                          "group h-full! flex-none! shrink-0 justify-between! gap-1.5! rounded-none! border-x-0! border-t-0! border-b-2! text-[11.5px]! font-medium!",
                           t.id === activeId
                             ? "border-b-primary! text-foreground! bg-transparent!"
                             : "border-b-transparent! text-muted-foreground/65 hover:text-muted-foreground! hover:bg-sidebar-accent/40!",
@@ -394,7 +394,7 @@ export function TabBar({
                               e.stopPropagation();
                               onClose(t.id);
                             }}
-                            className="rounded-sm p-0.5 opacity-0 transition-opacity duration-100 hover:bg-accent hover:text-foreground hover:opacity-100 group-hover:opacity-50"
+                            className="rounded-sm p-0.5 opacity-0 hover:bg-accent hover:text-foreground hover:opacity-100 group-hover:opacity-50"
                           >
                             <HugeiconsIcon
                               icon={Cancel01Icon}
