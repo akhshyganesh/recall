@@ -2,7 +2,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { ThemePref } from "@/modules/settings/store";
-import { setShowHidden, setCheckForUpdates, setZoomLevel } from "@/modules/settings/store";
+import { setShowHidden, setCheckForUpdates, setZoomLevel, setShowTips } from "@/modules/settings/store";
 import { useTheme } from "@/modules/theme";
 import {
   ComputerIcon,
@@ -224,6 +224,7 @@ export function GeneralSection() {
   const { theme, setTheme } = useTheme();
   const showHidden = usePreferencesStore((s) => s.showHidden);
   const checkForUpdates = usePreferencesStore((s) => s.checkForUpdates);
+  const showTips = usePreferencesStore((s) => s.showTips);
 
   return (
     <div className="flex flex-col">
@@ -296,6 +297,15 @@ export function GeneralSection() {
           <Switch
             checked={checkForUpdates}
             onCheckedChange={(v) => void setCheckForUpdates(v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Show tips"
+          description="Display rotating tips in the top-right corner of the workspace."
+        >
+          <Switch
+            checked={showTips}
+            onCheckedChange={(v) => void setShowTips(v)}
           />
         </SettingRow>
       </SettingsCard>

@@ -52,6 +52,8 @@ export type Preferences = {
   accentHue: number;
   /** OpenRouter API key for AI features. */
   openRouterApiKey: string;
+  /** Show rotating tips toaster in the top-right corner. */
+  showTips: boolean;
 };
 
 const STORE_PATH = "recall-settings.json";
@@ -73,6 +75,7 @@ const KEY_ZOOM_LEVEL = "zoomLevel";
 const KEY_SHORTCUTS = "shortcuts";
 const KEY_ACCENT_HUE = "accentHue";
 const KEY_OPEN_ROUTER_API_KEY = "openRouterApiKey";
+const KEY_SHOW_TIPS = "showTips";
 
 export const TERMINAL_FONT_SIZE_DEFAULT = 14;
 export const TERMINAL_FONT_SIZE_MIN = 8;
@@ -113,6 +116,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   shortcuts: {} as Record<ShortcutId, KeyBinding[]>,
   accentHue: 300,
   openRouterApiKey: "",
+  showTips: true,
 };
 
 const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
@@ -174,6 +178,7 @@ export async function loadPreferences(): Promise<Preferences> {
     zoomLevel: get<number>(KEY_ZOOM_LEVEL) ?? DEFAULT_PREFERENCES.zoomLevel,
     accentHue: get<number>(KEY_ACCENT_HUE) ?? DEFAULT_PREFERENCES.accentHue,
     openRouterApiKey: get<string>(KEY_OPEN_ROUTER_API_KEY) ?? DEFAULT_PREFERENCES.openRouterApiKey,
+    showTips: get<boolean>(KEY_SHOW_TIPS) ?? DEFAULT_PREFERENCES.showTips,
     shortcuts:
       get<Record<ShortcutId, KeyBinding[]>>(KEY_SHORTCUTS) ??
       DEFAULT_PREFERENCES.shortcuts,
@@ -260,6 +265,10 @@ export async function setOpenRouterApiKey(value: string): Promise<void> {
   await writePref(KEY_OPEN_ROUTER_API_KEY, value.trim());
 }
 
+export async function setShowTips(value: boolean): Promise<void> {
+  await writePref(KEY_SHOW_TIPS, value);
+}
+
 export async function setShortcuts(
   value: Record<ShortcutId, KeyBinding[]> | {},
 ): Promise<void> {
@@ -285,6 +294,7 @@ export async function importPreferences(prefs: Partial<Preferences>): Promise<vo
   if (prefs.zoomLevel !== undefined) writes.push(writePref(KEY_ZOOM_LEVEL, prefs.zoomLevel));
   if (prefs.accentHue !== undefined) writes.push(writePref(KEY_ACCENT_HUE, prefs.accentHue));
   if (prefs.openRouterApiKey !== undefined) writes.push(writePref(KEY_OPEN_ROUTER_API_KEY, prefs.openRouterApiKey));
+  if (prefs.showTips !== undefined) writes.push(writePref(KEY_SHOW_TIPS, prefs.showTips));
   if (prefs.shortcuts !== undefined) writes.push(writePref(KEY_SHORTCUTS, prefs.shortcuts));
   await Promise.all(writes);
 }
@@ -318,6 +328,7 @@ export async function onPreferencesChange(
     [KEY_SHORTCUTS]: "shortcuts",
     [KEY_ACCENT_HUE]: "accentHue",
     [KEY_OPEN_ROUTER_API_KEY]: "openRouterApiKey",
+    [KEY_SHOW_TIPS]: "showTips",
   };
   // Same-process writes still fire onChange immediately; cross-window writes
   // arrive via the Tauri event emitted by writePref().

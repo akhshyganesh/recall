@@ -86,6 +86,7 @@ import { useSplitView } from "./useSplitView";
 import { useTabClosing } from "./useTabClosing";
 import { useWorkspaceBootstrap } from "./useWorkspaceBootstrap";
 import { WorkspaceSurface } from "./WorkspaceSurface";
+import { TipToast } from "./TipToast";
 
 const SettingsPanel = lazy(() =>
   import("@/settings/SettingsApp").then((m) => ({ default: m.SettingsPanel })),
@@ -1119,6 +1120,8 @@ export default function App() {
             confirmRunningClose={confirmRunningClose}
             cancelRunningClose={cancelRunningClose}
           />
+
+          <TipToast />
         </div>
       </TooltipProvider>
       {/* Extension background components (portals, overlays, global listeners) */}

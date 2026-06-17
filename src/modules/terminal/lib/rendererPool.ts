@@ -143,6 +143,41 @@ function termOptions() {
   };
 }
 
+// FitAddon.fit() subtracts DEFAULT_SCROLL_BAR_WIDTH (14px) from available width
+// to leave room for the Monaco scrollbar. Since we hide the scrollbar via CSS,
+// those 14px become dead space. This replacement computes dims without that
+// subtraction so the terminal fills the full container edge-to-edge.
+function fitSlot(slot: Slot): void {
+  const { term } = slot;
+  if (!term.element?.parentElement) {
+    slot.fitAddon.fit();
+    return;
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const core = (term as any)._core;
+  const dims = core?._renderService?.dimensions;
+  if (!dims || dims.css.cell.width === 0 || dims.css.cell.height === 0) {
+    slot.fitAddon.fit();
+    return;
+  }
+  const parentStyle = window.getComputedStyle(term.element.parentElement);
+  const parentW = parseFloat(parentStyle.getPropertyValue("width"));
+  const parentH = parseFloat(parentStyle.getPropertyValue("height"));
+  const termStyle = window.getComputedStyle(term.element);
+  const padHor =
+    parseFloat(termStyle.getPropertyValue("padding-left")) +
+    parseFloat(termStyle.getPropertyValue("padding-right"));
+  const padVer =
+    parseFloat(termStyle.getPropertyValue("padding-top")) +
+    parseFloat(termStyle.getPropertyValue("padding-bottom"));
+  const cols = Math.max(2, Math.floor((parentW - padHor) / dims.css.cell.width));
+  const rows = Math.max(1, Math.floor((parentH - padVer) / dims.css.cell.height));
+  if (term.cols !== cols || term.rows !== rows) {
+    core._renderService.clear();
+    term.resize(cols, rows);
+  }
+}
+
 function createSlot(): Slot {
   const term = new Terminal(termOptions());
   const fitAddon = new FitAddon();
@@ -358,7 +393,7 @@ function bindSlot(slot: Slot, p: AcquireParams): void {
   slot.oscDisposers = p.registerOsc(slot.term);
 
   setupResizeObserver(slot, p);
-  slot.fitAddon.fit();
+  fitSlot(slot);
   slot.lastCols = slot.term.cols;
   slot.lastRows = slot.term.rows;
   slot.lastW = p.container.clientWidth;
@@ -411,7 +446,7 @@ function rewireSlot(slot: Slot, p: AcquireParams): void {
     p.container.appendChild(slot.host);
   }
   setupResizeObserver(slot, p);
-  slot.fitAddon.fit();
+  fitSlot(slot);
   slot.lastW = p.container.clientWidth;
   slot.lastH = p.container.clientHeight;
   if (slot.term.cols !== p.cols || slot.term.rows !== p.rows) {
@@ -450,7 +485,7 @@ function setupResizeObserver(slot: Slot, p: AcquireParams): void {
       if (w === slot.lastW && h === slot.lastH) return;
       slot.lastW = w;
       slot.lastH = h;
-      slot.fitAddon.fit();
+      fitSlot(slot);
       if (slot.ptyTimer) clearTimeout(slot.ptyTimer);
       slot.ptyTimer = setTimeout(flushPty, PTY_RESIZE_DEBOUNCE_MS);
     }, FIT_DEBOUNCE_MS);
@@ -621,7 +656,7 @@ export function applyFontSize(size: number): void {
   for (const slot of slots) {
     if (slot.term.options.fontSize === size) continue;
     slot.term.options.fontSize = size;
-    slot.fitAddon.fit();
+    fitSlot(slot);
     if (slot.currentLeafId !== null) {
       slot.lastCols = slot.term.cols;
       slot.lastRows = slot.term.rows;
@@ -635,7 +670,7 @@ export function applyLetterSpacing(spacing: number): void {
   for (const slot of slots) {
     if (slot.term.options.letterSpacing === spacing) continue;
     slot.term.options.letterSpacing = spacing;
-    slot.fitAddon.fit();
+    fitSlot(slot);
   }
 }
 
@@ -644,7 +679,7 @@ export function applyFontFamily(family: string): void {
   for (const slot of slots) {
     if (slot.term.options.fontFamily === resolved) continue;
     slot.term.options.fontFamily = resolved;
-    slot.fitAddon.fit();
+    fitSlot(slot);
     if (slot.currentLeafId !== null) {
       slot.lastCols = slot.term.cols;
       slot.lastRows = slot.term.rows;
